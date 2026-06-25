@@ -55,6 +55,8 @@
     company-intelligence-analyst.toml
     market-sentiment-analyzer.toml
     match-strategist.toml
+    learning-path-strategist.toml
+    personal-branding-strategist.toml
     resume-architect.toml
     factual-reviewer.toml
 ```
@@ -79,6 +81,8 @@ User Input
   -> CompanyIntelligenceAnalyst
   -> MarketSentimentAnalyzer
   -> MatchStrategist
+  -> LearningPathStrategist
+  -> PersonalBrandingStrategist
   -> ResumeArchitect
   -> FactualReviewer
   -> Final Decision Package
@@ -89,7 +93,11 @@ User Input
 - 只分析简历：`ProfileExtractor -> ResumeArchitect -> FactualReviewer`
 - 只分析岗位：`JDAnalyzer -> CompanyIntelligenceAnalyst -> MarketSentimentAnalyzer`
 - 目标岗位定制简历：完整流程
-- 找岗位：`ProfileExtractor -> JobScout -> JDAnalyzer -> MatchStrategist`
+- 找岗位：`ProfileExtractor -> JobScout -> JDAnalyzer -> MatchStrategist -> LearningPathStrategist`
+
+这个 pipeline 不应只做静态匹配。对于有潜力但当前条件不完全满足的用户，系统应输出一条“成长型匹配”路线：先学习、补项目、补证据，再决定是否投递和如何包装简历。例如用户会 Python、Java 和工程基础，但缺少 LLM 相关知识时，不应简单判定“不匹配 LLM 应用岗”，而应给出可执行的 AI / LLM 学习路径、项目建议、产出证据和简历转化方式。
+
+同时，pipeline 也应包含“个人包装”能力。不同专业和行业看待候选人的方式不同：计算机相关岗位常需要 GitHub、项目 demo、技术博客、个人网站或开源贡献作为展示；设计岗位更重作品集；科研岗位更重论文、主页和 Google Scholar；产品和运营岗位更重案例、数据结果和业务分析。因此系统应根据目标行业设计个人展示面，而不是只改一份简历。
 
 ## 5. 角色设计
 
@@ -414,7 +422,134 @@ User Input
 - 不做最终简历改写。
 - 不替用户做人生选择，只给可解释建议。
 
-### 5.8 ResumeArchitect
+### 5.8 LearningPathStrategist
+
+学习路径策略师。负责回答：“如果用户现在还不完全匹配目标岗位，应该补什么、怎么补、补到什么证据级别后再投？”
+
+这个角色解决一个关键问题：求职推荐不应只基于用户现有条件做静态筛选。很多用户具备可迁移基础，例如会 Python、Java、后端开发、数据处理、科研实验或工程部署，但缺少目标岗位中的某一块知识。系统应该识别这些可迁移能力，给出短期可执行的学习和项目路径，再把真实完成的成果转化为简历材料。
+
+输入：
+
+- 候选人画像。
+- 岗位分析。
+- 匹配差距。
+- 公司和行业趋势。
+- 用户可投入时间，例如 1 周、2 周、1 个月、3 个月。
+- 用户偏好，例如工程、算法、产品、研究、数据、全栈。
+
+工作方面：
+
+- 差距分层：硬门槛差距、技能差距、项目证据差距、叙事差距。
+- 可迁移能力识别：已有语言、工程、数据、论文、业务、系统设计能力能否迁移到目标岗位。
+- 学习优先级：先补最影响投递转化率的知识，而不是列一个泛泛课程清单。
+- 学习路径设计：按 7 天、14 天、30 天、90 天给出具体路线。
+- 项目化建议：学习必须转化为可展示项目、demo、GitHub、报告、博客、实验结果或部署链接。
+- 简历转化规则：只有真实完成、能解释、能展示、能被追问的学习成果才允许写进简历。
+- 岗位再选择：如果短期无法补齐，则推荐更合理的过渡岗位或相邻岗位。
+- 面试可防御性：学习路径中每个成果都要能回答“为什么做、怎么做、效果如何、局限是什么”。
+
+示例：
+
+用户会 Python、Java、Web 后端和数据库，但 LLM 经验不足，目标是 LLM 应用工程师。该角色不应直接推荐放弃，而应输出：
+
+- 先学：prompt engineering、RAG、embedding、向量数据库、function calling / tool use、LLM eval、API 成本与延迟优化。
+- 再做：一个可部署的 RAG 问答项目，包含文档解析、chunking、retrieval、reranking、回答引用、评测集和错误分析。
+- 再包装：把原有后端能力与 LLM 应用结合，写成“构建可评测、可部署的 LLM 应用系统”，而不是空泛写“熟悉大模型”。
+- 再投递：优先投 LLM 应用工程、AI 产品工程、RAG 工程、Agent 工具链实习，而不是一开始冲纯算法研究岗。
+
+输出：
+
+```json
+{
+  "gap_taxonomy": {
+    "hard_blockers": [],
+    "learnable_gaps": [],
+    "evidence_gaps": [],
+    "narrative_gaps": []
+  },
+  "transferable_strengths": [],
+  "learning_plan": {
+    "7_days": [],
+    "14_days": [],
+    "30_days": [],
+    "90_days": []
+  },
+  "project_recommendations": [],
+  "resume_conversion": [],
+  "ready_to_apply_when": [],
+  "alternative_roles": []
+}
+```
+
+禁止事项：
+
+- 不建议把“正在学习”包装成“熟练掌握”。
+- 不把没有完成的课程、项目或实验写成简历成果。
+- 不推荐和目标岗位无关的泛泛学习清单。
+- 不让用户为了热门方向强行转向完全不适合的岗位。
+- 不承诺学习后一定获得 offer。
+
+### 5.9 PersonalBrandingStrategist
+
+个人包装策略师。负责回答：“除了简历之外，用户应该用哪些外部展示资产证明自己？”
+
+这个角色不只是“美化人设”，而是根据目标行业、岗位类型和候选人基础，设计一套可被招聘方快速验证的个人展示面。不同专业和行业的评价方式不同，计算机、设计、科研、产品、运营、金融、咨询等方向需要展示的证据形态不同。
+
+输入：
+
+- 候选人画像。
+- 目标岗位和行业。
+- 用户已有外部资产，例如 GitHub、个人网站、博客、论文主页、作品集、LinkedIn、脉脉、公众号、Notion、Behance。
+- 学习路径和项目建议。
+- 用户隐私偏好。
+
+工作方面：
+
+- 行业展示标准判断：不同岗位需要哪些展示资产。
+- GitHub 包装：适用于计算机、AI、数据、后端、前端、开源、工具链岗位。
+- 个人网站设计：适用于需要综合展示项目、研究、作品、博客、联系方式的候选人。
+- 作品集设计：适用于设计、产品、内容、运营、数据分析、咨询案例等方向。
+- 技术博客/项目文档：把学习路径和项目结果沉淀成可读证据。
+- LinkedIn / 脉脉 / 个人主页优化：统一 title、summary、项目描述、关键词。
+- 资产优先级：根据目标岗位判断先做 GitHub、个人网站、作品集，还是先改简历。
+- 可信度设计：每个展示资产都要有真实项目、代码、截图、demo、实验报告或案例支撑。
+- 隐私与边界：隐藏个人敏感信息、内部项目细节、未公开客户信息。
+
+按行业的展示建议：
+
+- 计算机 / AI / 数据岗位：GitHub、项目 README、demo 链接、技术博客、个人网站、开源贡献。
+- 前端 / 全栈岗位：个人网站、在线 demo、组件库、项目截图、性能优化说明。
+- 设计岗位：作品集网站、Behance / Dribbble、设计过程、用户研究和落地结果。
+- 产品岗位：产品案例、PRD 摘要、竞品分析、增长实验、指标结果。
+- 运营 / 市场岗位：活动案例、内容作品、数据复盘、增长指标、渠道策略。
+- 科研岗位：个人学术主页、Google Scholar、论文、代码复现、实验报告。
+- 金融 / 咨询岗位：项目案例、行业研究、建模文件摘要、商业分析报告。
+
+输出：
+
+```json
+{
+  "branding_strategy": "",
+  "recommended_assets": [],
+  "asset_priority": [],
+  "github_plan": {},
+  "personal_website_plan": {},
+  "portfolio_plan": {},
+  "profile_copy": {},
+  "privacy_checks": [],
+  "done_definition": []
+}
+```
+
+禁止事项：
+
+- 不把个人包装变成虚假人设。
+- 不建议展示未完成、不可解释或无法证明的项目。
+- 不公开隐私信息、内部资料或违反 NDA 的材料。
+- 不把所有行业都套用同一套 GitHub / 个人网站模板。
+- 不为了视觉包装牺牲内容真实性。
+
+### 5.10 ResumeArchitect
 
 简历架构师。负责回答：“如何把真实经历组织成最适合这个岗位的表达？”
 
@@ -457,7 +592,7 @@ User Input
 - 不为了 ATS 牺牲可读性。
 - 不绕过 FactualReviewer。
 
-### 5.9 FactualReviewer
+### 5.11 FactualReviewer
 
 事实与风险审查员。负责回答：“这份简历和建议是否真实、合规、可防御？”
 
@@ -643,10 +778,12 @@ User Input
 4. 外界评价与市场风向
 5. 人岗匹配与差距分析
 6. 投递优先级
-7. 简历设计方案
-8. 简历改写草稿
-9. 风险审查结果
-10. 面试准备建议
+7. 学习路径与能力补齐方案
+8. 个人展示与包装方案
+9. 简历设计方案
+10. 简历改写草稿
+11. 风险审查结果
+12. 面试准备建议
 ```
 
 示例结构：
@@ -658,6 +795,8 @@ User Input
   "company_intelligence": {},
   "market_sentiment": {},
   "fit_analysis": {},
+  "learning_plan": {},
+  "personal_branding": {},
   "resume_plan": {},
   "resume_draft": "",
   "factual_review": {},
@@ -684,6 +823,8 @@ ProfileExtractor
   -> CompanyIntelligenceAnalyst
   -> MarketSentimentAnalyzer
   -> MatchStrategist
+  -> LearningPathStrategist
+  -> PersonalBrandingStrategist
   -> ResumeArchitect
   -> FactualReviewer
 ```
@@ -694,6 +835,8 @@ MVP 输出：
 - 岗位拆解。
 - 公司与风向摘要。
 - 匹配分和投递优先级。
+- 学习路径和能力补齐建议。
+- GitHub、个人网站、作品集等个人展示建议。
 - 简历结构建议。
 - 针对岗位的简历草稿。
 - 风险审查清单。
@@ -703,6 +846,8 @@ MVP 验收标准：
 - 所有强判断必须有来源或用户材料依据。
 - 简历改写不能引入无证据事实。
 - 岗位匹配必须区分硬门槛和软匹配。
+- 对于可学习差距，必须给出具体学习路径、项目产出和可写入简历的证据标准。
+- 对于需要外部展示的行业，必须说明推荐展示资产和完成标准。
 - 公司评价必须带置信度。
 - 输出能让用户明确知道下一步该做什么。
 
@@ -747,7 +892,31 @@ MVP 验收标准：
 - 根据公司业务生成业务理解题。
 - 根据项目经历生成 STAR 故事。
 
-### 10.5 Plugin 分发
+### 10.5 Learning Roadmap 扩展
+
+增加面向目标岗位的学习路线生成：
+
+- 从岗位群中抽取高频技能差距。
+- 根据用户已有基础识别可迁移能力。
+- 生成 7 天、14 天、30 天、90 天学习路线。
+- 将学习任务转化为可展示项目。
+- 输出“完成到什么程度才可以写进简历”的证据标准。
+- 生成学习后的简历 bullet 草稿，但必须经过 FactualReviewer 审查。
+
+### 10.6 Personal Branding 扩展
+
+增加个人展示资产生成和审查：
+
+- GitHub profile README。
+- 项目 README 模板。
+- 个人网站结构。
+- 作品集目录。
+- LinkedIn / 脉脉 summary。
+- 技术博客选题。
+- 项目 demo 展示清单。
+- 隐私和 NDA 风险检查。
+
+### 10.7 Plugin 分发
 
 当 skill 和 subagents 稳定后，可以打包为 Codex plugin：
 
@@ -773,5 +942,7 @@ codex-career-plugin/
 4. 不抓取未授权个人简历。
 5. 不把匿名情绪当事实。
 6. 不为提高匹配度编造经历。
-7. 先做本地 Codex workflow，再考虑 plugin 化。
-
+7. 不把未完成的学习或项目包装成既有成果。
+8. 对可学习差距给出成长路径，而不是只做静态岗位过滤。
+9. 根据行业设计个人展示资产，不把所有人都套进同一套包装模板。
+10. 先做本地 Codex workflow，再考虑 plugin 化。
