@@ -23,6 +23,18 @@ TASK_TYPES = {
     "learning_plan",
 }
 
+ROUTES = {
+    "single_job_scout": ["job-scout"],
+    "job_search": [
+        "major-cluster-classifier",
+        "profile-extractor",
+        "job-scout",
+        "jd-analyzer",
+        "match-strategist",
+        "learning-path-strategist",
+    ],
+}
+
 
 def write_json(path: Path, payload: dict[str, Any]) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -405,61 +417,69 @@ def simulate(args: argparse.Namespace) -> dict[str, Any]:
     context = build_context_packet(run_id, profile_ref, context_ref, profile, args.task_type)
     write_json(context_path, {"runtime_context_packet": context})
 
-    target_agent = "job-scout"
-    injection_path = run_dir / "injections" / f"{target_agent}.secondary_prompt_injection.json"
-    input_packet_path = run_dir / "invocations" / f"{target_agent}.input_packet.json"
-    allowed_facts_path = run_dir / "invocations" / f"{target_agent}.allowed_user_facts.json"
-    invocation_path = run_dir / "invocations" / f"{target_agent}.invocation.json"
-    role_output_path = run_dir / "agents" / target_agent / "output.json"
+    target_agents = ROUTES[args.route]
+    injection_paths: list[Path] = []
+    invocation_paths: list[Path] = []
+    generated_role_output_paths: list[tuple[str, Path]] = []
 
-    injection = build_injection(
-        run_id,
-        target_agent,
-        context_ref,
-        rel(injection_path, run_dir),
-        rel(input_packet_path, run_dir),
-        rel(allowed_facts_path, run_dir),
-        rel(role_output_path, run_dir),
-    )
-    write_json(injection_path, {"secondary_prompt_injection": injection})
-    write_json(input_packet_path, build_input_packet(run_id, target_agent, context_ref, rel(injection_path, run_dir)))
-    write_json(
-        allowed_facts_path,
-        {
-            "allowed_user_facts": [
-                fact
-                for fact in context["known_user_facts"]
-                if fact["field"] in {"major_name", "grade_or_year", "skill"}
-            ]
-        },
-    )
-    invocation = build_invocation(injection)
-    write_json(invocation_path, invocation)
+    for target_agent in target_agents:
+        injection_path = run_dir / "injections" / f"{target_agent}.secondary_prompt_injection.json"
+        input_packet_path = run_dir / "invocations" / f"{target_agent}.input_packet.json"
+        allowed_facts_path = run_dir / "invocations" / f"{target_agent}.allowed_user_facts.json"
+        invocation_path = run_dir / "invocations" / f"{target_agent}.invocation.json"
+        role_output_path = run_dir / "agents" / target_agent / "output.json"
 
-    role_output = {
-        "role_output_packet": {
-            "invocation_id": invocation["subagent_invocation"]["invocation_id"],
-            "target_agent": target_agent,
-            "status": "blocked",
-            "role_output_ref": rel(role_output_path, run_dir),
-            "evidence_packet_refs": [],
-            "runtime_weights_ref": "merge/runtime_weights.json",
-            "artifact_refs": [],
-            "blocked_outputs": ["fit_score", "application_strategy", "final_resume_draft"],
-            "runtime_research_tasks": context["public_research_needed"],
-            "needs_user_confirmation": context["missing_user_owned_facts"],
-            "handoff_to": ["career-orchestrator"],
-            "errors": [
-                {
-                    "category": "missing_user_fact",
-                    "severity": "blocking",
-                    "message": "Simulation keeps user-owned facts and public evidence incomplete.",
-                }
-            ],
-            "confidence": "low",
+        injection = build_injection(
+            run_id,
+            target_agent,
+            context_ref,
+            rel(injection_path, run_dir),
+            rel(input_packet_path, run_dir),
+            rel(allowed_facts_path, run_dir),
+            rel(role_output_path, run_dir),
+        )
+        write_json(injection_path, {"secondary_prompt_injection": injection})
+        write_json(input_packet_path, build_input_packet(run_id, target_agent, context_ref, rel(injection_path, run_dir)))
+        write_json(
+            allowed_facts_path,
+            {
+                "allowed_user_facts": [
+                    fact
+                    for fact in context["known_user_facts"]
+                    if fact["field"] in {"major_name", "grade_or_year", "skill"}
+                ]
+            },
+        )
+        invocation = build_invocation(injection)
+        write_json(invocation_path, invocation)
+
+        role_output = {
+            "role_output_packet": {
+                "invocation_id": invocation["subagent_invocation"]["invocation_id"],
+                "target_agent": target_agent,
+                "status": "blocked",
+                "role_output_ref": rel(role_output_path, run_dir),
+                "evidence_packet_refs": [],
+                "runtime_weights_ref": "merge/runtime_weights.json",
+                "artifact_refs": [],
+                "blocked_outputs": ["fit_score", "application_strategy", "final_resume_draft"],
+                "runtime_research_tasks": context["public_research_needed"],
+                "needs_user_confirmation": context["missing_user_owned_facts"],
+                "handoff_to": ["career-orchestrator"],
+                "errors": [
+                    {
+                        "category": "missing_user_fact",
+                        "severity": "blocking",
+                        "message": "Simulation keeps user-owned facts and public evidence incomplete.",
+                    }
+                ],
+                "confidence": "low",
+            }
         }
-    }
-    write_json(role_output_path, role_output)
+        write_json(role_output_path, role_output)
+        injection_paths.append(injection_path)
+        invocation_paths.append(invocation_path)
+        generated_role_output_paths.append((target_agent, role_output_path))
 
     runtime_weights_path = run_dir / "merge" / "runtime_weights.json"
     write_json(
@@ -584,14 +604,17 @@ def simulate(args: argparse.Namespace) -> dict[str, Any]:
             "user_private",
             contains_private_resume=True,
         ),
-        artifact_ref(run_id, run_dir, injection_path, "secondary_prompt_injection", "career-orchestrator"),
-        artifact_ref(run_id, run_dir, input_packet_path, "subagent_input", "career-orchestrator"),
-        artifact_ref(run_id, run_dir, invocation_path, "subagent_input", "career-orchestrator"),
-        artifact_ref(run_id, run_dir, role_output_path, "subagent_output", target_agent),
         artifact_ref(run_id, run_dir, runtime_weights_path, "merge_result", "career-orchestrator"),
         artifact_ref(run_id, run_dir, error_path, "merge_result", "career-orchestrator"),
         artifact_ref(run_id, run_dir, blocked_path, "final_package", "career-orchestrator"),
     ]
+    for path in injection_paths:
+        artifact_refs.append(artifact_ref(run_id, run_dir, path, "secondary_prompt_injection", "career-orchestrator"))
+    for path in invocation_paths:
+        artifact_refs.append(artifact_ref(run_id, run_dir, path, "subagent_input", "career-orchestrator"))
+    for target_agent, path in generated_role_output_paths:
+        artifact_refs.append(artifact_ref(run_id, run_dir, path, "subagent_output", target_agent))
+
     manifest = {
         "execution_manifest": {
             "run_id": run_id,
@@ -606,8 +629,8 @@ def simulate(args: argparse.Namespace) -> dict[str, Any]:
             "run_dir_ref": str(run_dir),
             "current_stage": "blocked",
             "runtime_context_packet_ref": context_ref,
-            "secondary_prompt_injection_refs": [rel(injection_path, run_dir)],
-            "subagent_invocation_refs": [rel(invocation_path, run_dir)],
+            "secondary_prompt_injection_refs": [rel(path, run_dir) for path in injection_paths],
+            "subagent_invocation_refs": [rel(path, run_dir) for path in invocation_paths],
             "artifact_manifest_ref": "manifest.json",
             "artifact_refs": artifact_refs,
             "evidence_packet_refs": [],
@@ -630,11 +653,11 @@ def simulate(args: argparse.Namespace) -> dict[str, Any]:
             "stage": "blocked",
             "task_type": args.task_type,
             "runtime_context_packet_ref": context_ref,
-            "secondary_prompt_injection_refs": [rel(injection_path, run_dir)],
-            "subagent_invocation_refs": [rel(invocation_path, run_dir)],
+            "secondary_prompt_injection_refs": [rel(path, run_dir) for path in injection_paths],
+            "subagent_invocation_refs": [rel(path, run_dir) for path in invocation_paths],
             "active_agents": [],
             "completed_agents": [],
-            "blocked_agents": [target_agent],
+            "blocked_agents": target_agents,
             "failed_invocations": [],
             "artifact_manifest_ref": "manifest.json",
             "shared_context_refs": [context_ref],
@@ -668,6 +691,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--input-text", required=True)
     parser.add_argument("--run-root", default=".career-pipeline-runs")
     parser.add_argument("--run-id", default="")
+    parser.add_argument("--route", default="single_job_scout", choices=sorted(ROUTES))
     args = parser.parse_args(argv)
     try:
         response = simulate(args)

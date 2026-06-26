@@ -77,6 +77,20 @@ ALLOWED_INVOCATION_STATUSES = {
     "malformed",
 }
 
+PLAN_QUEUE_REQUIRED_FIELDS = [
+    "queue_index",
+    "target_agent",
+    "invocation_ref",
+    "input_refs",
+    "output_artifact_target",
+    "dispatch_mode",
+    "status",
+    "allowed_network",
+    "requires_human_approval",
+    "privacy_class",
+    "blocked_until",
+]
+
 
 class ValidationError(Exception):
     pass
@@ -261,6 +275,41 @@ def validate_manifest(payload: dict[str, Any]) -> None:
         raise ValidationError("blocked runs must not set `final_package_ref`")
 
 
+def validate_subagent_plan(payload: dict[str, Any]) -> None:
+    plan = payload.get("subagent_invocation_plan")
+    if not isinstance(plan, dict):
+        raise ValidationError("root: missing `subagent_invocation_plan` object")
+    require_non_empty(plan.get("run_id"), "run_id", "subagent_invocation_plan")
+    if plan.get("plan_status") != "ready":
+        raise ValidationError("subagent_invocation_plan: `plan_status` must be `ready`")
+    queue = plan.get("dispatch_queue")
+    if not isinstance(queue, list) or not queue:
+        raise ValidationError("subagent_invocation_plan: `dispatch_queue` must be a non-empty list")
+
+    for index, item in enumerate(queue):
+        where = f"dispatch_queue[{index}]"
+        if not isinstance(item, dict):
+            raise ValidationError(f"{where}: queue item must be an object")
+        for field in PLAN_QUEUE_REQUIRED_FIELDS:
+            if field not in item:
+                raise ValidationError(f"{where}: missing required field `{field}`")
+            require_non_empty(item[field], field, where)
+        if item["queue_index"] != index:
+            raise ValidationError(f"{where}: `queue_index` must match list order")
+        if item["dispatch_mode"] != "plan_only":
+            raise ValidationError(f"{where}: `dispatch_mode` must be `plan_only`")
+        if item["status"] != "planned":
+            raise ValidationError(f"{where}: `status` must be `planned`")
+        if item["allowed_network"] is not False:
+            raise ValidationError(f"{where}: plan-only dispatch must set `allowed_network` to false")
+        if item["requires_human_approval"] is not True:
+            raise ValidationError(f"{where}: plan-only dispatch must require human approval")
+        require_list(item["input_refs"], "input_refs", where)
+        require_list(item["blocked_until"], "blocked_until", where)
+        if any(ref.replace("\\", "/").startswith("input/raw_refs") for ref in item["input_refs"]):
+            raise ValidationError(f"{where}: raw input refs must not be exposed to subagent plans")
+
+
 def validate_repository(root: Path) -> None:
     agents_dir = root / ".codex" / "agents"
     skill_file = root / ".agents" / "skills" / "career-pipeline" / "SKILL.md"
@@ -289,6 +338,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--injections", type=Path, help="JSON file containing secondary_prompt_injections")
     parser.add_argument("--manifest", type=Path, help="JSON file containing execution_manifest and run_state")
+    parser.add_argument("--subagent-plan", type=Path, help="JSON file containing subagent_invocation_plan")
     parser.add_argument("--repo-root", type=Path, default=Path.cwd(), help="Repository root to validate")
     parser.add_argument("--emit-invocations", action="store_true", help="Emit canonical subagent_invocations")
     args = parser.parse_args(argv)
@@ -302,7 +352,9 @@ def main(argv: list[str] | None = None) -> int:
                 output["subagent_invocations"] = invocations
         if args.manifest:
             validate_manifest(load_json(args.manifest))
-        if not args.injections and not args.manifest:
+        if args.subagent_plan:
+            validate_subagent_plan(load_json(args.subagent_plan))
+        if not args.injections and not args.manifest and not args.subagent_plan:
             validate_repository(args.repo_root)
         if args.emit_invocations:
             print(json.dumps(output, ensure_ascii=False, indent=2))

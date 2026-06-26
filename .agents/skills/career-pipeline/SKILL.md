@@ -32,6 +32,7 @@ Use these scripts only for local contract validation and simulation. They do not
 
 - `scripts/validate_runtime_contracts.py` validates repository role prompts, secondary prompt injections, canonical subagent invocation packets, execution manifests, and blocked/final gate consistency.
 - `scripts/simulate_runtime_run.py` creates a private ignored `.career-pipeline-runs/<run_id>/` artifact tree for a no-network blocked run, useful for checking runtime packet shape before building a real runner.
+- `scripts/build_subagent_plan.py` creates a plan-only dispatch queue from a simulated run. It must not be treated as proof that local subagents executed.
 
 ## Built-In Databases
 

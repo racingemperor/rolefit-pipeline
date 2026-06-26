@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "validate_runtime_contracts.py"
 SIMULATOR = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "simulate_runtime_run.py"
+PLAN_BUILDER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "build_subagent_plan.py"
 
 
 def run_python(script: Path, *args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
@@ -287,3 +288,110 @@ def test_repository_role_prompts_satisfy_runtime_traceability_contract():
     result = run_python(VALIDATOR)
 
     assert result.returncode == 0, result.stderr
+
+
+def test_plan_builder_creates_plan_only_dispatch_queue(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "我是计算机专业大二，会 Python，想找 AI 实习。",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+
+    result = run_python(PLAN_BUILDER, "--run-dir", str(run_dir))
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)
+    assert response["planner_response"]["exit_status"] == "success"
+    plan_path = run_dir / response["planner_response"]["subagent_plan_ref"]
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    queue = plan["subagent_invocation_plan"]["dispatch_queue"]
+    agents = [item["target_agent"] for item in queue]
+    assert agents == [
+        "major-cluster-classifier",
+        "profile-extractor",
+        "job-scout",
+        "jd-analyzer",
+        "match-strategist",
+        "learning-path-strategist",
+    ]
+    assert all(item["dispatch_mode"] == "plan_only" for item in queue)
+    assert all(item["status"] == "planned" for item in queue)
+    assert not any("input/raw_refs.json" in item["input_refs"] for item in queue)
+
+    validation = run_python(VALIDATOR, "--subagent-plan", str(plan_path))
+    assert validation.returncode == 0, validation.stderr
+
+
+def test_validator_rejects_subagent_plan_that_is_not_plan_only(tmp_path):
+    plan = {
+        "subagent_invocation_plan": {
+            "run_id": "run-test",
+            "plan_status": "ready",
+            "dispatch_queue": [
+                {
+                    "queue_index": 0,
+                    "target_agent": "job-scout",
+                    "invocation_ref": "invocations/job-scout.invocation.json",
+                    "input_refs": ["input/normalized/runtime_context_packet.json"],
+                    "output_artifact_target": "agents/job-scout/output.json",
+                    "dispatch_mode": "execute",
+                    "status": "running",
+                    "allowed_network": True,
+                    "requires_human_approval": False,
+                    "privacy_class": "derived",
+                    "blocked_until": ["human_confirms_real_subagent_execution"],
+                }
+            ],
+        }
+    }
+    plan_path = tmp_path / "bad-plan.json"
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+    result = run_python(VALIDATOR, "--subagent-plan", str(plan_path))
+
+    assert result.returncode == 1
+    assert "plan_only" in result.stderr
+
+
+def test_validator_rejects_subagent_plan_that_exposes_raw_input(tmp_path):
+    plan = {
+        "subagent_invocation_plan": {
+            "run_id": "run-test",
+            "plan_status": "ready",
+            "dispatch_queue": [
+                {
+                    "queue_index": 0,
+                    "target_agent": "job-scout",
+                    "invocation_ref": "invocations/job-scout.invocation.json",
+                    "input_refs": [
+                        "input/raw_refs.json",
+                        "input/normalized/runtime_context_packet.json",
+                    ],
+                    "output_artifact_target": "agents/job-scout/output.json",
+                    "dispatch_mode": "plan_only",
+                    "status": "planned",
+                    "allowed_network": False,
+                    "requires_human_approval": True,
+                    "privacy_class": "derived",
+                    "blocked_until": ["human_confirms_real_subagent_execution"],
+                }
+            ],
+        }
+    }
+    plan_path = tmp_path / "raw-plan.json"
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+    result = run_python(VALIDATOR, "--subagent-plan", str(plan_path))
+
+    assert result.returncode == 1
+    assert "raw input" in result.stderr
