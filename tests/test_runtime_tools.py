@@ -8,6 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "validate_runtime_contracts.py"
 SIMULATOR = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "simulate_runtime_run.py"
 PLAN_BUILDER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "build_subagent_plan.py"
+PLAN_EXECUTOR = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "execute_subagent_plan.py"
+RUN_CONTINUER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "continue_runtime_run.py"
 
 
 def run_python(script: Path, *args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
@@ -395,3 +397,279 @@ def test_validator_rejects_subagent_plan_that_exposes_raw_input(tmp_path):
 
     assert result.returncode == 1
     assert "raw input" in result.stderr
+
+
+def test_executor_dry_run_preserves_plan_and_invocation_statuses(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "computer science sophomore, Python, looking for AI internship",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    plan = run_python(PLAN_BUILDER, "--run-dir", str(run_dir))
+    assert plan.returncode == 0, plan.stderr
+
+    result = run_python(PLAN_EXECUTOR, "--run-dir", str(run_dir))
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)
+    assert response["executor_response"]["exit_status"] == "dry_run"
+    event_log = run_dir / response["executor_response"]["execution_events_ref"]
+    assert event_log.is_file()
+
+    plan_path = run_dir / "invocations" / "subagent_invocation_plan.json"
+    plan_payload = json.loads(plan_path.read_text(encoding="utf-8"))
+    assert all(
+        item["status"] == "planned"
+        for item in plan_payload["subagent_invocation_plan"]["dispatch_queue"]
+    )
+    first_invocation_ref = plan_payload["subagent_invocation_plan"]["dispatch_queue"][0]["invocation_ref"]
+    first_invocation = json.loads((run_dir / first_invocation_ref).read_text(encoding="utf-8"))
+    assert first_invocation["subagent_invocation"]["status"] == "not_started"
+    assert "dry_run" in event_log.read_text(encoding="utf-8")
+
+
+def test_executor_execute_requires_human_approval(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "computer science sophomore, Python, looking for AI internship",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+
+    result = run_python(PLAN_EXECUTOR, "--run-dir", str(run_dir), "--execute")
+
+    assert result.returncode == 1
+    assert "human approval" in result.stderr.lower()
+
+
+def test_executor_network_execution_requires_source_policy_ack(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "computer science sophomore, Python, looking for AI internship",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+
+    result = run_python(
+        PLAN_EXECUTOR,
+        "--run-dir",
+        str(run_dir),
+        "--execute",
+        "--human-approved",
+        "--allow-network",
+    )
+
+    assert result.returncode == 1
+    assert "source policy" in result.stderr.lower()
+
+
+def test_validator_rejects_role_output_without_traceability(tmp_path):
+    output = {
+        "role_output_packet": {
+            "invocation_id": "run-test-job-scout",
+            "target_agent": "job-scout",
+            "status": "done",
+            "role_output_ref": "agents/job-scout/output.json",
+            "evidence_packet_refs": [],
+            "runtime_weights_ref": "merge/runtime_weights.json",
+            "artifact_refs": [],
+            "blocked_outputs": [],
+            "runtime_research_tasks": [],
+            "needs_user_confirmation": [],
+            "handoff_to": [],
+            "errors": [],
+            "confidence": "medium",
+        }
+    }
+    output_path = tmp_path / "role-output.json"
+    output_path.write_text(json.dumps(output), encoding="utf-8")
+
+    result = run_python(VALIDATOR, "--role-output", str(output_path))
+
+    assert result.returncode == 1
+    assert "invocation_ref" in result.stderr
+    assert "error_recovery_state" in result.stderr
+
+
+def test_validator_rejects_failed_role_output_with_final_decision_fields(tmp_path):
+    output = {
+        "invocation_ref": "invocations/job-scout.invocation.json",
+        "role_output_packet": {
+            "invocation_id": "run-test-job-scout",
+            "target_agent": "job-scout",
+            "status": "failed",
+            "role_output_ref": "agents/job-scout/output.json",
+            "evidence_packet_refs": [],
+            "runtime_weights_ref": "merge/runtime_weights.json",
+            "artifact_refs": [],
+            "blocked_outputs": ["application_strategy"],
+            "runtime_research_tasks": [],
+            "needs_user_confirmation": [],
+            "handoff_to": [],
+            "errors": [{"category": "subagent_failed"}],
+            "confidence": "low",
+        },
+        "error_recovery_state": {
+            "status": "failed",
+            "errors": [],
+            "recovery_actions": ["return_blocked_package"],
+            "degraded_outputs": [],
+            "blocked_outputs": ["application_strategy"],
+            "safe_outputs": [],
+            "next_action": "return_blocked_package",
+        },
+        "application_strategy": {"priority": "apply now"},
+    }
+    output_path = tmp_path / "failed-output.json"
+    output_path.write_text(json.dumps(output), encoding="utf-8")
+
+    result = run_python(VALIDATOR, "--role-output", str(output_path))
+
+    assert result.returncode == 1
+    assert "failed or malformed" in result.stderr
+
+
+def test_executor_rejects_malformed_backfill_output(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "computer science sophomore, Python, looking for AI internship",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+    bad_output = tmp_path / "bad-output.json"
+    bad_output.write_text(json.dumps({"not_role_output_packet": {}}), encoding="utf-8")
+
+    result = run_python(
+        PLAN_EXECUTOR,
+        "--run-dir",
+        str(run_dir),
+        "--backfill-output",
+        f"job-scout={bad_output}",
+    )
+
+    assert result.returncode == 1
+    assert "role_output_packet" in result.stderr
+
+
+def test_continue_runtime_run_accepts_user_facts_and_updates_same_run(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "resume_generation",
+        "--input-text",
+        "computer science sophomore, Python, looking for AI internship",
+        "--run-root",
+        str(run_root),
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    facts = {
+        "school_name": "Example University",
+        "degree_level": "bachelor",
+        "graduation_window": "2028",
+        "project_competition_research_experience": [
+            {"name": "LLM resume parser", "evidence": "course project"}
+        ],
+        "internship_experience": [{"company": "Example Lab", "role": "assistant"}],
+        "target_location_or_company_if_any": "Shanghai AI internship",
+    }
+
+    result = run_python(
+        RUN_CONTINUER,
+        "--run-dir",
+        str(run_dir),
+        "--user-facts-json",
+        json.dumps(facts),
+    )
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)
+    assert response["continuation_response"]["run_id"] == run_id
+    assert response["continuation_response"]["exit_status"] == "ready_for_dispatch"
+
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["execution_manifest"]["run_id"] == run_id
+    assert manifest["execution_manifest"]["current_stage"] == "injection_ready"
+    assert manifest["run_state"]["next_action"] == "dispatch_agents"
+    assert manifest["run_state"]["blocked_agents"] == []
+
+    context = json.loads(
+        (run_dir / "input" / "normalized" / "runtime_context_packet.json").read_text(encoding="utf-8")
+    )["runtime_context_packet"]
+    assert context["school_context"]["school_name"] == "Example University"
+    assert context["missing_user_owned_facts"] == []
+    known_fields = {fact["field"] for fact in context["known_user_facts"]}
+    assert {"school_name", "degree_level", "graduation_window"}.issubset(known_fields)
+
+
+def test_simulator_supports_resume_generation_route(tmp_path):
+    result = run_python(
+        SIMULATOR,
+        "--task-type",
+        "resume_generation",
+        "--input-text",
+        "computer science senior, Python, Java, resume generation",
+        "--run-root",
+        str(tmp_path / ".career-pipeline-runs"),
+        "--route",
+        "resume_generation",
+    )
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)
+    run_dir = tmp_path / ".career-pipeline-runs" / response["runner_response"]["run_id"]
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    agents = [
+        Path(ref).name.replace(".invocation.json", "")
+        for ref in manifest["execution_manifest"]["subagent_invocation_refs"]
+    ]
+    assert agents == [
+        "major-cluster-classifier",
+        "profile-extractor",
+        "resume-format-gate",
+        "resume-architect",
+        "factual-reviewer",
+        "hr-supervisor",
+    ]

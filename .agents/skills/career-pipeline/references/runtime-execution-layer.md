@@ -106,7 +106,7 @@ If a required role fails or evidence is missing, return a blocked or degraded pa
 
 ## Local Runner Contract
 
-This repository does not ship an executable runner yet, but a future runner should expose this contract:
+This repository ships a deterministic local execution shell for contract testing and safe handoff, but it does not yet ship a real Codex subagent adapter. The shell should expose this contract:
 
 ```json
 {
@@ -143,3 +143,12 @@ Suggested exit semantics:
 - This protocol does not require network access for every run.
 - This protocol does not store private user data in git.
 - This protocol does not replace the source policy, weight engine, or role output contracts.
+
+## Current Local Scripts
+
+- `simulate_runtime_run.py`: creates a private no-network blocked run with normalized input, runtime context, secondary injections, invocation packets, blocked package, and simulated blocked role outputs.
+- `build_subagent_plan.py`: turns invocation packets into a plan-only dispatch queue. Plan-only queues are not proof that subagents ran.
+- `execute_subagent_plan.py`: defaults to dry-run inspection, refuses real execution without human approval, refuses network execution without source-policy acknowledgement, writes redacted execution events, and can backfill externally produced role outputs only after schema checks.
+- `continue_runtime_run.py`: accepts one compact batch of user-owned facts and updates the same run so dispatch can continue without starting over.
+
+Real subagent execution remains blocked until a concrete adapter is configured and tested. Any adapter must keep the same privacy, source-policy, weight-provenance, role-output, HR, factual-review, and blocked/final gates.

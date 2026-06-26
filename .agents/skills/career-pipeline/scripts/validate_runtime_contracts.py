@@ -91,6 +91,66 @@ PLAN_QUEUE_REQUIRED_FIELDS = [
     "blocked_until",
 ]
 
+ROLE_OUTPUT_PACKET_REQUIRED_FIELDS = [
+    "invocation_id",
+    "target_agent",
+    "status",
+    "role_output_ref",
+    "evidence_packet_refs",
+    "runtime_weights_ref",
+    "artifact_refs",
+    "blocked_outputs",
+    "runtime_research_tasks",
+    "needs_user_confirmation",
+    "handoff_to",
+    "errors",
+    "confidence",
+]
+
+ROLE_OUTPUT_LIST_FIELDS = [
+    "evidence_packet_refs",
+    "artifact_refs",
+    "blocked_outputs",
+    "runtime_research_tasks",
+    "needs_user_confirmation",
+    "handoff_to",
+    "errors",
+]
+
+ALLOWED_ROLE_OUTPUT_STATUSES = {
+    "done",
+    "done_with_warnings",
+    "needs_context",
+    "blocked",
+    "failed",
+    "malformed",
+}
+
+ROLE_OUTPUT_FAILURE_STATUSES = {"failed", "malformed"}
+
+FINAL_DECISION_FIELDS = {
+    "fit_score",
+    "priority",
+    "application_priority",
+    "application_strategy",
+    "positioning_verdict",
+    "pass_to_next_stage",
+    "final_resume_draft",
+    "resume_draft",
+    "tailored_resume",
+    "hr_pass_status",
+}
+
+ERROR_RECOVERY_REQUIRED_FIELDS = [
+    "status",
+    "errors",
+    "recovery_actions",
+    "degraded_outputs",
+    "blocked_outputs",
+    "safe_outputs",
+    "next_action",
+]
+
 
 class ValidationError(Exception):
     pass
@@ -310,6 +370,60 @@ def validate_subagent_plan(payload: dict[str, Any]) -> None:
             raise ValidationError(f"{where}: raw input refs must not be exposed to subagent plans")
 
 
+def validate_role_output(payload: dict[str, Any]) -> None:
+    missing_top_level = [
+        field
+        for field in ["invocation_ref", "role_output_packet", "error_recovery_state"]
+        if field not in payload or payload[field] in ("", None, [], {})
+    ]
+    if missing_top_level:
+        raise ValidationError(
+            "role_output: missing required traceability or recovery fields: "
+            + ", ".join(missing_top_level)
+        )
+
+    packet = payload["role_output_packet"]
+    if not isinstance(packet, dict):
+        raise ValidationError("role_output.role_output_packet: must be an object")
+    for field in ROLE_OUTPUT_PACKET_REQUIRED_FIELDS:
+        if field not in packet:
+            raise ValidationError(f"role_output_packet: missing required field `{field}`")
+        if field in {"invocation_id", "target_agent", "status", "role_output_ref", "confidence"}:
+            require_non_empty(packet[field], field, "role_output_packet")
+    for field in ROLE_OUTPUT_LIST_FIELDS:
+        require_list(packet[field], field, "role_output_packet")
+    if packet["status"] not in ALLOWED_ROLE_OUTPUT_STATUSES:
+        raise ValidationError(
+            "role_output_packet: `status` must be one of "
+            + ", ".join(sorted(ALLOWED_ROLE_OUTPUT_STATUSES))
+        )
+
+    recovery = payload["error_recovery_state"]
+    if not isinstance(recovery, dict):
+        raise ValidationError("role_output.error_recovery_state: must be an object")
+    for field in ERROR_RECOVERY_REQUIRED_FIELDS:
+        if field not in recovery:
+            raise ValidationError(f"error_recovery_state: missing required field `{field}`")
+        if field in {
+            "errors",
+            "recovery_actions",
+            "degraded_outputs",
+            "blocked_outputs",
+            "safe_outputs",
+        }:
+            require_list(recovery[field], field, "error_recovery_state")
+        else:
+            require_non_empty(recovery[field], field, "error_recovery_state")
+
+    if packet["status"] in ROLE_OUTPUT_FAILURE_STATUSES:
+        forbidden = sorted(field for field in FINAL_DECISION_FIELDS if field in payload)
+        if forbidden:
+            raise ValidationError(
+                "failed or malformed role outputs must not include final decision fields: "
+                + ", ".join(forbidden)
+            )
+
+
 def validate_repository(root: Path) -> None:
     agents_dir = root / ".codex" / "agents"
     skill_file = root / ".agents" / "skills" / "career-pipeline" / "SKILL.md"
@@ -339,6 +453,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--injections", type=Path, help="JSON file containing secondary_prompt_injections")
     parser.add_argument("--manifest", type=Path, help="JSON file containing execution_manifest and run_state")
     parser.add_argument("--subagent-plan", type=Path, help="JSON file containing subagent_invocation_plan")
+    parser.add_argument("--role-output", type=Path, help="JSON file containing a role_output_packet")
     parser.add_argument("--repo-root", type=Path, default=Path.cwd(), help="Repository root to validate")
     parser.add_argument("--emit-invocations", action="store_true", help="Emit canonical subagent_invocations")
     args = parser.parse_args(argv)
@@ -354,7 +469,9 @@ def main(argv: list[str] | None = None) -> int:
             validate_manifest(load_json(args.manifest))
         if args.subagent_plan:
             validate_subagent_plan(load_json(args.subagent_plan))
-        if not args.injections and not args.manifest and not args.subagent_plan:
+        if args.role_output:
+            validate_role_output(load_json(args.role_output))
+        if not args.injections and not args.manifest and not args.subagent_plan and not args.role_output:
             validate_repository(args.repo_root)
         if args.emit_invocations:
             print(json.dumps(output, ensure_ascii=False, indent=2))

@@ -54,6 +54,8 @@
         validate_runtime_contracts.py
         simulate_runtime_run.py
         build_subagent_plan.py
+        execute_subagent_plan.py
+        continue_runtime_run.py
 
 .codex/
   agents/
@@ -109,7 +111,7 @@ data/
 
 - `SKILL.md` 是主编排器，定义何时触发 pipeline、何时派 subagent、如何合并结果。
 - `.codex/agents/*.toml` 定义具体角色，每个角色只负责一个清晰切面。
-- `scripts/` 当前提供本地合同验证、无网络模拟运行和 plan-only subagent 调用队列脚本，用来检查 prompt、二次注入、subagent invocation、manifest、blocked/final gate 是否符合协议；这些脚本不代表真实 subagent 已执行。简历解析、JD 标准化、匹配证据矩阵和文档渲染仍是后续确定性脚本扩展。
+- `scripts/` 当前提供本地合同验证、无网络模拟运行、plan-only subagent 调用队列、安全执行外壳、角色输出回填校验和同一 run 的用户补充信息继续流程，用来检查 prompt、二次注入、subagent invocation、manifest、blocked/final gate 是否符合协议；这些脚本不代表真实 subagent 已执行。简历解析、JD 标准化、匹配证据矩阵和文档渲染仍是后续确定性脚本扩展。
 - `references/` 存放规则、rubric、数据来源政策、运行层协议和写作准则，避免把大量知识塞进主 prompt。
 - `data/discipline_taxonomy/` 提供学科域注册表，用于先判断工科、理科、文科、社科、商科、艺术设计、医学健康、农学、法学公共事务或跨专业桥接，再进入对应分类逻辑。
 - `data/` 提供项目自带的静态数据库。第一批完整数据库是中国本科工科专业目录与就业导向大类映射；后续会扩展理科、文科、社科、商科和跨专业数据库。第二批数据库是大厂招聘信号库，用于按公司和工科就业大类整理官方 JD、官方招聘页、已验证 HR 公开信息、招聘软件公开 JD、候选人面经和社媒共识的采信规则。

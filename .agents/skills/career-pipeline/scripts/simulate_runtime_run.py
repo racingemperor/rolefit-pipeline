@@ -33,6 +33,54 @@ ROUTES = {
         "match-strategist",
         "learning-path-strategist",
     ],
+    "resume_generation": [
+        "major-cluster-classifier",
+        "profile-extractor",
+        "resume-format-gate",
+        "resume-architect",
+        "factual-reviewer",
+        "hr-supervisor",
+    ],
+    "resume_review": [
+        "profile-extractor",
+        "resume-format-gate",
+        "resume-architect",
+        "factual-reviewer",
+        "hr-supervisor",
+    ],
+    "tailored_resume": [
+        "profile-extractor",
+        "jd-analyzer",
+        "company-intelligence-analyst",
+        "resume-format-gate",
+        "resume-architect",
+        "factual-reviewer",
+        "hr-supervisor",
+    ],
+    "company_research": [
+        "jd-analyzer",
+        "company-intelligence-analyst",
+        "market-sentiment-analyzer",
+        "hr-supervisor",
+    ],
+    "personal_branding": [
+        "profile-extractor",
+        "personal-branding-strategist",
+        "hr-supervisor",
+        "factual-reviewer",
+    ],
+    "major_positioning": [
+        "major-cluster-classifier",
+        "profile-extractor",
+        "match-strategist",
+        "learning-path-strategist",
+    ],
+    "learning_plan": [
+        "major-cluster-classifier",
+        "profile-extractor",
+        "job-scout",
+        "learning-path-strategist",
+    ],
 }
 
 
@@ -47,7 +95,15 @@ def utc_now() -> str:
 
 
 def detect_major(text: str) -> str:
-    if "计算机" in text or "软件" in text or "人工智能" in text:
+    lowered = text.lower()
+    if (
+        "计算机" in text
+        or "软件" in text
+        or "人工智能" in text
+        or "computer science" in lowered
+        or "software" in lowered
+        or "artificial intelligence" in lowered
+    ):
         return "计算机类"
     if "机械" in text:
         return "机械类"
@@ -57,9 +113,14 @@ def detect_major(text: str) -> str:
 
 
 def detect_candidate_stage(text: str) -> str:
-    if any(token in text for token in ["大一", "大二", "大三", "研一", "研二", "非毕业"]):
+    lowered = text.lower()
+    if any(token in text for token in ["大一", "大二", "大三", "研一", "研二", "非毕业"]) or any(
+        token in lowered for token in ["freshman", "sophomore", "junior", "non-graduating"]
+    ):
         return "non_graduating"
-    if any(token in text for token in ["大四", "研三", "应届", "毕业"]):
+    if any(token in text for token in ["大四", "研三", "应届", "毕业"]) or any(
+        token in lowered for token in ["senior", "graduating", "graduate"]
+    ):
         return "graduating"
     return "unknown"
 
@@ -134,7 +195,7 @@ def build_profile(input_text: str) -> dict[str, Any]:
     candidate_stage = detect_candidate_stage(input_text)
     skills = extract_skills(input_text)
     target_roles = ["AI 实习"] if re.search(r"AI|人工智能|大模型|LLM", input_text, re.I) else []
-    target_kind = "internship" if "实习" in input_text else ""
+    target_kind = "internship" if "实习" in input_text or "internship" in input_text.lower() else ""
     return {
         "identity_and_contact": {
             "name_or_preferred_label": "",
@@ -147,7 +208,7 @@ def build_profile(input_text: str) -> dict[str, Any]:
             "college_or_department": "",
             "major_name": major_name,
             "degree_level": "",
-            "grade_or_year": "大二" if "大二" in input_text else "",
+            "grade_or_year": "大二" if "大二" in input_text or "sophomore" in input_text.lower() else "",
             "graduation_window": "",
             "education_status": candidate_stage,
         },
@@ -454,6 +515,7 @@ def simulate(args: argparse.Namespace) -> dict[str, Any]:
         write_json(invocation_path, invocation)
 
         role_output = {
+            "invocation_ref": rel(invocation_path, run_dir),
             "role_output_packet": {
                 "invocation_id": invocation["subagent_invocation"]["invocation_id"],
                 "target_agent": target_agent,
@@ -474,7 +536,22 @@ def simulate(args: argparse.Namespace) -> dict[str, Any]:
                     }
                 ],
                 "confidence": "low",
-            }
+            },
+            "error_recovery_state": {
+                "status": "blocked",
+                "errors": [
+                    {
+                        "category": "missing_user_fact",
+                        "severity": "blocking",
+                        "message": "Simulation keeps user-owned facts and public evidence incomplete.",
+                    }
+                ],
+                "recovery_actions": ["ask_user_once", "run_public_research"],
+                "degraded_outputs": ["known_information_summary"],
+                "blocked_outputs": ["fit_score", "application_strategy", "final_resume_draft"],
+                "safe_outputs": ["runtime_research_tasks", "needs_user_confirmation"],
+                "next_action": "return_blocked_package",
+            },
         }
         write_json(role_output_path, role_output)
         injection_paths.append(injection_path)
