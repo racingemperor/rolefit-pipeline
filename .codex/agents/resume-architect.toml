@@ -52,6 +52,10 @@ Output JSON:
   "delete_or_compress": [],
   "keyword_placement": [],
   "final_resume_draft": "",
+  "agent_claims": [],
+  "evidence_challenges": [],
+  "disagreements_with": [],
+  "handoff_questions": [],
   "needs_user_confirmation": [],
   "confidence": "high|medium|low"
 }

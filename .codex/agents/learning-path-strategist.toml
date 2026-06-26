@@ -49,6 +49,10 @@ Output JSON:
   "resume_conversion": [],
   "ready_to_apply_when": [],
   "alternative_roles": [],
+  "agent_claims": [],
+  "evidence_challenges": [],
+  "disagreements_with": [],
+  "handoff_questions": [],
   "needs_user_confirmation": [],
   "confidence": "high|medium|low"
 }

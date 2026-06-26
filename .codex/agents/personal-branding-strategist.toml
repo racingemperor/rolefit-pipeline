@@ -44,6 +44,10 @@ Output JSON:
   "profile_copy": {},
   "privacy_checks": [],
   "done_definition": [],
+  "agent_claims": [],
+  "evidence_challenges": [],
+  "disagreements_with": [],
+  "handoff_questions": [],
   "needs_user_confirmation": [],
   "confidence": "high|medium|low"
 }

@@ -60,6 +60,7 @@
     match-strategist.toml
     learning-path-strategist.toml
     personal-branding-strategist.toml
+    hr-supervisor.toml
     resume-format-gate.toml
     resume-architect.toml
     factual-reviewer.toml
@@ -114,16 +115,18 @@ User Input
   -> MatchStrategist
   -> LearningPathStrategist
   -> PersonalBrandingStrategist
+  -> HRSupervisor
   -> ResumeFormatGate
   -> ResumeArchitect
   -> FactualReviewer
+  -> HRSupervisor
   -> Final Decision Package
 ```
 
 根据任务类型可以裁剪流程：
 
 - 只做专业定位：`MajorClusterClassifier`
-- 只分析简历：`ProfileExtractor -> ResumeFormatGate -> ResumeArchitect -> FactualReviewer`
+- 只分析简历：`ProfileExtractor -> ResumeFormatGate -> ResumeArchitect -> FactualReviewer -> HRSupervisor`
 - 只分析岗位：`JDAnalyzer -> CompanyIntelligenceAnalyst -> MarketSentimentAnalyzer`
 - 目标岗位定制简历：完整流程
 - 找岗位：`MajorClusterClassifier -> ProfileExtractor -> JobScout -> JDAnalyzer -> MatchStrategist -> LearningPathStrategist`
@@ -131,6 +134,8 @@ User Input
 这个 pipeline 不应只做静态匹配。对于有潜力但当前条件不完全满足的用户，系统应输出一条“成长型匹配”路线：先学习、补项目、补证据，再决定是否投递和如何包装简历。例如用户会 Python、Java 和工程基础，但缺少 LLM 相关知识时，不应简单判定“不匹配 LLM 应用岗”，而应给出可执行的 AI / LLM 学习路径、项目建议、产出证据和简历转化方式。
 
 同时，pipeline 也应包含“个人包装”能力。不同专业和行业看待候选人的方式不同：计算机相关岗位常需要 GitHub、项目 demo、技术博客、个人网站或开源贡献作为展示；设计岗位更重作品集；科研岗位更重论文、主页和 Google Scholar；产品和运营岗位更重案例、数据结果和业务分析。因此系统应根据目标行业设计个人展示面，而不是只改一份简历。
+
+整套 pipeline 应在 HR 监督视角下运行。HR 角色不替代事实审查，也不帮助用户造假，而是检查所有子智能体输出是否能让招聘方快速看懂：目标岗位是什么、候选人的 2-4 个核心竞争力是什么、证据在哪里、为什么值得约面。尤其在个人包装环节，包装不是“美化人设”，而是让真实优势以 HR 能一目了然的方式呈现出来。
 
 流程起点应先根据用户专业判断学科域，再做就业导向的大类归并。每类学科的求职逻辑不同：工科看工程交付和工具链，理科看科研训练、数学建模和实验方法，文科看写作、研究、语言和内容判断，商科看业务指标和商业场景，艺术设计看作品集和设计过程，跨专业则看桥接证据。当前已落地的是工科数据库，其他学科先通过 `data/discipline_taxonomy/discipline_registry.zh-CN.json` 预留框架。一个专业可以有多个标签：系统应输出“学科域 + 主就业大类 + 交叉标签 + 权重 + 推荐岗位方向”。例如人工智能在求职建议中通常可主归“计算机与 AI 软件类”，同时带有电子信息、自动化、数学建模等副标签；机器人工程则可能横跨自动化、机械、电子信息和计算机。用户输入具体专业后，系统先判断学科域、大类和交叉标签，再在相近专业群中横向比较能力差距，推荐更适合补齐的技能和岗位方向。
 
@@ -644,7 +649,48 @@ User Input
 - 不把所有行业都套用同一套 GitHub / 个人网站模板。
 - 不为了视觉包装牺牲内容真实性。
 
-### 5.11 ResumeFormatGate
+### 5.11 HRSupervisor
+
+HR 监督员。负责回答：“HR 是否能快速看懂这个候选人的目标、可信优势和约面理由？”
+
+这个角色贯穿整个 pipeline，尤其监督 PersonalBrandingStrategist、ResumeFormatGate、ResumeArchitect 和最终 decision package。它不替代 FactualReviewer，不创造新经历，也不负责写最终简历；它负责从招聘初筛视角检查信息是否清晰、有竞争力、可信、能被快速扫描。
+
+工作方面：
+
+- 10 秒清晰度：目标岗位、学历状态、核心竞争力和最强证据是否能快速看到。
+- 竞争力信号密度：是否突出 2-4 个最能打动 HR 的优势，而不是信息堆砌。
+- 证据链一致性：简历、项目、GitHub、个人网站、作品集、论文、案例之间是否互相支撑。
+- 学科/行业适配：展示标准是否符合 discipline_domain 和目标行业。
+- HR 风险识别：目标不明、经历过散、技术自嗨、空泛性格、过度包装、隐私泄露、无法验证。
+- 子智能体辩论裁决：当匹配策略、个人包装、简历写作和事实审查冲突时，要求补证据、降置信度或退回对应角色重写。
+
+输出：
+
+```json
+{
+  "hr_readability_score": 0,
+  "competitive_signal_summary": [],
+  "hr_first_screen_risks": [],
+  "positioning_verdict": "pass|revise|required_user_confirmation",
+  "debate_summary": {
+    "agreements": [],
+    "conflicts": [],
+    "resolution": []
+  },
+  "agent_feedback": [],
+  "recommended_reframe": [],
+  "pass_to_next_stage": false
+}
+```
+
+禁止事项：
+
+- 不为提高吸引力编造经历、指标、奖项、学历或项目结果。
+- 不用 HR 视角压过事实审查；事实冲突时以 FactualReviewer 为准。
+- 不把个人包装变成夸张人设或营销话术。
+- 不用单一行业标准评价所有学科背景。
+
+### 5.12 ResumeFormatGate
 
 简历格式门禁。负责回答：“用户当前材料是否已经满足简历生成格式，应该进入哪个简历版本？”
 
@@ -691,7 +737,7 @@ User Input
 - 不把空泛性格描述直接塞进简历。
 - 不批准有隐私、NDA 或事实风险的材料进入生成。
 
-### 5.12 ResumeArchitect
+### 5.13 ResumeArchitect
 
 简历架构师。负责回答：“如何把真实经历组织成最适合这个岗位的表达？”
 
@@ -735,7 +781,7 @@ User Input
 - 不为了 ATS 牺牲可读性。
 - 不绕过 ResumeFormatGate 和 FactualReviewer。
 
-### 5.13 FactualReviewer
+### 5.14 FactualReviewer
 
 事实与风险审查员。负责回答：“这份简历和建议是否真实、合规、可防御？”
 
@@ -1086,7 +1132,41 @@ User Input
 - 1-3 年：低权重。
 - 3 年以上：仅作背景参考。
 
-## 9. 输出产品形态
+## 9. 子智能体协作与辩论协议
+
+子智能体之间需要能相互配合和辩论，而不是各自独立输出结论。所有角色输出都应保留共同字段、证据说明、置信度和需要用户确认的问题。涉及简历、包装、匹配和 HR 监督的角色还应显式输出冲突点和反驳理由。
+
+协作规则：
+
+- 每个角色只能在自己的职责内下结论，不能替代其他角色。
+- 任何强结论都必须带来源、用户材料或明确推断标记。
+- 下游角色可以挑战上游角色，但必须指出冲突字段、证据差异和希望重跑的角色。
+- `HRSupervisor` 负责把子智能体冲突转化为 HR 视角的 `pass|revise|required_user_confirmation`。
+- `FactualReviewer` 对事实真实性拥有最高优先级；HR 认为表达强但事实不足时，必须退回补证据。
+- 当 `MatchStrategist` 判断高匹配但 `ProfileExtractor` 证据弱，必须进入辩论状态，不能直接生成强包装。
+- 当 `PersonalBrandingStrategist` 建议展示资产但无法支撑简历主线，必须退回重构包装方案。
+
+建议所有关键角色输出：
+
+```json
+{
+  "agent_claims": [],
+  "evidence_challenges": [],
+  "disagreements_with": [
+    {
+      "agent": "",
+      "field": "",
+      "reason": "",
+      "requested_resolution": ""
+    }
+  ],
+  "handoff_questions": []
+}
+```
+
+辩论不应该变成多轮空转。若冲突来自缺少用户材料，应停止生成最终简历或包装，输出补材料清单；若冲突来自来源优先级，应以官方 JD、用户原始材料、已验证 HR 公开信息和 FactualReviewer 结论为高优先级依据。
+
+## 10. 输出产品形态
 
 最终输出不应该只有一份改写后的简历，而应包括一个 decision package：
 
@@ -1099,11 +1179,13 @@ User Input
 6. 投递优先级
 7. 学习路径与能力补齐方案
 8. 个人展示与包装方案
-9. 简历格式门禁结果
-10. 简历设计方案
-11. 简历改写草稿
-12. 风险审查结果
-13. 面试准备建议
+9. HR 监督与首筛可读性结果
+10. 子智能体辩论与冲突裁决
+11. 简历格式门禁结果
+12. 简历设计方案
+13. 简历改写草稿
+14. 风险审查结果
+15. 面试准备建议
 ```
 
 示例结构：
@@ -1117,6 +1199,8 @@ User Input
   "fit_analysis": {},
   "learning_plan": {},
   "personal_branding": {},
+  "hr_supervision": {},
+  "agent_debate": {},
   "resume_format_gate": {},
   "resume_plan": {},
   "resume_draft": "",
@@ -1125,7 +1209,7 @@ User Input
 }
 ```
 
-## 10. MVP 建议
+## 11. MVP 建议
 
 第一版不做全网岗位搜索，先支持用户提供材料：
 
@@ -1146,9 +1230,11 @@ ProfileExtractor
   -> MatchStrategist
   -> LearningPathStrategist
   -> PersonalBrandingStrategist
+  -> HRSupervisor
   -> ResumeFormatGate
   -> ResumeArchitect
   -> FactualReviewer
+  -> HRSupervisor
 ```
 
 MVP 输出：
@@ -1159,6 +1245,8 @@ MVP 输出：
 - 匹配分和投递优先级。
 - 学习路径和能力补齐建议。
 - GitHub、个人网站、作品集等个人展示建议。
+- HR 首筛视角下的竞争力摘要和可读性评分。
+- 子智能体冲突点、裁决结果和需要用户补充的材料。
 - 简历格式门禁结果。
 - 简历结构建议。
 - 针对岗位的简历草稿。
@@ -1174,9 +1262,9 @@ MVP 验收标准：
 - 公司评价必须带置信度。
 - 输出能让用户明确知道下一步该做什么。
 
-## 11. 后续扩展
+## 12. 后续扩展
 
-### 11.1 Job Search 扩展
+### 12.1 Job Search 扩展
 
 增加自动岗位搜索：
 
@@ -1186,7 +1274,7 @@ MVP 验收标准：
 - 岗位时效判断。
 - 关键词策略生成。
 
-### 11.2 Talent Benchmark 扩展
+### 12.2 Talent Benchmark 扩展
 
 增加授权样本库：
 
@@ -1195,7 +1283,7 @@ MVP 验收标准：
 - 生成岗位成功画像。
 - 比较用户与成功画像的差距。
 
-### 11.3 Resume Rendering 扩展
+### 12.3 Resume Rendering 扩展
 
 增加输出格式：
 
@@ -1206,7 +1294,7 @@ MVP 验收标准：
 - 英文 resume。
 - 一页版与详细版。
 
-### 11.4 Interview Preparation 扩展
+### 12.4 Interview Preparation 扩展
 
 增加面试准备：
 
@@ -1215,7 +1303,7 @@ MVP 验收标准：
 - 根据公司业务生成业务理解题。
 - 根据项目经历生成 STAR 故事。
 
-### 11.5 Learning Roadmap 扩展
+### 12.5 Learning Roadmap 扩展
 
 增加面向目标岗位的学习路线生成：
 
@@ -1226,7 +1314,7 @@ MVP 验收标准：
 - 输出“完成到什么程度才可以写进简历”的证据标准。
 - 生成学习后的简历 bullet 草稿，但必须经过 FactualReviewer 审查。
 
-### 11.6 Personal Branding 扩展
+### 12.6 Personal Branding 扩展
 
 增加个人展示资产生成和审查：
 
@@ -1239,7 +1327,7 @@ MVP 验收标准：
 - 项目 demo 展示清单。
 - 隐私和 NDA 风险检查。
 
-### 11.7 Plugin 分发
+### 12.7 Plugin 分发
 
 当 skill 和 subagents 稳定后，可以打包为 Codex plugin：
 
@@ -1257,7 +1345,7 @@ codex-career-plugin/
 
 插件适合团队分发；本地迭代阶段先用 repo-scoped skill 即可。
 
-## 12. 核心原则
+## 13. 核心原则
 
 1. 求职建议必须可解释。
 2. 简历改写必须可追溯到用户原始材料。

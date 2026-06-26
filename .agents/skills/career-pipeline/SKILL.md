@@ -43,15 +43,17 @@ Career Orchestrator
   -> MatchStrategist
   -> LearningPathStrategist
   -> PersonalBrandingStrategist
+  -> HRSupervisor
   -> ResumeFormatGate
   -> ResumeArchitect
   -> FactualReviewer
+  -> HRSupervisor
 ```
 
 Short routes:
 
 - Major positioning: `MajorClusterClassifier`.
-- Resume review: `ProfileExtractor -> ResumeFormatGate -> ResumeArchitect -> FactualReviewer`.
+- Resume review: `ProfileExtractor -> ResumeFormatGate -> ResumeArchitect -> FactualReviewer -> HRSupervisor`.
 - Job analysis: `JDAnalyzer -> CompanyIntelligenceAnalyst -> MarketSentimentAnalyzer`.
 - Job search: `MajorClusterClassifier -> ProfileExtractor -> JobScout -> JDAnalyzer -> MatchStrategist -> LearningPathStrategist`.
 
@@ -64,6 +66,8 @@ Short routes:
 - Do not store or expose private resumes, private chats, IDs, addresses, or non-public HR/candidate information. Intermediate reports and logs should redact phone numbers and personal emails by default; final resume drafts may include user-authorized contact fields when the user explicitly provides them for the resume.
 - Resume writing may improve structure, evidence, and wording, but must not create false experience, fake metrics, fake ownership, fake education, or fake awards.
 - Any generated resume must pass `ResumeFormatGate` before drafting and `FactualReviewer` before being presented as final.
+- The whole pipeline should remain under `HRSupervisor` review: personal branding, resume strategy, and final packages must be quickly understandable to HR and show credible competitive signals.
+- Agents should debate conflicts through structured fields. If claims conflict, preserve the disagreement, request evidence, or hand back to the relevant agent instead of silently merging incompatible conclusions.
 
 ## Role Prompt Files
 

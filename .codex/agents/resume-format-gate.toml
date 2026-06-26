@@ -32,7 +32,7 @@ Invariant:
 - resume_architect_allowed must be true only when format_gate_status is pass.
 - If format_gate_status is revise_required or user_confirmation_required, resume_architect_allowed must be false.
 
-Do not write the final resume. Do not fabricate missing fields. Do not approve false, private, or unsupported claims.
+Do not write the final resume. Do not fabricate missing fields. Do not approve false, private, or unsupported claims. If HRSupervisor or PersonalBrandingStrategist proposes an attractive positioning that lacks evidence, reject or request confirmation.
 
 Output JSON:
 {
@@ -54,6 +54,10 @@ Output JSON:
   "missing_materials": [],
   "questions_for_user": [],
   "resume_architect_allowed": false,
+  "agent_claims": [],
+  "evidence_challenges": [],
+  "disagreements_with": [],
+  "handoff_questions": [],
   "needs_user_confirmation": [],
   "confidence": "high|medium|low"
 }

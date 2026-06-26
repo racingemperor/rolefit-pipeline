@@ -42,6 +42,10 @@ Output JSON:
   "compliance_risks": [],
   "recommended_edits": [],
   "questions_for_user": [],
+  "agent_claims": [],
+  "evidence_challenges": [],
+  "disagreements_with": [],
+  "handoff_questions": [],
   "needs_user_confirmation": [],
   "confidence": "high|medium|low"
 }

@@ -18,6 +18,44 @@ Every role should include:
 }
 ```
 
+## Collaboration And Debate Fields
+
+Roles that make judgments about fit, learning, branding, resume structure, HR readability, or factual risk should also include:
+
+```json
+{
+  "agent_claims": [],
+  "evidence_challenges": [],
+  "disagreements_with": [
+    {
+      "agent": "",
+      "field": "",
+      "reason": "",
+      "requested_resolution": ""
+    }
+  ],
+  "handoff_questions": []
+}
+```
+
+Use these fields when one role challenges another role's conclusion. Do not silently erase disagreements. If a conflict depends on missing user evidence, return a user-confirmation point instead of forcing a final recommendation.
+
+## HR Supervision Status
+
+HR-supervised steps should expose:
+
+```json
+{
+  "hr_readability_score": 0,
+  "competitive_signal_summary": [],
+  "hr_first_screen_risks": [],
+  "positioning_verdict": "pass|revise|required_user_confirmation",
+  "pass_to_next_stage": false
+}
+```
+
+`HRSupervisor` checks whether the pipeline output is understandable, credible, and competitive from a first-screen HR perspective. It cannot override `FactualReviewer` on truthfulness.
+
 ## Evidence Notes
 
 Use `source_notes` to distinguish:

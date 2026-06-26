@@ -41,6 +41,10 @@ Output JSON:
   "resume_angle": "",
   "application_strategy": "",
   "interview_risks": [],
+  "agent_claims": [],
+  "evidence_challenges": [],
+  "disagreements_with": [],
+  "handoff_questions": [],
   "needs_user_confirmation": [],
   "confidence": "high|medium|low"
 }
