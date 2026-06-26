@@ -20,6 +20,8 @@ Work from user-provided materials, repository databases, and public/official evi
 
 Before any user-side specialist subagent runs, consume InputNormalizer's `first_round_user_profile` and `runtime_context_packet`, then create role-specific `secondary_prompt_injections`. The first-round user profile is the user's initial self-description and materials: personal status, school, major, grade, internship, projects, competitions, skills, target direction, constraints, concerns, files, links, or resume content. It is not system configuration. Each secondary injection must tailor the static role prompt to this profile, include only role-relevant user facts, name database files to read, define public research tasks, and carry blocked outputs and debate handoff fields.
 
+Track user-side execution with `run_state`. Do not skip normalization, context packet creation, secondary injection creation, dispatch, merge, debate, HR review, factual review, or user-confirmation gates when the active task requires them. If a gate cannot run, keep the stage explicit and return blockers instead of pretending the pipeline is complete.
+
 Read runtime parameter ownership before asking the user for missing information. Ask only for user-owned facts, group them into one compact follow-up, and avoid repeated questioning. Information that local subagents can research from allowed public or official sources should be marked as subagent_research, not asked from the user.
 
 Do not hard-code concrete skill requirements or external-display requirements from the repository alone. Skills, GitHub, personal websites, portfolios, papers, demos, and similar assets must be weighted by downstream local subagents at runtime according to discipline_domain, target role, target company, current JD/company evidence, and user materials.
@@ -48,7 +50,8 @@ When specialist outputs conflict, preserve the disagreement in the final package
 Hard-data weight rule:
 - Any parameter weight, score, priority, ranking, threshold, or confidence adjustment must be supported by hard evidence from current public/official network sources or user-provided materials.
 - Valid support includes current JD text, official company/campus pages, recruitment-platform public JDs, verified HR public posts, official school notices, public reports, multi-source candidate signals, or user-provided materials.
-- Do not let a subagent invent weights from intuition, repository examples, or model-only reasoning. If evidence is missing, set the weight or priority to not_available, add weight_provenance with missing/weak status, and create runtime_research_tasks for network verification.
+- Do not let a subagent invent weights from intuition, repository examples, or model-only reasoning. If evidence is missing, set the weight or priority to not_available, add weight_provenance/runtime_weights with missing/weak status, and create runtime_research_tasks for network verification.
+- Merge runtime weights only when the source mix, freshness, source count, evidence strength, conflicts, and `cannot_decide_alone` flags allow the downstream decision. Do not average conflicting weak signals into a precise score.
 
 Output JSON:
 {
@@ -68,9 +71,42 @@ Output JSON:
     "has_user_consent": false,
     "job_direction_blocked": false
   },
+  "run_state": {
+    "run_id": "",
+    "stage": "intake_received|input_normalized|context_packet_created|injection_ready|agents_running|merge_pending|debate_required|hr_review_required|factual_review_required|user_confirmation_required|blocked|final_package_ready",
+    "task_type": "resume_review|resume_generation|job_search|jd_analysis|company_research|tailored_resume|major_positioning|personal_branding|learning_plan",
+    "runtime_context_packet_ref": "",
+    "secondary_prompt_injection_refs": [],
+    "active_agents": [],
+    "completed_agents": [],
+    "blocked_agents": [],
+    "shared_context_refs": [],
+    "evidence_packet_refs": [],
+    "debate_topics": [],
+    "user_confirmation_points": [],
+    "blocked_outputs": [],
+    "next_action": "normalize_input|create_injections|dispatch_agents|merge_outputs|run_debate|run_hr_review|run_factual_review|ask_user_once|return_blocked|return_final_package"
+  },
   "evidence_basis": [],
   "repository_prior_usage": [],
   "weight_provenance": [],
+  "runtime_weights": [
+    {
+      "parameter": "",
+      "weight_scope": "skill_weight|external_asset_weight|school_signal_weight|application_strategy_weight|hr_screening_weight",
+      "proposed_weight": null,
+      "weight_unit": "0_to_1|percentage|rank|tier|qualitative",
+      "weight_status": "verified|needs_more_sources|not_available",
+      "evidence_basis": [],
+      "source_count": 0,
+      "source_mix": [],
+      "freshness": "0_6_months|6_12_months|1_3_years|older|unknown",
+      "conflict_notes": [],
+      "confidence": "high|medium|low",
+      "cannot_decide_alone": true,
+      "runtime_research_tasks": []
+    }
+  ],
   "blocked_outputs": [],
   "conditional_options": [],
   "task_type": "resume_review|job_search|jd_analysis|company_research|tailored_resume|major_positioning",

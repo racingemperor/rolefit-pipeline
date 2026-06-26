@@ -187,6 +187,58 @@ Before user-side specialist subagents run, the orchestrator should expose:
 
 Each injected prompt must be derived from `runtime_context_packet`, the target role's static prompt, and the smallest relevant database subset. Do not dispatch a specialist with only the static role prompt. Do not pass all user data to every role; minimize private and irrelevant facts by role.
 
+## Runtime Orchestration Fields
+
+Pipeline-level orchestration should expose:
+
+```json
+{
+  "run_state": {
+    "run_id": "",
+    "stage": "intake_received|input_normalized|context_packet_created|injection_ready|agents_running|merge_pending|debate_required|hr_review_required|factual_review_required|user_confirmation_required|blocked|final_package_ready",
+    "task_type": "resume_review|resume_generation|job_search|jd_analysis|company_research|tailored_resume|major_positioning|personal_branding|learning_plan",
+    "runtime_context_packet_ref": "",
+    "secondary_prompt_injection_refs": [],
+    "active_agents": [],
+    "completed_agents": [],
+    "blocked_agents": [],
+    "shared_context_refs": [],
+    "evidence_packet_refs": [],
+    "debate_topics": [],
+    "user_confirmation_points": [],
+    "blocked_outputs": [],
+    "next_action": "normalize_input|create_injections|dispatch_agents|merge_outputs|run_debate|run_hr_review|run_factual_review|ask_user_once|return_blocked|return_final_package"
+  }
+}
+```
+
+Use `run_state` to prevent silent stage skipping. If a required gate is missing, return `blocked` or keep the current stage with explicit blockers.
+
+## User Interaction Fields
+
+User-facing intake and follow-up steps should expose:
+
+```json
+{
+  "user_interaction_state": {
+    "interaction_mode": "resume_only|direction_analysis|targeted_application|learning_plan|personal_branding|unknown",
+    "information_completeness": "sufficient|partial|insufficient",
+    "user_followup_policy": "one_round_only",
+    "known_information_summary": "",
+    "next_possible_actions": [],
+    "missing_user_owned_facts": [],
+    "subagent_research_not_asked_from_user": [],
+    "incomplete_resume_consent_required": false,
+    "incomplete_resume_allowed": false,
+    "application_direction_allowed": false,
+    "blocked_outputs": [],
+    "one_round_followup_prompt": ""
+  }
+}
+```
+
+Use this state to keep first responses concise: summarize known facts, explain what can and cannot be done, then ask one compact batch for missing user-owned facts only when needed.
+
 ## Parameter Ownership Fields
 
 Roles that ask questions, research public data, or set weights should expose:
@@ -203,7 +255,24 @@ Roles that ask questions, research public data, or set weights should expose:
     "skill_weights": [],
     "external_asset_weights": [],
     "school_signal_weights": []
-  }
+  },
+  "runtime_weights": [
+    {
+      "parameter": "",
+      "weight_scope": "skill_weight|external_asset_weight|school_signal_weight|application_strategy_weight|hr_screening_weight",
+      "proposed_weight": null,
+      "weight_unit": "0_to_1|percentage|rank|tier|qualitative",
+      "weight_status": "verified|needs_more_sources|not_available",
+      "evidence_basis": [],
+      "source_count": 0,
+      "source_mix": [],
+      "freshness": "0_6_months|6_12_months|1_3_years|older|unknown",
+      "conflict_notes": [],
+      "confidence": "high|medium|low",
+      "cannot_decide_alone": true,
+      "runtime_research_tasks": []
+    }
+  ]
 }
 ```
 
