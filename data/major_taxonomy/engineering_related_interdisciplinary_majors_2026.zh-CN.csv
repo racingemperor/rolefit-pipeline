@@ -1,0 +1,16 @@
+﻿code,name,official_class_code,official_class_name,degree_award,old_major_code,primary_cluster,primary_cluster_name,cross_tags,engineering_related
+140001TK,未来机器人,14,交叉学科,工学,083201TK,automation_control_robotics,自动化、控制与机器人工程类,机器人/智能装备;自动化控制;机械设计;数据与 AI,True
+140002TK,交叉工程,14,交叉学科,工学,083202TK,engineering_mechanics_simulation,工程力学、仿真与基础建模类,系统工程;工程分析;数学建模,True
+140003TK,低空技术与工程,14,交叉学科,工学,083203TK,aerospace_marine_defense_nuclear,航空航天、海洋、兵器与核工程类,低空经济;高端装备;交通;无人系统,True
+140004TK,集成电路科学与工程,14,交叉学科,工学,083204TK,electronics_communication_ic,电子信息、通信与集成电路类,半导体;电子信息;芯片;工艺研发,True
+140005T,碳中和科学与工程,14,交叉学科,工学,083205T,resources_environment_safety,资源、地质、矿业、环境与安全类,碳中和;新能源;环境;材料科学,True
+140006T,智慧城市与空间规划,14,交叉学科,工学,083206T,civil_architecture_spatial_infrastructure,土木、建筑、水利与空间基础设施类,智慧城市;空间信息;BIM;城市规划,True
+140007T,智能医学工程,14,交叉学科,工学,101011T,biomedical_bioengineering_health,生物医学、生物工程与健康工程类,医疗器械;数据与 AI;医学影像;法规质量,True
+140008T,生物医药数据科学,14,交叉学科,理学,101012T,biomedical_bioengineering_health,生物医学、生物工程与健康工程类,生物医学;数据与 AI;生物信息;医学数据,True
+140009T,智能影像工程,14,交叉学科,工学,101013T,biomedical_bioengineering_health,生物医学、生物工程与健康工程类,医学影像;数据与 AI;医疗器械;算法,True
+140010TK,医工学,14,交叉学科,工学,101014TK,biomedical_bioengineering_health,生物医学、生物工程与健康工程类,医疗器械;生物医学;工程医学;法规质量,True
+140011TK,医疗器械与装备工程,14,交叉学科,工学,101015TK,biomedical_bioengineering_health,生物医学、生物工程与健康工程类,医疗器械;装备;法规质量;硬件,True
+140012TK,具身智能,14,交叉学科,工学,,computer_ai_software,计算机与 AI 软件类,具身智能;机器人/智能装备;数据与 AI;自动化控制,True
+140013TK,脑机科学与技术,14,交叉学科,工学,,biomedical_bioengineering_health,生物医学、生物工程与健康工程类,脑机接口;生物医学;数据与 AI;电子信息,True
+140014T,工程互联网,14,交叉学科,工学,,computer_ai_software,计算机与 AI 软件类,工业互联网;软件工程;智能制造;数据与 AI,True
+140015T,深地科学与工程,14,交叉学科,工学,,resources_environment_safety,资源、地质、矿业、环境与安全类,深地工程;资源;地质;工程分析,True

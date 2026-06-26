@@ -1,0 +1,267 @@
+{
+  "metadata": {
+    "version": "0.1.0",
+    "language": "zh-CN",
+    "source_title": "普通高等学校本科专业目录（2026年）",
+    "source_url": "https://www.moe.gov.cn/srcsite/A08/moe_1034/s3882/202604/W020260427440749576927.pdf",
+    "scope": "14 学科门类：交叉学科中与工程就业高度相关的专业",
+    "note": "这些专业不属于 08 工学门类，但多项授予工学学士，适合作为工科相关交叉专业进入求职分类器。",
+    "generated_on": "2026-06-26"
+  },
+  "majors": [
+    {
+      "code": "140001TK",
+      "name": "未来机器人",
+      "official_class_code": "14",
+      "official_class_name": "交叉学科",
+      "degree_award": "工学",
+      "old_major_code": "083201TK",
+      "primary_cluster": "automation_control_robotics",
+      "primary_cluster_name": "自动化、控制与机器人工程类",
+      "cross_tags": [
+        "机器人/智能装备",
+        "自动化控制",
+        "机械设计",
+        "数据与 AI"
+      ],
+      "engineering_related": true
+    },
+    {
+      "code": "140002TK",
+      "name": "交叉工程",
+      "official_class_code": "14",
+      "official_class_name": "交叉学科",
+      "degree_award": "工学",
+      "old_major_code": "083202TK",
+      "primary_cluster": "engineering_mechanics_simulation",
+      "primary_cluster_name": "工程力学、仿真与基础建模类",
+      "cross_tags": [
+        "系统工程",
+        "工程分析",
+        "数学建模"
+      ],
+      "engineering_related": true
+    },
+    {
+      "code": "140003TK",
+      "name": "低空技术与工程",
+      "official_class_code": "14",
+      "official_class_name": "交叉学科",
+      "degree_award": "工学",
+      "old_major_code": "083203TK",
+      "primary_cluster": "aerospace_marine_defense_nuclear",
+      "primary_cluster_name": "航空航天、海洋、兵器与核工程类",
+      "cross_tags": [
+        "低空经济",
+        "高端装备",
+        "交通",
+        "无人系统"
+      ],
+      "engineering_related": true
+    },
+    {
+      "code": "140004TK",
+      "name": "集成电路科学与工程",
+      "official_class_code": "14",
+      "official_class_name": "交叉学科",
+      "degree_award": "工学",
+      "old_major_code": "083204TK",
+      "primary_cluster": "electronics_communication_ic",
+      "primary_cluster_name": "电子信息、通信与集成电路类",
+      "cross_tags": [
+        "半导体",
+        "电子信息",
+        "芯片",
+        "工艺研发"
+      ],
+      "engineering_related": true
+    },
+    {
+      "code": "140005T",
+      "name": "碳中和科学与工程",
+      "official_class_code": "14",
+      "official_class_name": "交叉学科",
+      "degree_award": "工学",
+      "old_major_code": "083205T",
+      "primary_cluster": "resources_environment_safety",
+      "primary_cluster_name": "资源、地质、矿业、环境与安全类",
+      "cross_tags": [
+        "碳中和",
+        "新能源",
+        "环境",
+        "材料科学"
+      ],
+      "engineering_related": true
+    },
+    {
+      "code": "140006T",
+      "name": "智慧城市与空间规划",
+      "official_class_code": "14",
+      "official_class_name": "交叉学科",
+      "degree_award": "工学",
+      "old_major_code": "083206T",
+      "primary_cluster": "civil_architecture_spatial_infrastructure",
+      "primary_cluster_name": "土木、建筑、水利与空间基础设施类",
+      "cross_tags": [
+        "智慧城市",
+        "空间信息",
+        "BIM",
+        "城市规划"
+      ],
+      "engineering_related": true
+    },
+    {
+      "code": "140007T",
+      "name": "智能医学工程",
+      "official_class_code": "14",
+      "official_class_name": "交叉学科",
+      "degree_award": "工学",
+      "old_major_code": "101011T",
+      "primary_cluster": "biomedical_bioengineering_health",
+      "primary_cluster_name": "生物医学、生物工程与健康工程类",
+      "cross_tags": [
+        "医疗器械",
+        "数据与 AI",
+        "医学影像",
+        "法规质量"
+      ],
+      "engineering_related": true
+    },
+    {
+      "code": "140008T",
+      "name": "生物医药数据科学",
+      "official_class_code": "14",
+      "official_class_name": "交叉学科",
+      "degree_award": "理学",
+      "old_major_code": "101012T",
+      "primary_cluster": "biomedical_bioengineering_health",
+      "primary_cluster_name": "生物医学、生物工程与健康工程类",
+      "cross_tags": [
+        "生物医学",
+        "数据与 AI",
+        "生物信息",
+        "医学数据"
+      ],
+      "engineering_related": true
+    },
+    {
+      "code": "140009T",
+      "name": "智能影像工程",
+      "official_class_code": "14",
+      "official_class_name": "交叉学科",
+      "degree_award": "工学",
+      "old_major_code": "101013T",
+      "primary_cluster": "biomedical_bioengineering_health",
+      "primary_cluster_name": "生物医学、生物工程与健康工程类",
+      "cross_tags": [
+        "医学影像",
+        "数据与 AI",
+        "医疗器械",
+        "算法"
+      ],
+      "engineering_related": true
+    },
+    {
+      "code": "140010TK",
+      "name": "医工学",
+      "official_class_code": "14",
+      "official_class_name": "交叉学科",
+      "degree_award": "工学",
+      "old_major_code": "101014TK",
+      "primary_cluster": "biomedical_bioengineering_health",
+      "primary_cluster_name": "生物医学、生物工程与健康工程类",
+      "cross_tags": [
+        "医疗器械",
+        "生物医学",
+        "工程医学",
+        "法规质量"
+      ],
+      "engineering_related": true
+    },
+    {
+      "code": "140011TK",
+      "name": "医疗器械与装备工程",
+      "official_class_code": "14",
+      "official_class_name": "交叉学科",
+      "degree_award": "工学",
+      "old_major_code": "101015TK",
+      "primary_cluster": "biomedical_bioengineering_health",
+      "primary_cluster_name": "生物医学、生物工程与健康工程类",
+      "cross_tags": [
+        "医疗器械",
+        "装备",
+        "法规质量",
+        "硬件"
+      ],
+      "engineering_related": true
+    },
+    {
+      "code": "140012TK",
+      "name": "具身智能",
+      "official_class_code": "14",
+      "official_class_name": "交叉学科",
+      "degree_award": "工学",
+      "old_major_code": "",
+      "primary_cluster": "computer_ai_software",
+      "primary_cluster_name": "计算机与 AI 软件类",
+      "cross_tags": [
+        "具身智能",
+        "机器人/智能装备",
+        "数据与 AI",
+        "自动化控制"
+      ],
+      "engineering_related": true
+    },
+    {
+      "code": "140013TK",
+      "name": "脑机科学与技术",
+      "official_class_code": "14",
+      "official_class_name": "交叉学科",
+      "degree_award": "工学",
+      "old_major_code": "",
+      "primary_cluster": "biomedical_bioengineering_health",
+      "primary_cluster_name": "生物医学、生物工程与健康工程类",
+      "cross_tags": [
+        "脑机接口",
+        "生物医学",
+        "数据与 AI",
+        "电子信息"
+      ],
+      "engineering_related": true
+    },
+    {
+      "code": "140014T",
+      "name": "工程互联网",
+      "official_class_code": "14",
+      "official_class_name": "交叉学科",
+      "degree_award": "工学",
+      "old_major_code": "",
+      "primary_cluster": "computer_ai_software",
+      "primary_cluster_name": "计算机与 AI 软件类",
+      "cross_tags": [
+        "工业互联网",
+        "软件工程",
+        "智能制造",
+        "数据与 AI"
+      ],
+      "engineering_related": true
+    },
+    {
+      "code": "140015T",
+      "name": "深地科学与工程",
+      "official_class_code": "14",
+      "official_class_name": "交叉学科",
+      "degree_award": "工学",
+      "old_major_code": "",
+      "primary_cluster": "resources_environment_safety",
+      "primary_cluster_name": "资源、地质、矿业、环境与安全类",
+      "cross_tags": [
+        "深地工程",
+        "资源",
+        "地质",
+        "工程分析"
+      ],
+      "engineering_related": true
+    }
+  ]
+}

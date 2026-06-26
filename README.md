@@ -39,9 +39,11 @@
       SKILL.md
       references/
         data-source-policy.md
+        major-cluster-taxonomy.md
         resume-writing-rules.md
         job-analysis-rubric.md
       scripts/
+        classify_major.py
         parse_resume.py
         normalize_job_postings.py
         score_fit.py
@@ -49,6 +51,7 @@
 
 .codex/
   agents/
+    major-cluster-classifier.toml
     profile-extractor.toml
     jd-analyzer.toml
     job-scout.toml
@@ -59,6 +62,16 @@
     personal-branding-strategist.toml
     resume-architect.toml
     factual-reviewer.toml
+
+data/
+  major_taxonomy/
+    engineering_official_majors_2026.zh-CN.json
+    engineering_employment_clusters.zh-CN.json
+    engineering_employment_clusters.zh-CN.md
+    engineering_major_index.zh-CN.csv
+    engineering_related_interdisciplinary_majors_2026.zh-CN.json
+    engineering_related_interdisciplinary_majors_2026.zh-CN.csv
+    summary.json
 ```
 
 其中：
@@ -67,6 +80,7 @@
 - `.codex/agents/*.toml` 定义具体角色，每个角色只负责一个清晰切面。
 - `scripts/` 处理确定性任务，例如简历解析、JD 标准化、schema 校验、匹配分计算、文档渲染。
 - `references/` 存放规则、rubric、数据来源政策和写作准则，避免把大量知识塞进主 prompt。
+- `data/` 提供项目自带的静态数据库。第一批数据库是中国本科工科专业目录与就业导向大类映射，后续可扩展岗位族、技能图谱、学习路径模板和个人展示模板。
 
 ## 4. 总体 Pipeline
 
@@ -75,6 +89,7 @@
 ```text
 User Input
   -> Career Orchestrator
+  -> MajorClusterClassifier
   -> ProfileExtractor
   -> JDAnalyzer
   -> JobScout
@@ -90,14 +105,17 @@ User Input
 
 根据任务类型可以裁剪流程：
 
+- 只做专业定位：`MajorClusterClassifier`
 - 只分析简历：`ProfileExtractor -> ResumeArchitect -> FactualReviewer`
 - 只分析岗位：`JDAnalyzer -> CompanyIntelligenceAnalyst -> MarketSentimentAnalyzer`
 - 目标岗位定制简历：完整流程
-- 找岗位：`ProfileExtractor -> JobScout -> JDAnalyzer -> MatchStrategist -> LearningPathStrategist`
+- 找岗位：`MajorClusterClassifier -> ProfileExtractor -> JobScout -> JDAnalyzer -> MatchStrategist -> LearningPathStrategist`
 
 这个 pipeline 不应只做静态匹配。对于有潜力但当前条件不完全满足的用户，系统应输出一条“成长型匹配”路线：先学习、补项目、补证据，再决定是否投递和如何包装简历。例如用户会 Python、Java 和工程基础，但缺少 LLM 相关知识时，不应简单判定“不匹配 LLM 应用岗”，而应给出可执行的 AI / LLM 学习路径、项目建议、产出证据和简历转化方式。
 
 同时，pipeline 也应包含“个人包装”能力。不同专业和行业看待候选人的方式不同：计算机相关岗位常需要 GitHub、项目 demo、技术博客、个人网站或开源贡献作为展示；设计岗位更重作品集；科研岗位更重论文、主页和 Google Scholar；产品和运营岗位更重案例、数据结果和业务分析。因此系统应根据目标行业设计个人展示面，而不是只改一份简历。
+
+流程起点应先根据用户专业做就业导向的大类归并。这个归并参考中国高校工科专业设置，但不完全等同于官方专业类，而是服务于就业匹配。一个专业可以有多个标签：系统应输出“主就业大类 + 交叉标签 + 权重 + 推荐岗位方向”。例如人工智能在官方目录中可作为电子信息相关专业出现，但在求职建议中通常可主归“计算机与 AI 软件类”，同时带有电子信息、自动化、数学建模等副标签；机器人工程则可能横跨自动化、机械、电子信息和计算机。用户输入具体专业后，系统先判断大类和交叉标签，再在相近专业群中横向比较能力差距，推荐更适合补齐的技能和岗位方向。
 
 ## 5. 角色设计
 
@@ -134,7 +152,60 @@ User Input
 }
 ```
 
-### 5.2 ProfileExtractor
+### 5.2 MajorClusterClassifier
+
+专业大类分类员。负责回答：“用户的具体专业在就业上应归入哪些能力大类，应和哪些相近专业横向比较？”
+
+这个角色用于 pipeline 的最前置分类。它参考中国高校工科专业目录，但采用就业导向的交叉分类，而不是只按官方专业类做单标签归档。一个专业可以同时拥有多个标签，并且不同标签有不同权重。
+
+默认应读取仓库自带数据库：
+
+- `data/major_taxonomy/engineering_employment_clusters.zh-CN.json`
+- `data/major_taxonomy/engineering_major_index.zh-CN.csv`
+
+输入：
+
+- 用户专业名称，例如人工智能、机器人工程、电子信息工程、机械设计制造及其自动化。
+- 学校、学院、培养方案、课程列表、项目经历。
+- 用户目标行业和岗位方向。
+- 用户已有技能和作品。
+
+工作方面：
+
+- 标准化专业名称：处理简称、旧专业名、实验班、交叉学院、方向班。
+- 主就业大类判断：给出最适合用于求职匹配的主类。
+- 交叉标签识别：给出 2-5 个副标签，例如计算机、电子信息、自动化、机械、材料、能源、土木、数学建模。
+- 权重分配：标记每个标签对就业匹配的影响权重。
+- 相近专业横向对比：指出应和哪些专业一起比较能力，例如人工智能可和计算机、软件工程、数据科学横向比较。
+- 能力底座判断：判断用户专业天然具备哪些基础，例如数学、编程、电路、控制、机械设计、材料实验、工艺流程。
+- 岗位方向初筛：给出该专业群常见岗位、相邻岗位、转向岗位。
+- 补齐方向建议：指出如果用户想进入某类岗位，需要补哪些能力。
+
+输出：
+
+```json
+{
+  "normalized_major": "",
+  "primary_cluster": "",
+  "cross_tags": [
+    {"tag": "", "weight": 0.0, "reason": ""}
+  ],
+  "peer_majors": [],
+  "natural_strengths": [],
+  "likely_role_families": [],
+  "adjacent_role_families": [],
+  "skill_gaps_by_target": {}
+}
+```
+
+禁止事项：
+
+- 不把一个专业强行塞进唯一大类。
+- 不完全照搬官方专业类；官方分类只作为参考。
+- 不把专业名称等同于个人能力，必须结合课程、项目和技能。
+- 不把热门方向强推给所有专业。
+
+### 5.3 ProfileExtractor
 
 候选人画像提取员。负责回答：“这个人到底能做什么，有哪些可证明的证据？”
 
@@ -179,7 +250,7 @@ User Input
 - 不把推断当事实。
 - 不决定投递优先级。
 
-### 5.3 JDAnalyzer
+### 5.4 JDAnalyzer
 
 岗位分析员。负责回答：“这个岗位真正筛选什么人？”
 
@@ -223,7 +294,7 @@ User Input
 - 不把招聘宣传语当事实。
 - 不用社交媒体传闻覆盖招聘软件或公司官网中的明确岗位要求。
 
-### 5.4 JobScout
+### 5.5 JobScout
 
 岗位侦察员。负责回答：“有哪些岗位值得进入候选池？”
 
@@ -272,7 +343,7 @@ User Input
 - 不虚构岗位。
 - 不深度改写简历。
 
-### 5.5 CompanyIntelligenceAnalyst
+### 5.6 CompanyIntelligenceAnalyst
 
 公司情报分析员。负责回答：“这家公司现在处在什么状态，这个岗位有没有战略价值？”
 
@@ -326,7 +397,7 @@ User Input
 - 不做投资建议。
 - 不输出未经来源支持的强判断。
 
-### 5.6 MarketSentimentAnalyzer
+### 5.7 MarketSentimentAnalyzer
 
 外部评价与风向分析员。负责回答：“外界如何评价这家公司、岗位和行业方向？”
 
@@ -378,7 +449,7 @@ User Input
 - 不把情绪性评价当事实。
 - 不输出诽谤性或无法来源支撑的结论。
 
-### 5.7 MatchStrategist
+### 5.8 MatchStrategist
 
 匹配策略师。负责回答：“这个人该不该投这个岗位，应该怎么打？”
 
@@ -424,7 +495,7 @@ User Input
 - 不做最终简历改写。
 - 不替用户做人生选择，只给可解释建议。
 
-### 5.8 LearningPathStrategist
+### 5.9 LearningPathStrategist
 
 学习路径策略师。负责回答：“如果用户现在还不完全匹配目标岗位，应该补什么、怎么补、补到什么证据级别后再投？”
 
@@ -491,7 +562,7 @@ User Input
 - 不让用户为了热门方向强行转向完全不适合的岗位。
 - 不承诺学习后一定获得 offer。
 
-### 5.9 PersonalBrandingStrategist
+### 5.10 PersonalBrandingStrategist
 
 个人包装策略师。负责回答：“除了简历之外，用户应该用哪些外部展示资产证明自己？”
 
@@ -551,7 +622,7 @@ User Input
 - 不把所有行业都套用同一套 GitHub / 个人网站模板。
 - 不为了视觉包装牺牲内容真实性。
 
-### 5.10 ResumeArchitect
+### 5.11 ResumeArchitect
 
 简历架构师。负责回答：“如何把真实经历组织成最适合这个岗位的表达？”
 
@@ -594,7 +665,7 @@ User Input
 - 不为了 ATS 牺牲可读性。
 - 不绕过 FactualReviewer。
 
-### 5.11 FactualReviewer
+### 5.12 FactualReviewer
 
 事实与风险审查员。负责回答：“这份简历和建议是否真实、合规、可防御？”
 
@@ -635,11 +706,112 @@ User Input
 - 不通过没有证据的强 claim。
 - 不为了好看牺牲真实性。
 
-## 6. 数据来源设计
+## 6. 中国工科专业就业大类预分类
+
+这套分类用于求职匹配，不是官方专业目录的替代品。官方专业类用于识别专业背景，求职大类用于判断岗位能力和补齐路径。一个专业可以拥有多个交叉标签。
+
+仓库已经提供一份静态数据库，不需要每次运行时重新抓取或重新分类：
+
+- `data/major_taxonomy/engineering_official_majors_2026.zh-CN.json`
+- `data/major_taxonomy/engineering_employment_clusters.zh-CN.json`
+- `data/major_taxonomy/engineering_employment_clusters.zh-CN.md`
+- `data/major_taxonomy/engineering_major_index.zh-CN.csv`
+- `data/major_taxonomy/engineering_related_interdisciplinary_majors_2026.zh-CN.json`
+- `data/major_taxonomy/engineering_related_interdisciplinary_majors_2026.zh-CN.csv`
+- `data/major_taxonomy/summary.json`
+
+数据来源为教育部《普通高等学校本科专业目录（2026年）》中 `08 学科门类：工学`。当前版本抽取了 31 个官方工学专业类、293 个工科专业，并归并为 17 个就业导向大类。每个具体专业只有一个 `primary_cluster`，以降低不同大类之间的专业重合；但可以有多个 `cross_tags`，用于表示交叉分类和相邻岗位方向。
+
+另外，目录中的 `14 学科门类：交叉学科` 包含一批与工科就业强相关的新专业，例如未来机器人、低空技术与工程、具身智能、工程互联网、集成电路科学与工程等。它们不属于 `08 工学` 门类，但多项授予工学学士学位，因此单独放入 `engineering_related_interdisciplinary_majors_2026.zh-CN.*`，作为 MajorClusterClassifier 的补充查询库。
+
+### 6.1 分类原则
+
+- 使用“主就业大类 + 交叉标签 + 权重”的形式。
+- 主就业大类表示最常见、最直接的就业方向。
+- 交叉标签表示该专业可迁移到的相邻能力域。
+- 权重应结合用户课程、项目、技能和目标岗位动态调整。
+- 相同专业在不同学校可能方向不同，例如自动化可能偏控制、机器人、嵌入式、工业过程或 AI。
+- 专业分类只做初筛，不能替代个人能力画像。
+
+输出示例：
+
+```json
+{
+  "normalized_major": "人工智能",
+  "primary_cluster": "计算机与 AI 软件类",
+  "cross_tags": [
+    {"tag": "电子信息", "weight": 0.25, "reason": "专业设置与智能感知、信号处理、嵌入式方向相关"},
+    {"tag": "自动化与控制", "weight": 0.20, "reason": "机器人、控制、智能系统方向可迁移"},
+    {"tag": "数学与数据建模", "weight": 0.20, "reason": "机器学习、优化、统计建模是能力底座"}
+  ],
+  "peer_majors": ["计算机科学与技术", "软件工程", "数据科学与大数据技术", "智能科学与技术"],
+  "likely_role_families": ["AI 应用工程", "算法工程", "数据科学", "后端/平台工程"],
+  "skill_gaps_by_target": {
+    "LLM 应用工程": ["RAG", "向量数据库", "LLM eval", "工程部署"]
+  }
+}
+```
+
+### 6.2 预分类摘要
+
+完整专业清单见 `data/major_taxonomy/engineering_employment_clusters.zh-CN.md`。下表只展示就业大类摘要，具体专业归属以静态数据库为准。
+
+| 就业大类 | 覆盖专业数 | 官方专业类 | 典型岗位 |
+|---|---:|---|---|
+| 计算机与 AI 软件类 | 20 | 0809 | 后端开发、前端/全栈、客户端开发、AI 应用工程、算法工程、数据工程 |
+| 电子信息、通信与集成电路类 | 22 | 0807 | 硬件工程师、嵌入式工程师、通信算法、FPGA、芯片设计、半导体工艺 |
+| 自动化、控制与机器人工程类 | 8 | 0808 | 控制算法、机器人工程、嵌入式控制、PLC/工业自动化、运动控制、系统集成 |
+| 机械、车辆与智能制造类 | 21 | 0802 | 机械设计、结构工程、车辆工程、制造工艺、设备工程、CAE 仿真 |
+| 仪器、测控与智能感知类 | 3 | 0803 | 测试测量工程师、传感器工程师、仪器研发、硬件测试、智能感知工程师 |
+| 材料、半导体材料与新能源材料类 | 23 | 0804 | 材料研发、工艺工程、质量工程、半导体材料、电池材料、检测分析 |
+| 能源动力、电气与电力系统类 | 18 | 0805, 0806 | 电气工程师、电力系统、新能源工程、储能工程、热能工程、电控工程 |
+| 土木、建筑、水利与空间基础设施类 | 34 | 0810, 0811, 0812, 0828 | 结构工程、施工管理、BIM 工程、水利工程、测绘/GIS、城市规划支持 |
+| 化工、制药与过程工程类 | 9 | 0813 | 化工工艺、制药工艺、生产工程、过程安全、质量检测、研发助理 |
+| 资源、地质、矿业、环境与安全类 | 28 | 0814, 0815, 0825, 0829 | 地质工程、资源勘查、矿业工程、环境工程、EHS、安全工程 |
+| 交通运输、轨道与航运运行类 | 13 | 0818 | 交通规划、运输管理、轨道交通、航运技术、智慧交通、交通设备控制 |
+| 航空航天、海洋、兵器与核工程类 | 31 | 0819, 0820, 0821, 0822 | 飞行器设计、航天系统、船舶设计、海洋装备、无人系统、制导控制 |
+| 农业、林业与生态装备工程类 | 13 | 0823, 0824 | 农业装备、农业自动化、林业工程、木材加工、家具工程、生态装备 |
+| 纺织、轻工、食品与消费品制造类 | 26 | 0816, 0817, 0827 | 纺织工程、服装工程、包装工程、食品研发、食品质量、轻工工艺 |
+| 生物医学、生物工程与健康工程类 | 9 | 0826, 0830 | 医疗器械、生物工程、生物制药、合成生物、临床工程、康复工程 |
+| 工程力学、仿真与基础建模类 | 2 | 0801 | CAE 仿真、结构分析、力学工程、工程建模、科研助理、仿真软件应用 |
+| 公安技术、消防与公共安全工程类 | 13 | 0831 | 公安技术、消防工程、安全防范、网络安全执法、数据警务、应急救援 |
+
+
+### 6.3 交叉分类示例
+
+- 人工智能：主类可为“计算机与 AI 软件类”；交叉标签可为电子信息、自动化、数学建模。
+- 机器人工程：主类可为“自动化、控制与机器人工程类”；交叉标签可为机械、电子信息、计算机、AI。
+- 物联网工程：主类默认为“计算机与 AI 软件类”；若学校培养明显偏硬件、通信或嵌入式，可提升电子信息、嵌入式、通信等交叉标签权重。
+- 智能制造工程：主类可为“机械、车辆与制造类”；交叉标签可为自动化、工业工程、数据分析。
+- 生物医学工程：主类可为“生物医学、生物工程与健康工程类”；交叉标签可为电子信息、医学、算法、医疗器械。
+- 新能源科学与工程：主类可为“电气与能源动力类”；交叉标签可为材料、化工、数据、设备工程。
+- 工业设计：主类可随目标岗位变化；硬件产品方向偏机械与制造，互联网产品方向可交叉产品、设计、用户研究。
+- 具身智能：来自交叉学科补充库；主类可为“计算机与 AI 软件类”，交叉标签可为机器人、自动化控制、数据与 AI。
+
+### 6.4 基于专业大类的横向对比
+
+用户输入具体专业后，系统应在同类和交叉类中横向比较，而不是直接给所有岗位打分。
+
+对比维度：
+
+- 同专业常见就业方向。
+- 相近专业更强的能力，例如软件工程强工程实践，自动化强控制和系统，电子信息强硬件和信号。
+- 用户相比同类候选人的优势和短板。
+- 目标岗位需要补齐的最短路径。
+- 哪些岗位适合立即投，哪些岗位适合学习 2-8 周后投，哪些岗位不建议当前阶段投入。
+
+示例：
+
+- 人工智能专业但工程项目弱：优先补 GitHub 项目、后端部署、LLM 应用工程，而不是只写机器学习课程。
+- 机械专业想转机器人软件：补 Python/C++、ROS、控制基础、传感器、仿真项目，再投机器人应用/测试/系统集成岗位。
+- 电子信息专业想转后端：补 Web 后端、数据库、分布式基础、项目部署，同时保留嵌入式/IoT 作为差异化标签。
+- 材料专业想去新能源企业：强化电池材料、工艺、实验数据分析、质量体系，而不是泛泛转互联网。
+
+## 7. 数据来源设计
 
 数据来源应分层处理，不同来源具有不同可信度和合规边界。
 
-### 6.1 公开岗位信息
+### 7.1 公开岗位信息
 
 用途：JDAnalyzer、JobScout、MatchStrategist。
 
@@ -675,7 +847,7 @@ User Input
 - 不破反爬。
 - 不抓取非公开数据。
 
-### 6.2 公司基本面与发展状况
+### 7.2 公司基本面与发展状况
 
 用途：CompanyIntelligenceAnalyst、MatchStrategist。
 
@@ -698,7 +870,7 @@ User Input
 - 组织稳定性。
 - 岗位是否处于核心业务。
 
-### 6.3 外界评价与市场风向
+### 7.3 外界评价与市场风向
 
 用途：MarketSentimentAnalyzer、MatchStrategist。
 
@@ -721,7 +893,7 @@ User Input
 - 输出必须带来源说明、时间和置信度。
 - 对岗位职责和任职要求的判断，优先以招聘软件公开 JD、公司官网、校招官网和用户提供 JD 为准；小红书、脉脉、牛客、知乎等只用于补充“实际工作内容、面试体验、团队氛围、隐性要求、非大厂 JD 模糊处的解释”。
 
-### 6.4 用户授权样本
+### 7.4 用户授权样本
 
 用途：构建“成功候选人画像”的合规替代方案。
 
@@ -752,7 +924,7 @@ User Input
 - 未授权录用结果。
 - 可反推出个人身份的组合信息。
 
-### 6.5 不建议或禁止的数据
+### 7.5 不建议或禁止的数据
 
 不应爬取：
 
@@ -767,7 +939,7 @@ User Input
 
 岗位分析可以来自公开 JD、公司公开信息、外界公开评价和用户授权样本；不能依赖未经授权的个人简历抓取。
 
-## 7. 证据与可信度分级
+## 8. 证据与可信度分级
 
 建议所有输出都带证据等级：
 
@@ -786,7 +958,7 @@ User Input
 - 1-3 年：低权重。
 - 3 年以上：仅作背景参考。
 
-## 8. 输出产品形态
+## 9. 输出产品形态
 
 最终输出不应该只有一份改写后的简历，而应包括一个 decision package：
 
@@ -823,7 +995,7 @@ User Input
 }
 ```
 
-## 9. MVP 建议
+## 10. MVP 建议
 
 第一版不做全网岗位搜索，先支持用户提供材料：
 
@@ -870,9 +1042,9 @@ MVP 验收标准：
 - 公司评价必须带置信度。
 - 输出能让用户明确知道下一步该做什么。
 
-## 10. 后续扩展
+## 11. 后续扩展
 
-### 10.1 Job Search 扩展
+### 11.1 Job Search 扩展
 
 增加自动岗位搜索：
 
@@ -882,7 +1054,7 @@ MVP 验收标准：
 - 岗位时效判断。
 - 关键词策略生成。
 
-### 10.2 Talent Benchmark 扩展
+### 11.2 Talent Benchmark 扩展
 
 增加授权样本库：
 
@@ -891,7 +1063,7 @@ MVP 验收标准：
 - 生成岗位成功画像。
 - 比较用户与成功画像的差距。
 
-### 10.3 Resume Rendering 扩展
+### 11.3 Resume Rendering 扩展
 
 增加输出格式：
 
@@ -902,7 +1074,7 @@ MVP 验收标准：
 - 英文 resume。
 - 一页版与详细版。
 
-### 10.4 Interview Preparation 扩展
+### 11.4 Interview Preparation 扩展
 
 增加面试准备：
 
@@ -911,7 +1083,7 @@ MVP 验收标准：
 - 根据公司业务生成业务理解题。
 - 根据项目经历生成 STAR 故事。
 
-### 10.5 Learning Roadmap 扩展
+### 11.5 Learning Roadmap 扩展
 
 增加面向目标岗位的学习路线生成：
 
@@ -922,7 +1094,7 @@ MVP 验收标准：
 - 输出“完成到什么程度才可以写进简历”的证据标准。
 - 生成学习后的简历 bullet 草稿，但必须经过 FactualReviewer 审查。
 
-### 10.6 Personal Branding 扩展
+### 11.6 Personal Branding 扩展
 
 增加个人展示资产生成和审查：
 
@@ -935,7 +1107,7 @@ MVP 验收标准：
 - 项目 demo 展示清单。
 - 隐私和 NDA 风险检查。
 
-### 10.7 Plugin 分发
+### 11.7 Plugin 分发
 
 当 skill 和 subagents 稳定后，可以打包为 Codex plugin：
 
@@ -953,7 +1125,7 @@ codex-career-plugin/
 
 插件适合团队分发；本地迭代阶段先用 repo-scoped skill 即可。
 
-## 11. 核心原则
+## 12. 核心原则
 
 1. 求职建议必须可解释。
 2. 简历改写必须可追溯到用户原始材料。

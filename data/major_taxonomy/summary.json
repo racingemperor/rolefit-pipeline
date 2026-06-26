@@ -1,0 +1,95 @@
+{
+  "official_class_count": 31,
+  "official_major_count": 293,
+  "employment_cluster_count": 17,
+  "cluster_counts": [
+    {
+      "id": "computer_ai_software",
+      "name": "计算机与 AI 软件类",
+      "primary_major_count": 20
+    },
+    {
+      "id": "electronics_communication_ic",
+      "name": "电子信息、通信与集成电路类",
+      "primary_major_count": 22
+    },
+    {
+      "id": "automation_control_robotics",
+      "name": "自动化、控制与机器人工程类",
+      "primary_major_count": 8
+    },
+    {
+      "id": "mechanical_vehicle_manufacturing",
+      "name": "机械、车辆与智能制造类",
+      "primary_major_count": 21
+    },
+    {
+      "id": "instrumentation_sensing_measurement",
+      "name": "仪器、测控与智能感知类",
+      "primary_major_count": 3
+    },
+    {
+      "id": "materials_semiconductor_new_energy",
+      "name": "材料、半导体材料与新能源材料类",
+      "primary_major_count": 23
+    },
+    {
+      "id": "energy_power_electrical",
+      "name": "能源动力、电气与电力系统类",
+      "primary_major_count": 18
+    },
+    {
+      "id": "civil_architecture_spatial_infrastructure",
+      "name": "土木、建筑、水利与空间基础设施类",
+      "primary_major_count": 34
+    },
+    {
+      "id": "chemical_pharma_process",
+      "name": "化工、制药与过程工程类",
+      "primary_major_count": 9
+    },
+    {
+      "id": "resources_environment_safety",
+      "name": "资源、地质、矿业、环境与安全类",
+      "primary_major_count": 28
+    },
+    {
+      "id": "transportation_mobility",
+      "name": "交通运输、轨道与航运运行类",
+      "primary_major_count": 13
+    },
+    {
+      "id": "aerospace_marine_defense_nuclear",
+      "name": "航空航天、海洋、兵器与核工程类",
+      "primary_major_count": 31
+    },
+    {
+      "id": "agriculture_forestry_equipment",
+      "name": "农业、林业与生态装备工程类",
+      "primary_major_count": 13
+    },
+    {
+      "id": "textile_light_food_consumer_manufacturing",
+      "name": "纺织、轻工、食品与消费品制造类",
+      "primary_major_count": 26
+    },
+    {
+      "id": "biomedical_bioengineering_health",
+      "name": "生物医学、生物工程与健康工程类",
+      "primary_major_count": 9
+    },
+    {
+      "id": "engineering_mechanics_simulation",
+      "name": "工程力学、仿真与基础建模类",
+      "primary_major_count": 2
+    },
+    {
+      "id": "public_security_technical_engineering",
+      "name": "公安技术、消防与公共安全工程类",
+      "primary_major_count": 13
+    }
+  ],
+  "engineering_related_interdisciplinary_major_count": 15,
+  "engineering_related_interdisciplinary_engineering_degree_count": 14,
+  "total_lookup_major_count": 308
+}
