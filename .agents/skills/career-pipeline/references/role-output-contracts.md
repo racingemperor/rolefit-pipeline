@@ -27,9 +27,15 @@ Every role should include:
     "job_direction_blocked": false
   },
   "evidence_basis": [],
+  "artifact_refs": [],
+  "execution_log_refs": [],
+  "invocation_ref": "",
+  "role_output_packet_ref": "",
+  "error_recovery_state_ref": "",
   "repository_prior_usage": [],
   "weight_provenance": [],
   "blocked_outputs": [],
+  "degraded_outputs": [],
   "conditional_options": [],
   "runtime_research_tasks": [],
   "evidence_requirements": [],
@@ -41,6 +47,8 @@ Every role should include:
 ```
 
 Use `evidence_bound_judgment` only when the judgment is limited to supplied user materials, current JD text, current public evidence gathered by runtime subagents, or a static taxonomy/schema lookup. Use `runtime_evidence_required` or `blocked` when current evidence or user-owned facts are missing.
+
+Use `artifact_refs`, `execution_log_refs`, `invocation_ref`, `role_output_packet_ref`, and `error_recovery_state_ref` for traceability. A role output that cannot be tied to a run, invocation, artifact, or role output packet should not be merged into a final package.
 
 Each `evidence_basis` item should identify the supported claim:
 
@@ -81,6 +89,94 @@ Each `weight_provenance` item should use:
 ```
 
 Use `cannot_decide_alone = true` for repository priors, single weak social posts, stale sources, or model inference.
+
+## Runtime Execution And Artifact Fields
+
+Runtime wrappers should preserve these fields when available:
+
+```json
+{
+  "execution_manifest": {
+    "run_id": "",
+    "current_stage": "intake_received|input_normalized|context_packet_created|injection_ready|agents_running|merge_pending|debate_required|hr_review_required|factual_review_required|user_confirmation_required|blocked|final_package_ready",
+    "runtime_context_packet_ref": "",
+    "secondary_prompt_injection_refs": [],
+    "subagent_invocation_refs": [],
+    "artifact_manifest_ref": "",
+    "artifact_refs": [],
+    "evidence_packet_refs": [],
+    "runtime_weights_ref": "",
+    "error_recovery_state_ref": "",
+    "final_package_ref": ""
+  },
+  "subagent_invocation": {
+    "invocation_id": "",
+    "run_id": "",
+    "target_agent": "",
+    "base_prompt_ref": ".codex/agents/<agent>.toml",
+    "secondary_prompt_injection_ref": "",
+    "runtime_context_packet_ref": "",
+    "input_packet_ref": "",
+    "allowed_user_facts_ref": "",
+    "database_files_to_read": [],
+    "source_policy_refs": [],
+    "research_tasks": [],
+    "hard_data_weight_tasks": [],
+    "required_output_fields": [],
+    "output_artifact_target": "",
+    "expected_artifact_types": [],
+    "required_log_events": [],
+    "privacy_constraints": [],
+    "handoff_contract": [],
+    "debate_contract": [],
+    "timeout_or_budget_hint": "",
+    "retry_allowed": true,
+    "on_failure": "return_blocked|rerun_with_more_context|handoff_to_orchestrator",
+    "status": "not_started|running|done|blocked|failed|malformed"
+  },
+  "role_output_packet": {
+    "invocation_id": "",
+    "target_agent": "",
+    "status": "done|done_with_warnings|needs_context|blocked|failed|malformed",
+    "role_output_ref": "",
+    "evidence_packet_refs": [],
+    "runtime_weights_ref": "",
+    "artifact_refs": [],
+    "blocked_outputs": [],
+    "runtime_research_tasks": [],
+    "needs_user_confirmation": [],
+    "errors": []
+  },
+  "artifact_refs": [],
+  "execution_log_refs": []
+}
+```
+
+The canonical schemas live in `runtime-execution-layer.md`, `subagent-invocation-contract.md`, and `runtime-artifact-schema.md`. Role prompts may return references instead of embedding entire artifacts.
+
+Artifact references should include `artifact_id`, `run_id`, `artifact_type`, `path`, `created_by`, `privacy_class`, and safety flags when material is persisted locally. Runtime logs should be redacted by default.
+
+Specialist role prompts should return `role_output_packet` and `error_recovery_state` inline when no runtime wrapper is present. When a wrapper is present, the wrapper may persist those objects and the role output may return `role_output_packet_ref` and `error_recovery_state_ref`; the orchestrator must resolve the refs before merging.
+
+## Error Recovery Fields
+
+When a role blocks, fails, returns malformed output, or produces only safe partial output, expose:
+
+```json
+{
+  "error_recovery_state": {
+    "status": "not_applicable|recovered|degraded|needs_user_confirmation|needs_public_research|blocked|failed",
+    "errors": [],
+    "recovery_actions": [],
+    "degraded_outputs": [],
+    "blocked_outputs": [],
+    "safe_outputs": [],
+    "next_action": "continue|ask_user_once|run_public_research|retry_agent|run_debate|run_hr_review|run_factual_review|return_blocked_package"
+  }
+}
+```
+
+If output is degraded, downstream roles may merge safe factual fields, `evidence_basis`, `blocked_outputs`, and `runtime_research_tasks`, but must not merge final fit scores, application priorities, HR pass status, or resume tailoring decisions that depend on the failed evidence.
 
 ## Collaboration And Debate Fields
 
@@ -174,6 +270,30 @@ Before user-side specialist subagents run, the orchestrator should expose:
       "hard_data_weight_tasks": [],
       "database_files_to_read": [],
       "source_policy_refs": [],
+      "invocation_contract": {
+        "invocation_id": "",
+        "run_id": "",
+        "target_agent": "",
+        "base_prompt_ref": ".codex/agents/<agent>.toml",
+        "secondary_prompt_injection_ref": "",
+        "runtime_context_packet_ref": "",
+        "input_packet_ref": "",
+        "allowed_user_facts_ref": "",
+        "database_files_to_read": [],
+        "source_policy_refs": [],
+        "research_tasks": [],
+        "hard_data_weight_tasks": [],
+        "required_output_fields": [],
+        "output_artifact_target": "",
+        "privacy_constraints": [],
+        "handoff_contract": [],
+        "debate_contract": [],
+        "expected_artifact_types": [],
+        "required_log_events": [],
+        "timeout_or_budget_hint": "",
+        "retry_allowed": true,
+        "on_failure": "return_blocked|rerun_with_more_context|handoff_to_orchestrator"
+      },
       "blocked_outputs": [],
       "required_output_fields": [],
       "handoff_contract": [],
@@ -199,14 +319,20 @@ Pipeline-level orchestration should expose:
     "task_type": "resume_review|resume_generation|job_search|jd_analysis|company_research|tailored_resume|major_positioning|personal_branding|learning_plan",
     "runtime_context_packet_ref": "",
     "secondary_prompt_injection_refs": [],
+    "subagent_invocation_refs": [],
     "active_agents": [],
     "completed_agents": [],
     "blocked_agents": [],
+    "failed_invocations": [],
+    "artifact_manifest_ref": "",
     "shared_context_refs": [],
     "evidence_packet_refs": [],
+    "execution_log_refs": [],
     "debate_topics": [],
     "user_confirmation_points": [],
     "blocked_outputs": [],
+    "degraded_outputs": [],
+    "recovery_actions": [],
     "next_action": "normalize_input|create_injections|dispatch_agents|merge_outputs|run_debate|run_hr_review|run_factual_review|ask_user_once|return_blocked|return_final_package"
   }
 }

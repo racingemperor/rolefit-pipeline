@@ -53,6 +53,25 @@ Output JSON:
     "job_direction_blocked": false
   },
   "evidence_basis": [],
+  "artifact_refs": [],
+  "execution_log_refs": [],
+  "invocation_ref": "",
+  "role_output_packet_ref": "",
+  "error_recovery_state_ref": "",
+  "role_output_packet": {
+    "invocation_id": "",
+    "target_agent": "learning-path-strategist",
+    "status": "done|done_with_warnings|needs_context|blocked|failed|malformed",
+    "role_output_ref": "",
+    "evidence_packet_refs": [],
+    "runtime_weights_ref": "",
+    "artifact_refs": [],
+    "blocked_outputs": [],
+    "runtime_research_tasks": [],
+    "needs_user_confirmation": [],
+    "handoff_to": [],
+    "errors": []
+  },
   "repository_prior_usage": [],
   "weight_provenance": [],
   "blocked_outputs": [],
@@ -70,6 +89,7 @@ Output JSON:
   },
   "runtime_skill_research_needed": [],
   "skill_priority_weights": [],
+  "runtime_weights": [],
   "transferable_strengths": [],
   "learning_plan": {
     "7_days": [],
@@ -86,6 +106,15 @@ Output JSON:
   "disagreements_with": [],
   "handoff_questions": [],
   "needs_user_confirmation": [],
+  "error_recovery_state": {
+    "status": "not_applicable|recovered|degraded|needs_user_confirmation|needs_public_research|blocked|failed",
+    "errors": [],
+    "recovery_actions": [],
+    "degraded_outputs": [],
+    "blocked_outputs": [],
+    "safe_outputs": [],
+    "next_action": "continue|ask_user_once|run_public_research|retry_agent|run_debate|run_hr_review|run_factual_review|return_blocked_package"
+  },
   "confidence": "high|medium|low"
 }
 """

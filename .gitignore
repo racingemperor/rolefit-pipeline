@@ -1,0 +1,5 @@
+.career-pipeline-runs/
+.career-pipeline-cache/
+*.local.json
+*.private.json
+*.redacted.tmp

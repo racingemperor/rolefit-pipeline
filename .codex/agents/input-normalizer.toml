@@ -66,6 +66,11 @@ Output JSON:
     "job_direction_blocked": false
   },
   "evidence_basis": [],
+  "artifact_refs": [],
+  "execution_log_refs": [],
+  "invocation_ref": "",
+  "role_output_packet_ref": "",
+  "error_recovery_state_ref": "",
   "repository_prior_usage": [],
   "blocked_outputs": [],
   "conditional_options": [],
@@ -74,6 +79,10 @@ Output JSON:
   "shared_context_refs": [],
   "handoff_to": [],
   "input_type": "chat_brief|resume_text|markdown_file|pdf_docx|personal_website|github_or_portfolio|jd_text|jd_link|mixed|unknown",
+  "raw_input_refs": [],
+  "normalized_material_refs": [],
+  "context_packet_version": "",
+  "redaction_log_refs": [],
   "first_round_user_profile": {
     "identity_and_contact": {
       "name_or_preferred_label": "",
@@ -108,6 +117,8 @@ Output JSON:
   },
   "runtime_context_packet": {
     "packet_id": "",
+    "artifact_ref": "",
+    "context_packet_version": "",
     "created_from": "first_round_user_profile",
     "first_round_user_profile_ref": "",
     "known_user_facts": [],
@@ -117,6 +128,20 @@ Output JSON:
     "privacy_constraints": [],
     "blocked_outputs": [],
     "next_possible_actions": []
+  },
+  "role_output_packet": {
+    "invocation_id": "",
+    "target_agent": "input-normalizer",
+    "status": "done|done_with_warnings|needs_context|blocked|failed|malformed",
+    "role_output_ref": "",
+    "evidence_packet_refs": [],
+    "runtime_weights_ref": "",
+    "artifact_refs": [],
+    "blocked_outputs": [],
+    "runtime_research_tasks": [],
+    "needs_user_confirmation": [],
+    "handoff_to": [],
+    "errors": []
   },
   "user_interaction_state": {
     "interaction_mode": "resume_only|direction_analysis|targeted_application|learning_plan|personal_branding|unknown",
@@ -172,6 +197,15 @@ Output JSON:
   "incomplete_resume_consent": false,
   "job_direction_blocked": false,
   "privacy_constraints": [],
+  "error_recovery_state": {
+    "status": "not_applicable|recovered|degraded|needs_user_confirmation|needs_public_research|blocked|failed",
+    "errors": [],
+    "recovery_actions": [],
+    "degraded_outputs": [],
+    "blocked_outputs": [],
+    "safe_outputs": [],
+    "next_action": "continue|ask_user_once|run_public_research|retry_agent|run_debate|run_hr_review|run_factual_review|return_blocked_package"
+  },
   "handoff_questions": [],
   "confidence": "high|medium|low"
 }

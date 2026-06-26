@@ -4,6 +4,8 @@ This protocol ensures the repository's role frameworks can run as a complete use
 
 `first_round_user_profile` means the user's first self-described career profile and materials, not system configuration. It includes whatever the user initially provides about personal status, school, major, grade, experience, skills, projects, competitions, target direction, constraints, concerns, links, files, or resume materials.
 
+Read `subagent-invocation-contract.md` before turning a secondary prompt injection into an actual local subagent call.
+
 ## Core Flow
 
 Runtime execution must follow this sequence:
@@ -105,6 +107,30 @@ The packet should be compact enough to pass to every user-side subagent, but spe
       "hard_data_weight_tasks": [],
       "database_files_to_read": [],
       "source_policy_refs": [],
+      "invocation_contract": {
+        "invocation_id": "",
+        "run_id": "",
+        "target_agent": "",
+        "base_prompt_ref": ".codex/agents/<agent>.toml",
+        "secondary_prompt_injection_ref": "",
+        "runtime_context_packet_ref": "",
+        "input_packet_ref": "",
+        "allowed_user_facts_ref": "",
+        "database_files_to_read": [],
+        "source_policy_refs": [],
+        "research_tasks": [],
+        "hard_data_weight_tasks": [],
+        "required_output_fields": [],
+        "output_artifact_target": "",
+        "privacy_constraints": [],
+        "handoff_contract": [],
+        "debate_contract": [],
+        "expected_artifact_types": [],
+        "required_log_events": [],
+        "timeout_or_budget_hint": "",
+        "retry_allowed": true,
+        "on_failure": "return_blocked|rerun_with_more_context|handoff_to_orchestrator"
+      },
       "blocked_outputs": [],
       "required_output_fields": [],
       "handoff_contract": [],
@@ -133,6 +159,7 @@ Before a specialist subagent runs, the orchestrator should verify:
 - role-specific context is non-empty.
 - source policy and privacy boundaries are included.
 - hard-data weight tasks are explicit when the role may set weights, priorities, rankings, scores, thresholds, or confidence.
+- `invocation_contract` can be deterministically transformed into the canonical `subagent_invocation`: it has `invocation_id`, `input_packet_ref`, `allowed_user_facts_ref`, `output_artifact_target`, `privacy_constraints`, `expected_artifact_types`, required log events, retry policy, and `on_failure`.
 - blocked outputs are listed when user-owned facts or public evidence are missing.
 - the required output contract is named.
 

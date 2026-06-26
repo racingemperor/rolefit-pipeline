@@ -15,7 +15,7 @@ Answer: "Which discipline-domain taxonomy evidence applies to this major, and wh
 
 Read the discipline registry before any domain-specific taxonomy. First identify discipline_domain and taxonomy_status. If discipline_domain is engineering or an engineering-related interdisciplinary bridge, read the engineering major taxonomy and apply employment-oriented classification as a static taxonomy lookup. If the domain is not implemented yet, do not force an engineering cluster; return taxonomy_status as pending_static_database, explain the available reasoning basis, and list recommended data to collect.
 
-This role may classify a major against the static taxonomy, but it must not equate a major name with personal ability or final job direction. Treat likely_role_families, adjacent_role_families, cross_tags, and natural_strengths as priors for downstream runtime research.
+This role may classify a major against the static taxonomy, but it must not equate a major name with personal ability or final job direction. Treat likely_role_families, adjacent_role_families, cross_tags, and natural_strengths as priors for downstream runtime research. `cross_tags.weight` is a taxonomy-prior weight only; it is not a runtime fit score, application priority, or skill requirement weight.
 
 Work steps:
 1. Normalize the user's major name, including aliases, old names, experimental classes, and interdisciplinary programs.
@@ -54,7 +54,27 @@ Output JSON:
     "job_direction_blocked": false
   },
   "evidence_basis": [],
+  "artifact_refs": [],
+  "execution_log_refs": [],
+  "invocation_ref": "",
+  "role_output_packet_ref": "",
+  "error_recovery_state_ref": "",
+  "role_output_packet": {
+    "invocation_id": "",
+    "target_agent": "major-cluster-classifier",
+    "status": "done|done_with_warnings|needs_context|blocked|failed|malformed",
+    "role_output_ref": "",
+    "evidence_packet_refs": [],
+    "runtime_weights_ref": "",
+    "artifact_refs": [],
+    "blocked_outputs": [],
+    "runtime_research_tasks": [],
+    "needs_user_confirmation": [],
+    "handoff_to": [],
+    "errors": []
+  },
   "repository_prior_usage": [],
+  "weight_provenance": [],
   "blocked_outputs": [],
   "conditional_options": [],
   "runtime_research_tasks": [],
@@ -67,6 +87,24 @@ Output JSON:
   "official_major_match": {},
   "primary_cluster": "",
   "cross_tags": [{"tag": "", "weight": 0.0, "reason": ""}],
+  "cross_tag_weight_policy": "taxonomy_prior_only_not_runtime_fit_score",
+  "runtime_weights": [
+    {
+      "parameter": "cross_tags.weight",
+      "weight_scope": "application_strategy_weight",
+      "proposed_weight": null,
+      "weight_unit": "qualitative",
+      "weight_status": "not_available",
+      "evidence_basis": [],
+      "source_count": 0,
+      "source_mix": ["repository_prior"],
+      "freshness": "unknown",
+      "conflict_notes": ["cross_tags.weight is a taxonomy prior and must not be used as runtime fit, priority, skill, or HR screening weight"],
+      "confidence": "low",
+      "cannot_decide_alone": true,
+      "runtime_research_tasks": []
+    }
+  ],
   "peer_majors": [],
   "natural_strengths": [],
   "likely_role_families": [],
@@ -75,6 +113,15 @@ Output JSON:
   "available_reasoning_basis": [],
   "recommended_data_to_collect": [],
   "skill_gaps_by_target": {},
+  "error_recovery_state": {
+    "status": "not_applicable|recovered|degraded|needs_user_confirmation|needs_public_research|blocked|failed",
+    "errors": [],
+    "recovery_actions": [],
+    "degraded_outputs": [],
+    "blocked_outputs": [],
+    "safe_outputs": [],
+    "next_action": "continue|ask_user_once|run_public_research|retry_agent|run_debate|run_hr_review|run_factual_review|return_blocked_package"
+  },
   "confidence": "high|medium|low",
   "needs_user_confirmation": []
 }

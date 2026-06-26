@@ -16,8 +16,12 @@ Read these references as needed:
 - `references/data-catalog.md` before using any static database.
 - `references/source-policy.md` before analyzing job, company, HR, candidate, or social media information.
 - `references/runtime-collaboration-protocol.md` before dispatching or merging role prompts.
+- `references/runtime-execution-layer.md` before running, simulating, or implementing the local user-side execution shell.
 - `references/runtime-subagent-injection-protocol.md` before creating user-side subagent prompts.
+- `references/subagent-invocation-contract.md` before converting a secondary prompt injection into a concrete local subagent invocation.
 - `references/runtime-orchestration-protocol.md` before running or simulating the user-side pipeline state machine.
+- `references/runtime-artifact-schema.md` before writing, reading, merging, or exposing runtime artifacts, logs, evidence packets, resume drafts, or final packages.
+- `references/error-recovery-protocol.md` before retrying, degrading, blocking, or partially merging a failed run.
 - `references/user-interaction-flow.md` before asking the user for missing facts or handling incomplete information.
 - `references/runtime-weight-engine.md` before proposing, checking, or merging any runtime weight, score, priority, ranking, threshold, or confidence adjustment.
 - `references/role-output-contracts.md` before merging subagent outputs.
@@ -71,7 +75,9 @@ Short routes:
 - Treat every `.codex/agents/*.toml` file as a role framework for runtime local subagents, not as a frozen decision engine.
 - Normalize vague chats, Markdown, resumes, websites, links, and mixed materials through `InputNormalizer` before specialist agents.
 - Convert the user's first-round self-described profile, status, experience, goals, and materials into a `runtime_context_packet`, then have `CareerOrchestrator` create role-specific `secondary_prompt_injections` before any user-side specialist subagent runs.
+- Convert each `secondary_prompt_injection` into a traceable `subagent_invocation`; record `execution_manifest`, `artifact_refs`, `execution_log_refs`, `role_output_packet`, and `error_recovery_state` for runtime work.
 - Track user-side execution with `run_state`; do not skip normalization, context packet creation, secondary injection creation, merge, debate, HR review, factual review, or user-confirmation gates when they are required.
+- Do not silently merge blocked, failed, malformed, or partially recovered outputs into the final package. Merge safe partial fields only when the error recovery protocol allows it and the limitation is visible in `blocked_outputs`, `degraded_outputs`, or `runtime_research_tasks`.
 - Ask the user for missing user-owned facts once in a compact batch. Do not ask the user for data that local subagents can research from allowed public sources.
 - Treat concrete skill weights and external-display asset weights as runtime decisions. The repository provides schemas and examples, not universal requirements that every discipline must follow.
 - Require hard-data provenance for all weights, scores, priorities, rankings, thresholds, and confidence adjustments. Local subagents must verify them through public/official network sources or user-provided materials; if evidence is missing, return `not_available`, `needs_more_sources`, and runtime research tasks instead of guessing.

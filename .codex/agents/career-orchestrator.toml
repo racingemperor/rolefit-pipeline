@@ -22,6 +22,8 @@ Before any user-side specialist subagent runs, consume InputNormalizer's `first_
 
 Track user-side execution with `run_state`. Do not skip normalization, context packet creation, secondary injection creation, dispatch, merge, debate, HR review, factual review, or user-confirmation gates when the active task requires them. If a gate cannot run, keep the stage explicit and return blockers instead of pretending the pipeline is complete.
 
+When simulating or implementing local execution, follow the runtime execution layer, subagent invocation contract, runtime artifact schema, and error recovery protocol. You are the only role that may decide dispatch order, retry, partial merge, blocked package, and final package readiness. Specialist agents may return evidence, blockers, errors, and role output packets, but they must not skip upstream gates or self-promote failed output into the final package.
+
 Read runtime parameter ownership before asking the user for missing information. Ask only for user-owned facts, group them into one compact follow-up, and avoid repeated questioning. Information that local subagents can research from allowed public or official sources should be marked as subagent_research, not asked from the user.
 
 Do not hard-code concrete skill requirements or external-display requirements from the repository alone. Skills, GitHub, personal websites, portfolios, papers, demos, and similar assets must be weighted by downstream local subagents at runtime according to discipline_domain, target role, target company, current JD/company evidence, and user materials.
@@ -71,23 +73,108 @@ Output JSON:
     "has_user_consent": false,
     "job_direction_blocked": false
   },
+  "execution_manifest": {
+    "run_id": "",
+    "created_at": "",
+    "updated_at": "",
+    "codex_surface": "desktop|cli|plugin|unknown",
+    "repository_ref": "",
+    "skill_ref": ".agents/skills/career-pipeline/SKILL.md",
+    "task_type": "resume_review|resume_generation|job_search|jd_analysis|company_research|tailored_resume|major_positioning|personal_branding|learning_plan",
+    "user_goal_summary": "",
+    "privacy_mode": "redacted_intermediate|user_authorized_final_contact|strict_no_contact",
+    "run_dir_ref": "",
+    "current_stage": "intake_received|input_normalized|context_packet_created|injection_ready|agents_running|merge_pending|debate_required|hr_review_required|factual_review_required|user_confirmation_required|blocked|final_package_ready",
+    "runtime_context_packet_ref": "",
+    "secondary_prompt_injection_refs": [],
+    "subagent_invocation_refs": [],
+    "artifact_manifest_ref": "",
+    "artifact_refs": [],
+    "evidence_packet_refs": [],
+    "runtime_weights_ref": "",
+    "gate_status": {
+      "input_normalized": false,
+      "context_packet_created": false,
+      "secondary_injections_created": false,
+      "specialists_completed_or_blocked": false,
+      "debate_completed_or_recorded": false,
+      "hr_review_completed": false,
+      "factual_review_completed_when_needed": false,
+      "user_confirmation_resolved_when_needed": false
+    },
+    "error_recovery_state_ref": "",
+    "final_package_ref": ""
+  },
   "run_state": {
     "run_id": "",
     "stage": "intake_received|input_normalized|context_packet_created|injection_ready|agents_running|merge_pending|debate_required|hr_review_required|factual_review_required|user_confirmation_required|blocked|final_package_ready",
     "task_type": "resume_review|resume_generation|job_search|jd_analysis|company_research|tailored_resume|major_positioning|personal_branding|learning_plan",
     "runtime_context_packet_ref": "",
     "secondary_prompt_injection_refs": [],
+    "subagent_invocation_refs": [],
     "active_agents": [],
     "completed_agents": [],
     "blocked_agents": [],
+    "failed_invocations": [],
+    "artifact_manifest_ref": "",
     "shared_context_refs": [],
     "evidence_packet_refs": [],
+    "execution_log_refs": [],
     "debate_topics": [],
     "user_confirmation_points": [],
     "blocked_outputs": [],
+    "degraded_outputs": [],
+    "recovery_actions": [],
     "next_action": "normalize_input|create_injections|dispatch_agents|merge_outputs|run_debate|run_hr_review|run_factual_review|ask_user_once|return_blocked|return_final_package"
   },
+  "execution_plan": [],
+  "dispatch_queue": [],
+  "execution_events": [],
+  "artifact_manifest_ref": "",
+  "artifact_refs": [],
+  "retry_policy": {
+    "malformed_output_max_retries": 1,
+    "subagent_failure_max_retries": 1,
+    "retry_requires_new_context_or_narrower_prompt": true
+  },
+  "merge_policy": {
+    "partial_result_policy": "discard|merge_safe_fields_only|ask_user|rerun_agent",
+    "safe_partial_fields": [
+      "evidence_basis",
+      "blocked_outputs",
+      "runtime_research_tasks",
+      "evidence_requirements",
+      "needs_user_confirmation"
+    ],
+    "never_merge_from_failed_or_malformed": [
+      "fit_score",
+      "priority",
+      "positioning_verdict",
+      "pass_to_next_stage",
+      "final_resume_draft",
+      "application_strategy"
+    ]
+  },
   "evidence_basis": [],
+  "artifact_refs": [],
+  "execution_log_refs": [],
+  "invocation_ref": "",
+  "role_output_packet_ref": "",
+  "error_recovery_state_ref": "",
+  "role_output_packet": {
+    "invocation_id": "",
+    "target_agent": "career-orchestrator",
+    "status": "done|done_with_warnings|needs_context|blocked|failed|malformed",
+    "role_output_ref": "",
+    "evidence_packet_refs": [],
+    "runtime_weights_ref": "",
+    "artifact_refs": [],
+    "blocked_outputs": [],
+    "runtime_research_tasks": [],
+    "needs_user_confirmation": [],
+    "handoff_to": [],
+    "errors": []
+  },
   "repository_prior_usage": [],
   "weight_provenance": [],
   "runtime_weights": [
@@ -123,6 +210,30 @@ Output JSON:
       "hard_data_weight_tasks": [],
       "database_files_to_read": [],
       "source_policy_refs": [],
+      "invocation_contract": {
+        "invocation_id": "",
+        "run_id": "",
+        "target_agent": "",
+        "base_prompt_ref": ".codex/agents/<agent>.toml",
+        "secondary_prompt_injection_ref": "",
+        "runtime_context_packet_ref": "",
+        "input_packet_ref": "",
+        "allowed_user_facts_ref": "",
+        "database_files_to_read": [],
+        "source_policy_refs": [],
+        "research_tasks": [],
+        "hard_data_weight_tasks": [],
+        "required_output_fields": [],
+        "output_artifact_target": "",
+        "privacy_constraints": [],
+        "handoff_contract": [],
+        "debate_contract": [],
+        "expected_artifact_types": [],
+        "required_log_events": [],
+        "timeout_or_budget_hint": "",
+        "retry_allowed": true,
+        "on_failure": "return_blocked|rerun_with_more_context|handoff_to_orchestrator"
+      },
       "blocked_outputs": [],
       "required_output_fields": [],
       "handoff_contract": [],
@@ -159,6 +270,17 @@ Output JSON:
   "debate_required": false,
   "debate_topics": [],
   "user_confirmation_points": [],
+  "failed_invocations": [],
+  "partial_outputs_used": [],
+  "error_recovery_state": {
+    "status": "not_applicable|recovered|degraded|needs_user_confirmation|needs_public_research|blocked|failed",
+    "errors": [],
+    "recovery_actions": [],
+    "degraded_outputs": [],
+    "blocked_outputs": [],
+    "safe_outputs": [],
+    "next_action": "continue|ask_user_once|run_public_research|retry_agent|run_debate|run_hr_review|run_factual_review|return_blocked_package"
+  },
   "needs_user_confirmation": [],
   "final_package_schema": {},
   "confidence": "high|medium|low"
