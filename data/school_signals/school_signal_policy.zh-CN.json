@@ -1,0 +1,116 @@
+{
+  "metadata": {
+    "version": "0.1.0",
+    "language": "zh-CN",
+    "updated_on": "2026-06-26",
+    "purpose": "Framework for researching school-company cooperation, campus recruiting channels, internship suitability, and full-time suitability.",
+    "status": "policy and schema placeholder; no school-company partnership should be assumed without runtime source evidence"
+  },
+  "source_priority": [
+    {
+      "priority": 1,
+      "source_type": "official_school_career_center",
+      "examples": [
+        "school career center announcement",
+        "campus recruitment calendar",
+        "official employment report"
+      ],
+      "confidence": "high"
+    },
+    {
+      "priority": 2,
+      "source_type": "official_college_or_department",
+      "examples": [
+        "college internship-base announcement",
+        "school-enterprise cooperation notice",
+        "major-specific employer event"
+      ],
+      "confidence": "high"
+    },
+    {
+      "priority": 3,
+      "source_type": "official_employer_campus_page",
+      "examples": [
+        "target company's campus recruitment page",
+        "target company's school event page",
+        "official campus ambassador or referral program"
+      ],
+      "confidence": "high"
+    },
+    {
+      "priority": 4,
+      "source_type": "public_recruitment_platform_or_event_listing",
+      "examples": [
+        "public campus talk listing",
+        "public internship post naming school or city"
+      ],
+      "confidence": "medium"
+    },
+    {
+      "priority": 5,
+      "source_type": "candidate_or_social_media_signal",
+      "examples": [
+        "public student experience post",
+        "alumni discussion",
+        "social media campus recruiting discussion"
+      ],
+      "confidence": "low",
+      "usage": "Auxiliary only; cannot prove cooperation by itself."
+    }
+  ],
+  "research_fields": [
+    "school_name",
+    "college_or_department",
+    "major_name",
+    "target_company",
+    "target_role_family",
+    "official_partnership_evidence",
+    "campus_recruiting_event_evidence",
+    "internship_base_evidence",
+    "employment_report_signal",
+    "alumni_or_candidate_secondary_signal",
+    "source_url",
+    "source_date",
+    "confidence"
+  ],
+  "stage_rules": {
+    "non_graduating": {
+      "analyze": [
+        "current_internship_path",
+        "future_full_time_preparation_path"
+      ],
+      "note": "Separate what can be applied for now from what should be prepared before graduation."
+    },
+    "graduating": {
+      "analyze": [
+        "full_time_campus_recruiting",
+        "internship_to_full_time_if_available",
+        "supplementary_recruitment"
+      ]
+    },
+    "graduate": {
+      "analyze": [
+        "early_career_or_social_recruitment",
+        "campus_recruiting_if_eligible"
+      ]
+    },
+    "unknown": {
+      "analyze": [
+        "ask_grade_or_graduation_window_once"
+      ]
+    }
+  },
+  "hard_rules": [
+    "Do not invent school-company cooperation.",
+    "Do not treat a single anonymous social media post as evidence of school advantage.",
+    "Do not recommend a school-specific internship or job channel without source evidence.",
+    "If evidence is missing, mark school_signal_status as unknown and continue with general strategy."
+  ],
+  "output_shape": {
+    "school_signal_status": "confirmed|probable|unknown|conflicting",
+    "internship_signal": {},
+    "full_time_signal": {},
+    "source_notes": [],
+    "confidence": "high|medium|low"
+  }
+}

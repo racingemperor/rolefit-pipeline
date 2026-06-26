@@ -6,7 +6,8 @@
     "created_on": "2026-06-26",
     "purpose": "Reusable resume format, section logic, gate rules, HR trust scoring, and version selection for Codex career pipeline.",
     "evidence_policy": "no_fabrication_user_verified_only",
-    "default_when_no_target_company": "campus_general_cn_one_page"
+    "default_when_no_target_company": "campus_general_cn_one_page",
+    "runtime_weight_policy": "Concrete skill importance and external display asset importance are set by local subagents at runtime from current role, company, school, discipline, and user evidence. This database provides section logic and evidence rules, not universal skill or asset requirements."
   },
   "gate_statuses": {
     "pass": "Format and evidence density are sufficient for ResumeArchitect to draft.",
@@ -87,12 +88,12 @@
       "writing_rules": [
         "邮箱或手机号至少一个必须可用。",
         "文件名建议：姓名_学校_专业_学历_申请岗位。",
-        "技术岗优先放 GitHub/Gitee、项目文档、demo 或个人网站。",
+        "外部链接是否放入联系方式区，应按学科、岗位、公司和运行时证据判断；仓库不强制所有技术岗放 GitHub 或个人网站。",
         "不放身份证号、详细住址、家庭信息。"
       ],
       "trust_logic": [
         "联系方式稳定、岗位意向清楚、作品链接可访问，会降低 HR 沟通成本。",
-        "技术岗位的外部链接应能支持项目真实性。"
+        "被选入简历的外部链接应能支持项目真实性，且其价值由运行时学科/岗位权重决定。"
       ],
       "reject_conditions": [
         "无任何可联系渠道。",
@@ -105,7 +106,7 @@
         "email": "<邮箱>",
         "phone": "<手机号，可选>",
         "job_intention": "<岗位族或目标岗位>",
-        "github_or_gitee": "<技术岗优先>"
+        "github_or_gitee": "<如运行时判断该岗位认可且用户已有可展示内容>"
       }
     },
     {
@@ -131,7 +132,8 @@
         "按岗位族分组，不做关键词堆砌。",
         "每个核心技能最好关联项目、竞赛、实习或课程证据。",
         "熟悉、掌握、精通必须有不同证据门槛。",
-        "技能区只做索引，真正能力证明放在项目、实习、竞赛里。"
+        "技能区只做索引，真正能力证明放在项目、实习、竞赛里。",
+        "具体技能的重要性由用户设备上的 subagent 根据当前 JD、公司信号、学科和用户证据运行时设置，仓库不写死。"
       ],
       "proficiency_gate": {
         "familiar": "学过或在小任务中使用过，能解释基本概念。",
@@ -144,7 +146,7 @@
       ],
       "reject_conditions": [
         "只有熟练/精通但无项目支撑。",
-        "技能与目标岗完全不相关。",
+        "在运行时目标岗位证据下，技能与目标岗完全不相关。",
         "技术栈堆砌超过可解释范围。",
         "把正在学习的技能写成已掌握。"
       ],
@@ -302,7 +304,7 @@
       "section_id": "external_assets",
       "title": "外部展示资产",
       "use_when": [
-        "技术、设计、产品、科研岗位需要作品证明"
+        "运行时证据显示目标学科、岗位或公司认可外部作品证明"
       ],
       "reject_if": [
         "链接不可访问",
@@ -327,7 +329,7 @@
       "section_id": "evidence_links",
       "title": "证据链接",
       "use_when": [
-        "需要展示 GitHub、demo、报告、论文、证书或作品集"
+        "运行时证据显示需要展示 GitHub、demo、报告、论文、证书或作品集，且用户已有可公开证据"
       ],
       "reject_if": [
         "链接不可访问",
@@ -348,7 +350,7 @@
         "计算机基础",
         "工程实践",
         "系统设计基础",
-        "GitHub/demo/README",
+        "运行时认可的外部工程证据，例如 GitHub/demo/README",
         "AI/LLM 项目评测和部署"
       ],
       "required_evidence": [
@@ -507,7 +509,7 @@
     "coverage_strategy": [
       "按专业映射 primary_cluster 和 cross_tags。",
       "保留 2-3 个最能证明工程能力的项目。",
-      "技能分为通用工程底座、岗位方向技能、工具链、可迁移能力。",
+      "技能可分为通用工程底座、岗位方向技能、工具链、可迁移能力；具体权重由运行时 JD/公司/学科证据设置。",
       "不绑定单一公司话术，覆盖互联网、硬件、新能源、AI 的共同筛选点。"
     ],
     "default_section_order": [
@@ -521,10 +523,10 @@
     ],
     "keyword_strategy": [
       "不要太散，围绕工程底座 + 方向证据。",
-      "软件/AI 写编程、数据结构、系统、模型评估、部署。",
-      "硬件/嵌入式写电路、C/C++、调试、测试仪器、可靠性。",
-      "新能源写材料/电池/工艺/仿真/质量/安全。",
-      "机器人/自动化写控制、传感器、ROS/仿真、实机联调。"
+      "软件/AI 通常围绕编程、数据结构、系统、模型评估、部署，但以运行时 JD 和公司证据为准。",
+      "硬件/嵌入式通常围绕电路、C/C++、调试、测试仪器、可靠性，但以运行时 JD 和公司证据为准。",
+      "新能源通常围绕材料/电池/工艺/仿真/质量/安全，但以运行时 JD 和公司证据为准。",
+      "机器人/自动化通常围绕控制、传感器、ROS/仿真、实机联调，但以运行时 JD 和公司证据为准。"
     ]
   },
   "resume_versions": [
@@ -788,7 +790,7 @@
         "id": "role_relevance",
         "name": "岗位相关度",
         "weight": 20,
-        "scoring": "技能和项目是否匹配 JD must-have / hidden requirements。"
+        "scoring": "技能和项目是否匹配运行时 JD must-have / hidden requirements；无当前 JD 时只能按低置信度岗位族先验判断。"
       },
       {
         "id": "readability_format_stability",

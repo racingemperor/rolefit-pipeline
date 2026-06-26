@@ -1,0 +1,184 @@
+{
+  "metadata": {
+    "version": "0.1.0",
+    "language": "zh-CN",
+    "updated_on": "2026-06-26",
+    "purpose": "Define which pipeline parameters must come from the user, which are optional, which should be researched by local subagents, and which should be weighted at runtime.",
+    "core_policy": "The repository provides schemas, evidence rules, and routing contracts. It does not hard-code concrete skill requirements, external display requirements, or universal weights for every discipline."
+  },
+  "parameter_ownership_groups": [
+    {
+      "group_id": "user_required_minimal",
+      "description": "User-owned facts that should be requested once if they cannot be extracted from the user's materials.",
+      "question_policy": "Ask in one compact batch. The user may provide partial answers.",
+      "fields": [
+        {
+          "field": "education_identity",
+          "includes": [
+            "school_name",
+            "major_name",
+            "degree_level",
+            "grade_or_year_or_graduation_window"
+          ],
+          "why_needed": "Needed to classify discipline, stage, resume education section, and school-signal research."
+        },
+        {
+          "field": "current_goal",
+          "includes": [
+            "internship_or_full_time",
+            "target_role_or_role_family",
+            "target_city_optional",
+            "target_company_optional"
+          ],
+          "why_needed": "Needed to decide whether to run resume-only, internship analysis, full-time analysis, or concrete JD matching."
+        },
+        {
+          "field": "contact_for_resume",
+          "includes": [
+            "name_or_display_name",
+            "email_or_phone"
+          ],
+          "why_needed": "Needed only when generating a user-authorized resume draft."
+        },
+        {
+          "field": "experience_materials",
+          "includes": [
+            "projects",
+            "competitions",
+            "internships",
+            "research_or_coursework",
+            "available_links_or_files"
+          ],
+          "why_needed": "Needed to avoid fabricating abilities and to create evidence-backed resume sections."
+        }
+      ]
+    },
+    {
+      "group_id": "user_optional",
+      "description": "Useful facts that improve targeting but should not cause repeated questioning.",
+      "question_policy": "Ask only if the active task clearly benefits. Otherwise mark missing and continue.",
+      "fields": [
+        "gpa_or_rank",
+        "awards_certificates",
+        "language_scores",
+        "salary_or_stability_preference",
+        "city_preference",
+        "company_blacklist_or_constraints",
+        "work_authorization_or_remote_preference",
+        "portfolio_or_profile_links",
+        "preferred_resume_language_or_format"
+      ]
+    },
+    {
+      "group_id": "subagent_research",
+      "description": "Information that should be investigated by local subagents on the user's device from allowed public and official sources.",
+      "question_policy": "Do not ask the user to manually provide these unless they already have a source they want to use.",
+      "fields": [
+        {
+          "field": "target_role_skill_weights",
+          "sources": [
+            "official JD",
+            "company career page",
+            "recruitment-platform public JD",
+            "verified HR public post",
+            "multi-source interview experience"
+          ],
+          "note": "The repository does not decide concrete skill weights for a role."
+        },
+        {
+          "field": "external_asset_recognition",
+          "sources": [
+            "target-company JD",
+            "role-family hiring signal",
+            "verified HR post",
+            "candidate interview experience",
+            "discipline-specific public norms"
+          ],
+          "note": "The repository does not force GitHub, personal websites, portfolios, or papers across all disciplines."
+        },
+        {
+          "field": "school_company_cooperation",
+          "sources": [
+            "school career center",
+            "college or department announcement",
+            "official employer campus page",
+            "school-enterprise cooperation announcement",
+            "internship-base announcement",
+            "employment quality report"
+          ],
+          "note": "Partnership claims require official or primary evidence."
+        },
+        {
+          "field": "company_development_and_reputation",
+          "sources": [
+            "official company reports",
+            "official news",
+            "product and technology blogs",
+            "public financing or earnings information",
+            "recruitment trend",
+            "social media as weak auxiliary signal"
+          ],
+          "note": "Used as context, not as proof of a specific role requirement."
+        }
+      ]
+    },
+    {
+      "group_id": "runtime_weight_config",
+      "description": "Weights that should be set by downstream agents at runtime after reading user facts and current sources.",
+      "question_policy": "Do not ask the user to choose weights unless the user explicitly wants manual control.",
+      "fields": [
+        {
+          "field": "skill_weight",
+          "dimensions": [
+            "must_have",
+            "nice_to_have",
+            "learnable_gap",
+            "evidence_strength",
+            "discipline_fit"
+          ]
+        },
+        {
+          "field": "external_asset_weight",
+          "dimensions": [
+            "discipline_norm",
+            "target_role_expectation",
+            "company_screening_bias",
+            "asset_quality",
+            "privacy_risk"
+          ]
+        },
+        {
+          "field": "school_signal_weight",
+          "dimensions": [
+            "official_partnership_strength",
+            "campus_recruiting_frequency",
+            "major_alignment",
+            "alumni_or_employment_report_signal",
+            "source_freshness"
+          ]
+        },
+        {
+          "field": "application_strategy_weight",
+          "dimensions": [
+            "candidate_stage",
+            "hard_gate_match",
+            "evidence_gap",
+            "learning_time_required",
+            "competition_intensity"
+          ]
+        }
+      ]
+    }
+  ],
+  "minimal_one_round_question_template": {
+    "purpose": "Reduce user interruption when materials are incomplete.",
+    "template": "我已经从你提供的材料里整理出了现有信息。为了继续生成更准的简历或投递方向，请一次性补充下面能提供的内容：学校/专业/年级或毕业时间、当前想找实习还是全职、目标岗位或方向、1-3段最重要的项目/实习/竞赛经历、可以公开展示的链接、联系方式。如果暂时不想补充，我可以在你明确同意后只基于已有信息生成不完整简历，但不会提供投递方向建议。",
+    "do_not_repeat_questions": true
+  },
+  "incomplete_resume_policy": {
+    "allowed_only_with_explicit_user_consent": true,
+    "omit_missing_sections": true,
+    "block_application_direction": true,
+    "required_warning": "信息不完整时只能生成事实草稿，不能做针对性岗位推荐。详细信息越充分，简历和投递建议才越准。"
+  }
+}

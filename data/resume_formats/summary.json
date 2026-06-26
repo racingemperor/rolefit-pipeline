@@ -9,5 +9,5 @@
   "validation_rule_count": 9,
   "default_resume_version": "campus_general_cn_one_page",
   "gate_pass_threshold": 75,
-  "status": "seed resume format database for ResumeFormatGate and ResumeArchitect"
+  "status": "seed resume format database for ResumeFormatGate and ResumeArchitect; concrete skill and external-asset weights are runtime decisions"
 }

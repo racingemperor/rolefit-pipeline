@@ -10,6 +10,16 @@ Use this policy for job, company, HR, candidate, and social media information.
 4. Candidate interview experience, offer review, public referral post, multi-source social media consensus.
 5. Single anonymous post, screenshot, comment, or unverified rumor.
 
+For school-company cooperation and campus channels, use this priority:
+
+1. Official school career center, official employment report, official campus recruitment calendar.
+2. Official college or department notice, internship-base announcement, school-enterprise cooperation announcement.
+3. Official employer campus page or target-company school event page.
+4. Public recruitment-platform campus event or public JD.
+5. Candidate or social media signal.
+
+School-specific advantages require priority 1-3 evidence. Candidate or social media signals can only support preparation notes.
+
 ## Conflict Handling
 
 - Official JD and official career pages override social media claims.
@@ -17,6 +27,8 @@ Use this policy for job, company, HR, candidate, and social media information.
 - Candidate experiences can inform preparation, interview risk, and hidden expectations, but cannot become company requirements alone.
 - Social media signals need source type, date, platform, confidence, and whether identity is verified.
 - When sources conflict, preserve the conflict and state which source is primary.
+- Skill weights and external-display asset weights should be set from current JD/company/school/discipline evidence at runtime. Repository examples are priors, not requirements.
+- If a local subagent can research a public or official source, do not ask the user to manually provide that source unless the user volunteers it.
 
 ## Privacy
 
@@ -44,6 +56,7 @@ Allowed:
 - improve evidence order.
 - translate real work into stronger professional language.
 - mark claims that need user confirmation.
+- generate an incomplete resume draft only after explicit user consent, omitting missing sections and blocking application direction recommendations.
 
 Forbidden:
 

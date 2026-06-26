@@ -23,6 +23,8 @@ Use repository-relative paths:
 
 - `data/discipline_taxonomy/` for discipline-domain routing across engineering, science, humanities, social science, business, arts/design, medicine/health, agriculture, law/public affairs, and interdisciplinary backgrounds.
 - `data/major_taxonomy/` for the currently implemented engineering major taxonomy, employment clusters, cross-tags, and major lookup.
+- `data/runtime_parameters/` for deciding which parameters are user-owned, optional, researched by local subagents, or weighted at runtime.
+- `data/school_signals/` for source policy and schema for school-company cooperation, campus recruiting, internship, and full-time opportunity signals.
 - `data/company_signals/` for company-level hiring signals, source evidence, and company x major-cluster priors.
 - `data/resume_formats/` for reusable resume section logic, format variants, and format accept/reject rules.
 
@@ -33,7 +35,8 @@ Never paste an entire database into the prompt. Load the smallest file and subse
 Default full route:
 
 ```text
-Career Orchestrator
+InputNormalizer
+  -> Career Orchestrator
   -> MajorClusterClassifier
   -> ProfileExtractor
   -> JDAnalyzer
@@ -52,20 +55,26 @@ Career Orchestrator
 
 Short routes:
 
-- Major positioning: `MajorClusterClassifier`.
-- Resume review: `ProfileExtractor -> ResumeFormatGate -> ResumeArchitect -> FactualReviewer -> HRSupervisor`.
-- Job analysis: `JDAnalyzer -> CompanyIntelligenceAnalyst -> MarketSentimentAnalyzer`.
-- Job search: `MajorClusterClassifier -> ProfileExtractor -> JobScout -> JDAnalyzer -> MatchStrategist -> LearningPathStrategist`.
+- Major positioning: `InputNormalizer -> MajorClusterClassifier`.
+- Resume review: `InputNormalizer -> ProfileExtractor -> ResumeFormatGate -> ResumeArchitect -> FactualReviewer -> HRSupervisor`.
+- Job analysis: `InputNormalizer -> JDAnalyzer -> CompanyIntelligenceAnalyst -> MarketSentimentAnalyzer`.
+- Job search: `InputNormalizer -> MajorClusterClassifier -> ProfileExtractor -> JobScout -> JDAnalyzer -> MatchStrategist -> LearningPathStrategist`.
 
 ## Operating Rules
 
 - Prefer user-provided materials and official/public sources over memory.
+- Normalize vague chats, Markdown, resumes, websites, links, and mixed materials through `InputNormalizer` before specialist agents.
+- Ask the user for missing user-owned facts once in a compact batch. Do not ask the user for data that local subagents can research from allowed public sources.
+- Treat concrete skill weights and external-display asset weights as runtime decisions. The repository provides schemas and examples, not universal requirements that every discipline must follow.
+- For non-graduating candidates, split current internship analysis from future full-time preparation.
+- School-company cooperation and school-specific hiring advantages require official or primary runtime evidence; never infer them from school name alone.
 - Treat company-signal data as priors, not current role-specific requirements.
 - For a concrete job, require fresh JD text or current public JD retrieval before final resume tailoring.
 - Use candidate/social media information only as auxiliary preparation or risk signals unless it is verified by official sources.
 - Do not store or expose private resumes, private chats, IDs, addresses, or non-public HR/candidate information. Intermediate reports and logs should redact phone numbers and personal emails by default; final resume drafts may include user-authorized contact fields when the user explicitly provides them for the resume.
 - Resume writing may improve structure, evidence, and wording, but must not create false experience, fake metrics, fake ownership, fake education, or fake awards.
-- Any generated resume must pass `ResumeFormatGate` before drafting and `FactualReviewer` before being presented as final.
+- Complete resume drafts must pass `ResumeFormatGate` before drafting and `FactualReviewer` before being presented as final.
+- If the user refuses to provide missing information, generate an incomplete resume draft only after explicit consent and after `ResumeFormatGate` marks the incomplete-draft exception. Omit missing sections, block application direction recommendations, and warn that targeted advice requires detailed information.
 - The whole pipeline should remain under `HRSupervisor` review: personal branding, resume strategy, and final packages must be quickly understandable to HR and show credible competitive signals.
 - Agents should debate conflicts through structured fields. If claims conflict, preserve the disagreement, request evidence, or hand back to the relevant agent instead of silently merging incompatible conclusions.
 

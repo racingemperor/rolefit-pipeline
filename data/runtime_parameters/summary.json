@@ -1,0 +1,13 @@
+{
+  "version": "0.1.0",
+  "language": "zh-CN",
+  "updated_on": "2026-06-26",
+  "parameter_group_count": 4,
+  "groups": [
+    "user_required_minimal",
+    "user_optional",
+    "subagent_research",
+    "runtime_weight_config"
+  ],
+  "status": "runtime parameter ownership framework; concrete skill and external-asset weights are set by local subagents at runtime"
+}

@@ -36,8 +36,47 @@ Core files:
 Usage:
 
 - `MajorClusterClassifier` reads this database only after the discipline registry selects `engineering` or an engineering-related bridge path.
-- `LearningPathStrategist` and `PersonalBrandingStrategist` should use cluster skill lists and bridge skills.
+- `LearningPathStrategist` and `PersonalBrandingStrategist` may use cluster skill lists and bridge skills only as broad priors. Concrete skill importance and external display importance must be set by runtime subagent research.
 - `ResumeArchitect` should use cluster and target role labels when selecting format variants and section emphasis.
+
+## Runtime Parameters
+
+Path: `data/runtime_parameters/`
+
+Purpose: define which parameters should be provided by the user, which are optional, which should be researched by local subagents, and which weights should be configured at runtime.
+
+Core files:
+
+- `parameter_ownership.zh-CN.json`: ownership groups, one-round question policy, and incomplete-resume policy.
+- `summary.json`: group counts and status.
+
+Usage:
+
+- `InputNormalizer` reads this before asking follow-up questions.
+- `CareerOrchestrator` uses it to avoid repeated questioning and to route public-source research to local subagents.
+- `MatchStrategist`, `LearningPathStrategist`, and `PersonalBrandingStrategist` use it to avoid hard-coding skill or external-asset weights from repository priors.
+- `ResumeFormatGate` and `ResumeArchitect` use it for incomplete-resume consent and omission rules.
+
+Important: concrete skill weights and external display requirements are runtime outputs, not static repository requirements.
+
+## School Signals
+
+Path: `data/school_signals/`
+
+Purpose: define source priority and schema for school-company cooperation, campus recruiting, internship-base, employment-report, and grade-specific opportunity analysis.
+
+Core files:
+
+- `school_signal_policy.zh-CN.json`: source priority, research fields, stage rules, hard rules, and output shape.
+- `summary.json`: source priority and stage rule counts.
+
+Usage:
+
+- `InputNormalizer` extracts school and grade context and marks school-signal research needs.
+- `MatchStrategist` uses runtime school signals as opportunity priors for internship and full-time scenarios.
+- `HRSupervisor` checks that school-specific claims are supported by official or primary evidence.
+
+Important: this directory does not assert any school-company partnership. Local subagents must collect current evidence on the user's device.
 
 ## Company Hiring Signals
 
