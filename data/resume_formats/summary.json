@@ -1,0 +1,13 @@
+{
+  "version": "0.1.0",
+  "language": "zh-CN",
+  "updated_on": "2026-06-26",
+  "required_section_count": 5,
+  "optional_section_count": 6,
+  "role_family_overlay_count": 7,
+  "resume_version_count": 10,
+  "validation_rule_count": 9,
+  "default_resume_version": "campus_general_cn_one_page",
+  "gate_pass_threshold": 75,
+  "status": "seed resume format database for ResumeFormatGate and ResumeArchitect"
+}

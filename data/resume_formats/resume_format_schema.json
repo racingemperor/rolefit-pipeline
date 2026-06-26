@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Resume Format Database",
+  "type": "object",
+  "required": [
+    "metadata",
+    "required_sections",
+    "resume_versions",
+    "version_selection_rules",
+    "hr_trust_score_rubric",
+    "validation_rules"
+  ],
+  "properties": {
+    "metadata": {
+      "type": "object"
+    },
+    "gate_statuses": {
+      "type": "object"
+    },
+    "required_sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "section_id",
+          "title",
+          "required",
+          "fields",
+          "minimum_viable_fields",
+          "writing_rules",
+          "reject_conditions"
+        ]
+      }
+    },
+    "optional_sections": {
+      "type": "array"
+    },
+    "role_family_overlays": {
+      "type": "array"
+    },
+    "default_general_profile": {
+      "type": "object"
+    },
+    "resume_versions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "title",
+          "use_when",
+          "primary_sections"
+        ]
+      }
+    },
+    "version_selection_rules": {
+      "type": "array"
+    },
+    "hr_trust_score_rubric": {
+      "type": "object"
+    },
+    "validation_rules": {
+      "type": "array"
+    },
+    "ban_or_downrank": {
+      "type": "object"
+    },
+    "runtime_contract": {
+      "type": "object"
+    }
+  }
+}

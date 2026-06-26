@@ -1,0 +1,896 @@
+{
+  "metadata": {
+    "version": "0.1.0",
+    "language": "zh-CN",
+    "scenario": "engineering_campus_recruitment",
+    "created_on": "2026-06-26",
+    "purpose": "Reusable resume format, section logic, gate rules, HR trust scoring, and version selection for Codex career pipeline.",
+    "evidence_policy": "no_fabrication_user_verified_only",
+    "default_when_no_target_company": "campus_general_cn_one_page"
+  },
+  "gate_statuses": {
+    "pass": "Format and evidence density are sufficient for ResumeArchitect to draft.",
+    "revise_required": "Missing or weak information must be improved before drafting.",
+    "user_confirmation_required": "Potentially usable claims require user confirmation before drafting."
+  },
+  "required_sections": [
+    {
+      "section_id": "school_info",
+      "title": "学校信息",
+      "required": true,
+      "fields": [
+        "school_name",
+        "college_or_department",
+        "major_name",
+        "degree_level",
+        "graduation_window",
+        "education_type",
+        "gpa_or_rank",
+        "core_courses",
+        "honors_awards",
+        "major_cluster_id",
+        "cross_tags",
+        "target_role_relevance_notes"
+      ],
+      "minimum_viable_fields": [
+        "school_name",
+        "major_name",
+        "degree_level",
+        "graduation_window"
+      ],
+      "writing_rules": [
+        "学历从最高学历写到本科。",
+        "GPA/排名只在有优势或岗位要求时展示。",
+        "课程只保留与目标岗位相关的 3-6 门。",
+        "专业名称应关联 major_cluster_id 和 cross_tags。",
+        "校招/实习应明确在读状态、毕业时间和可实习周期。"
+      ],
+      "trust_logic": [
+        "学校、专业、学历和时间线越清楚，HR 越容易判断投递资格。",
+        "课程必须服务岗位相关性，不用堆所有课程。"
+      ],
+      "reject_conditions": [
+        "缺学校、专业或学历层级。",
+        "毕业时间与求职身份冲突。",
+        "疑似伪造或无法确认学历。",
+        "海外、转专业或实验班背景没有说明当前身份。"
+      ],
+      "example_shape": {
+        "major_name": "<专业名称>",
+        "graduation_window": "<YYYY.MM-YYYY.MM>",
+        "core_courses": [
+          "<与岗位相关课程>"
+        ],
+        "target_role_relevance_notes": "<该专业/课程如何支持目标方向>"
+      }
+    },
+    {
+      "section_id": "contact",
+      "title": "个人联系方式",
+      "required": true,
+      "fields": [
+        "name",
+        "phone",
+        "email",
+        "city_preference",
+        "job_intention",
+        "portfolio_links",
+        "github_or_gitee",
+        "personal_website",
+        "linkedin_or_maimai_optional"
+      ],
+      "minimum_viable_fields": [
+        "name",
+        "email_or_phone",
+        "job_intention"
+      ],
+      "writing_rules": [
+        "邮箱或手机号至少一个必须可用。",
+        "文件名建议：姓名_学校_专业_学历_申请岗位。",
+        "技术岗优先放 GitHub/Gitee、项目文档、demo 或个人网站。",
+        "不放身份证号、详细住址、家庭信息。"
+      ],
+      "trust_logic": [
+        "联系方式稳定、岗位意向清楚、作品链接可访问，会降低 HR 沟通成本。",
+        "技术岗位的外部链接应能支持项目真实性。"
+      ],
+      "reject_conditions": [
+        "无任何可联系渠道。",
+        "联系方式明显错误。",
+        "包含身份证、家庭住址、私人敏感信息。",
+        "英文简历缺邮箱或地区信息。"
+      ],
+      "example_shape": {
+        "name": "<姓名>",
+        "email": "<邮箱>",
+        "phone": "<手机号，可选>",
+        "job_intention": "<岗位族或目标岗位>",
+        "github_or_gitee": "<技术岗优先>"
+      }
+    },
+    {
+      "section_id": "skills",
+      "title": "掌握技能",
+      "required": true,
+      "fields": [
+        "programming_languages",
+        "engineering_tools",
+        "frameworks_or_platforms",
+        "domain_knowledge",
+        "lab_or_test_equipment",
+        "data_ai_methods",
+        "certificates",
+        "skill_evidence_refs",
+        "proficiency_level"
+      ],
+      "minimum_viable_fields": [
+        "grouped_skill_items",
+        "skill_evidence_refs"
+      ],
+      "writing_rules": [
+        "按岗位族分组，不做关键词堆砌。",
+        "每个核心技能最好关联项目、竞赛、实习或课程证据。",
+        "熟悉、掌握、精通必须有不同证据门槛。",
+        "技能区只做索引，真正能力证明放在项目、实习、竞赛里。"
+      ],
+      "proficiency_gate": {
+        "familiar": "学过或在小任务中使用过，能解释基本概念。",
+        "proficient": "在项目中独立使用过，能解释实现、问题和取舍。",
+        "expert": "有复杂项目、生产/竞赛/论文级证据，能解释边界和优化。"
+      },
+      "trust_logic": [
+        "技能和项目证据能互相引用时可信度最高。",
+        "少写形容词，多给工具、方法、场景和证据。"
+      ],
+      "reject_conditions": [
+        "只有熟练/精通但无项目支撑。",
+        "技能与目标岗完全不相关。",
+        "技术栈堆砌超过可解释范围。",
+        "把正在学习的技能写成已掌握。"
+      ],
+      "example_shape": {
+        "programming_languages": [
+          "<语言>"
+        ],
+        "engineering_tools": [
+          "<工具/仪器/软件>"
+        ],
+        "skill_evidence_refs": [
+          "project:<项目ID>",
+          "competition:<竞赛ID>"
+        ]
+      }
+    },
+    {
+      "section_id": "projects_competitions",
+      "title": "项目竞赛经历",
+      "required": true,
+      "fields": [
+        "name",
+        "type",
+        "time_range",
+        "role",
+        "team_size",
+        "background",
+        "task",
+        "technical_stack",
+        "actions",
+        "result_metrics",
+        "engineering_depth",
+        "evidence_links",
+        "interview_drill_points"
+      ],
+      "minimum_viable_fields": [
+        "name",
+        "role",
+        "actions",
+        "result_or_evidence"
+      ],
+      "writing_rules": [
+        "每段经历按背景-任务-行动-结果-证据结构化。",
+        "优先写本人贡献，而不是团队整体宣传。",
+        "结果可量化则量化；不能量化则写交付物、验证方式、复盘结论。",
+        "竞赛要写级别、排名/奖项、参赛规模；无名次则写技术产出。",
+        "同一项目可为不同岗位生成不同表述重点，但事实不能变。"
+      ],
+      "bullet_template": "<在什么场景下>，使用<方法/工具>完成<本人动作>，产出<交付物>，通过<指标/测试/评审>验证。",
+      "trust_logic": [
+        "本人角色、技术动作、结果验证和链接证据越清楚，越容易通过 HR 和技术面深挖。",
+        "失败处理、调试过程和取舍能提高工程可信度。"
+      ],
+      "reject_conditions": [
+        "没有任何项目、竞赛或实践。",
+        "只有名称没有职责。",
+        "把团队成果写成个人主导。",
+        "排名、奖项、指标无来源。",
+        "涉及 NDA 或内部数据。"
+      ],
+      "example_shape": {
+        "name": "<项目/竞赛名>",
+        "role": "<本人角色>",
+        "actions": [
+          "<本人动作>"
+        ],
+        "result_metrics": [
+          "<指标或交付物>"
+        ],
+        "evidence_links": [
+          "<GitHub/demo/报告/证书>"
+        ]
+      }
+    },
+    {
+      "section_id": "personality_potential",
+      "title": "个人性格和潜力",
+      "required": true,
+      "fields": [
+        "evidence_backed_traits",
+        "learning_ability",
+        "ownership",
+        "collaboration",
+        "problem_solving",
+        "resilience",
+        "growth_signals",
+        "risk_notes"
+      ],
+      "minimum_viable_fields": [
+        "evidence_backed_traits"
+      ],
+      "writing_rules": [
+        "不写空泛自评，必须绑定经历证据。",
+        "用行为证明性格：主动推进、复盘迭代、跨专业协作、长期投入。",
+        "校招可以强调潜力，但不能把未完成学习包装成已掌握成果。",
+        "通常不单独写成大段自我评价，而是嵌入项目、总结或附加信息。"
+      ],
+      "trust_logic": [
+        "潜力要由学习曲线、复盘能力、协作方式和长期投入证明。",
+        "性格表达必须服务岗位需求，而不是泛泛说认真负责。"
+      ],
+      "reject_conditions": [
+        "全是空泛自评。",
+        "与岗位方向不匹配。",
+        "出现无法证明的人设，如极强领导力但无经历。",
+        "性格描述削弱专业可信度。"
+      ],
+      "example_shape": {
+        "evidence_backed_traits": [
+          {
+            "trait": "学习能力",
+            "evidence_ref": "project:<项目ID>",
+            "description": "<通过补齐某项技术并交付项目体现>"
+          }
+        ]
+      }
+    }
+  ],
+  "optional_sections": [
+    {
+      "section_id": "internship_experience",
+      "title": "实习经历",
+      "use_when": [
+        "有真实实习或企业项目"
+      ],
+      "reject_if": [
+        "只有公司名无职责",
+        "违反 NDA"
+      ]
+    },
+    {
+      "section_id": "research_publications",
+      "title": "科研/论文",
+      "use_when": [
+        "算法/科研/研究型岗位",
+        "保研/科研助理方向"
+      ],
+      "reject_if": [
+        "论文未投稿却写已发表",
+        "无法说明方法和贡献"
+      ]
+    },
+    {
+      "section_id": "awards_certificates",
+      "title": "奖项证书",
+      "use_when": [
+        "奖项与岗位相关或能证明能力"
+      ],
+      "reject_if": [
+        "低相关奖项过多",
+        "证书无法验证"
+      ]
+    },
+    {
+      "section_id": "external_assets",
+      "title": "外部展示资产",
+      "use_when": [
+        "技术、设计、产品、科研岗位需要作品证明"
+      ],
+      "reject_if": [
+        "链接不可访问",
+        "项目不可解释",
+        "暴露隐私或内部材料"
+      ]
+    },
+    {
+      "section_id": "interview_drill_points",
+      "title": "面试深挖点",
+      "use_when": [
+        "面试准备",
+        "项目附录",
+        "技术复盘"
+      ],
+      "reject_if": [
+        "问题无法由用户经历支撑",
+        "包含未验证或虚构细节"
+      ]
+    },
+    {
+      "section_id": "evidence_links",
+      "title": "证据链接",
+      "use_when": [
+        "需要展示 GitHub、demo、报告、论文、证书或作品集"
+      ],
+      "reject_if": [
+        "链接不可访问",
+        "链接暴露隐私或内部资料",
+        "链接内容与简历 claim 不一致"
+      ]
+    }
+  ],
+  "role_family_overlays": [
+    {
+      "role_family": "software_ai_engineering",
+      "applies_to_clusters": [
+        "computer_ai_software"
+      ],
+      "emphasis": [
+        "编程基础",
+        "数据结构与算法",
+        "计算机基础",
+        "工程实践",
+        "系统设计基础",
+        "GitHub/demo/README",
+        "AI/LLM 项目评测和部署"
+      ],
+      "required_evidence": [
+        "可解释代码或项目文档",
+        "至少一个工程项目",
+        "技能与项目互相引用"
+      ],
+      "downrank": [
+        "只写模型名不写数据/评测/部署",
+        "只写课程无工程项目"
+      ]
+    },
+    {
+      "role_family": "hardware_embedded_ic",
+      "applies_to_clusters": [
+        "electronics_communication_ic",
+        "instrumentation_sensing_measurement"
+      ],
+      "emphasis": [
+        "电路/信号基础",
+        "C/C++/嵌入式",
+        "硬件调试",
+        "测试指标",
+        "EDA/FPGA/仪器工具",
+        "可靠性"
+      ],
+      "required_evidence": [
+        "板级/芯片/通信/嵌入式项目",
+        "测试或调试记录",
+        "指标或报告"
+      ],
+      "downrank": [
+        "只列芯片/工具名称",
+        "无调试或测试细节"
+      ]
+    },
+    {
+      "role_family": "robotics_automation_control",
+      "applies_to_clusters": [
+        "automation_control_robotics"
+      ],
+      "emphasis": [
+        "控制理论",
+        "传感器/执行器",
+        "ROS/仿真",
+        "实机联调",
+        "异常处理",
+        "系统集成"
+      ],
+      "required_evidence": [
+        "仿真或实机项目",
+        "控制指标",
+        "联调问题解决"
+      ],
+      "downrank": [
+        "只有课堂理论无项目",
+        "无法说明仿真和实机差异"
+      ]
+    },
+    {
+      "role_family": "vehicle_new_energy_battery",
+      "applies_to_clusters": [
+        "mechanical_vehicle_manufacturing",
+        "energy_power_electrical",
+        "materials_semiconductor_new_energy"
+      ],
+      "emphasis": [
+        "整车/结构/电气/电池/材料/工艺",
+        "质量和可靠性",
+        "安全规范",
+        "实验或制造约束"
+      ],
+      "required_evidence": [
+        "实验/仿真/工艺/测试数据",
+        "项目图纸或报告",
+        "质量/成本/效率指标"
+      ],
+      "downrank": [
+        "泛泛写新能源热情",
+        "无材料/电气/机械证据"
+      ]
+    },
+    {
+      "role_family": "research_algorithm_rnd",
+      "applies_to_clusters": [
+        "computer_ai_software",
+        "engineering_mechanics_simulation",
+        "biomedical_bioengineering_health"
+      ],
+      "emphasis": [
+        "研究问题",
+        "方法设计",
+        "实验对比",
+        "指标",
+        "论文/复现/代码",
+        "局限性"
+      ],
+      "required_evidence": [
+        "实验记录或论文/报告",
+        "可复现方法",
+        "清楚个人贡献"
+      ],
+      "downrank": [
+        "只写熟悉论文不写实验",
+        "指标无来源"
+      ]
+    },
+    {
+      "role_family": "product_data_business",
+      "applies_to_clusters": [
+        "computer_ai_software"
+      ],
+      "emphasis": [
+        "用户/需求/业务目标",
+        "数据分析",
+        "指标复盘",
+        "协作沟通",
+        "产品判断"
+      ],
+      "required_evidence": [
+        "案例、PRD、竞品分析、数据结果或业务复盘"
+      ],
+      "downrank": [
+        "只有想法无落地",
+        "无用户或指标"
+      ]
+    },
+    {
+      "role_family": "civil_infrastructure_energy_soe",
+      "applies_to_clusters": [
+        "civil_architecture_spatial_infrastructure",
+        "transportation_mobility",
+        "energy_power_electrical"
+      ],
+      "emphasis": [
+        "规范意识",
+        "工程现场",
+        "质量安全",
+        "进度成本",
+        "BIM/GIS/电力系统",
+        "协同"
+      ],
+      "required_evidence": [
+        "课程设计、实习、现场报告、模型或规范应用"
+      ],
+      "downrank": [
+        "只写吃苦耐劳",
+        "无工程场景"
+      ]
+    }
+  ],
+  "default_general_profile": {
+    "version_id": "campus_general_cn_one_page",
+    "target": "校招通用版",
+    "use_when": "用户没有明确目标公司或具体 JD。",
+    "coverage_strategy": [
+      "按专业映射 primary_cluster 和 cross_tags。",
+      "保留 2-3 个最能证明工程能力的项目。",
+      "技能分为通用工程底座、岗位方向技能、工具链、可迁移能力。",
+      "不绑定单一公司话术，覆盖互联网、硬件、新能源、AI 的共同筛选点。"
+    ],
+    "default_section_order": [
+      "contact",
+      "school_info",
+      "skills",
+      "projects_competitions",
+      "internship_experience",
+      "research_publications",
+      "personality_potential"
+    ],
+    "keyword_strategy": [
+      "不要太散，围绕工程底座 + 方向证据。",
+      "软件/AI 写编程、数据结构、系统、模型评估、部署。",
+      "硬件/嵌入式写电路、C/C++、调试、测试仪器、可靠性。",
+      "新能源写材料/电池/工艺/仿真/质量/安全。",
+      "机器人/自动化写控制、传感器、ROS/仿真、实机联调。"
+    ]
+  },
+  "resume_versions": [
+    {
+      "version_id": "campus_general_cn_one_page",
+      "title": "校招通用中文版一页",
+      "default": true,
+      "use_when": [
+        "无明确目标公司",
+        "无具体 JD",
+        "希望覆盖多个工程方向"
+      ],
+      "primary_sections": [
+        "contact",
+        "school_info",
+        "skills",
+        "projects_competitions",
+        "personality_potential"
+      ],
+      "max_pages": 1
+    },
+    {
+      "version_id": "target_role_cn_software_ai",
+      "title": "软件/AI 定向中文版",
+      "use_when": [
+        "后端",
+        "前端",
+        "全栈",
+        "算法",
+        "AI 应用",
+        "LLM 工程",
+        "数据工程"
+      ],
+      "primary_sections": [
+        "contact",
+        "school_info",
+        "skills",
+        "projects_competitions",
+        "external_assets"
+      ],
+      "required_overlay": "software_ai_engineering"
+    },
+    {
+      "version_id": "target_role_cn_hardware_embedded_ic",
+      "title": "硬件/嵌入式/IC 定向中文版",
+      "use_when": [
+        "硬件",
+        "嵌入式",
+        "芯片",
+        "FPGA",
+        "通信",
+        "测试"
+      ],
+      "primary_sections": [
+        "contact",
+        "school_info",
+        "skills",
+        "projects_competitions",
+        "internship_experience"
+      ],
+      "required_overlay": "hardware_embedded_ic"
+    },
+    {
+      "version_id": "target_role_cn_new_energy_vehicle_battery",
+      "title": "新能源/车辆/电池定向中文版",
+      "use_when": [
+        "新能源",
+        "车辆",
+        "电池",
+        "储能",
+        "材料",
+        "工艺",
+        "质量"
+      ],
+      "primary_sections": [
+        "contact",
+        "school_info",
+        "skills",
+        "projects_competitions",
+        "internship_experience"
+      ],
+      "required_overlay": "vehicle_new_energy_battery"
+    },
+    {
+      "version_id": "research_algorithm_or_graduate_rnd",
+      "title": "科研/算法/研发版",
+      "use_when": [
+        "算法研究",
+        "科研助理",
+        "研究型研发",
+        "研究生申请辅助"
+      ],
+      "primary_sections": [
+        "contact",
+        "school_info",
+        "research_publications",
+        "projects_competitions",
+        "skills"
+      ],
+      "required_overlay": "research_algorithm_rnd"
+    },
+    {
+      "version_id": "internship_short_version",
+      "title": "实习短版",
+      "use_when": [
+        "暑期实习",
+        "日常实习",
+        "材料较少"
+      ],
+      "primary_sections": [
+        "contact",
+        "school_info",
+        "skills",
+        "projects_competitions"
+      ],
+      "max_pages": 1
+    },
+    {
+      "version_id": "ats_plain_text_version",
+      "title": "ATS 纯文本版",
+      "use_when": [
+        "招聘系统上传",
+        "解析优先"
+      ],
+      "primary_sections": [
+        "contact",
+        "school_info",
+        "skills",
+        "projects_competitions",
+        "internship_experience"
+      ],
+      "layout_rules": [
+        "标准标题",
+        "少表格",
+        "不图片化",
+        "不用复杂文本框"
+      ]
+    },
+    {
+      "version_id": "campus_portal_structured_version",
+      "title": "校招门户结构化填报版",
+      "use_when": [
+        "公司网申系统逐项填写"
+      ],
+      "primary_sections": [
+        "school_info",
+        "contact",
+        "skills",
+        "projects_competitions",
+        "awards_certificates"
+      ],
+      "layout_rules": [
+        "字段短句化",
+        "保留可复制 bullet",
+        "指标和链接单列"
+      ]
+    },
+    {
+      "version_id": "english_resume_version",
+      "title": "英文 Resume 版",
+      "use_when": [
+        "海外岗位",
+        "外企",
+        "英文投递"
+      ],
+      "primary_sections": [
+        "contact",
+        "school_info",
+        "skills",
+        "projects_competitions",
+        "internship_experience"
+      ],
+      "layout_rules": [
+        "英文邮箱和地区清晰",
+        "bullet 动词开头",
+        "不放身份证/照片/详细地址"
+      ],
+      "section_title_mapping": {
+        "school_info": "Education",
+        "projects_competitions": "Projects",
+        "internship_experience": "Experience",
+        "contact": "Contact",
+        "skills": "Skills"
+      }
+    },
+    {
+      "version_id": "interviewer_deep_dive_appendix",
+      "title": "面试深挖附录",
+      "use_when": [
+        "面试准备",
+        "项目材料补充"
+      ],
+      "primary_sections": [
+        "projects_competitions",
+        "interview_drill_points",
+        "evidence_links"
+      ],
+      "layout_rules": [
+        "不作为投递主简历",
+        "用于准备项目追问"
+      ]
+    }
+  ],
+  "version_selection_rules": [
+    {
+      "condition": "no_target_company_and_no_specific_jd",
+      "primary_version": "campus_general_cn_one_page",
+      "secondary_version": null,
+      "reason": "默认校招通用版，覆盖面广。"
+    },
+    {
+      "condition": "target_role_family_contains_algorithm_or_research",
+      "primary_version": "research_algorithm_or_graduate_rnd",
+      "fallback_if_research_evidence_weak": "target_role_cn_software_ai"
+    },
+    {
+      "condition": "target_role_family_contains_backend_frontend_fullstack_test_ai_application",
+      "primary_version": "target_role_cn_software_ai"
+    },
+    {
+      "condition": "target_role_family_contains_hardware_embedded_ic_robotics",
+      "primary_version": "target_role_cn_hardware_embedded_ic",
+      "secondary_version": "target_role_cn_software_ai"
+    },
+    {
+      "condition": "target_role_family_contains_new_energy_vehicle_battery_materials",
+      "primary_version": "target_role_cn_new_energy_vehicle_battery"
+    },
+    {
+      "condition": "target_is_internship_and_material_is_short",
+      "primary_version": "internship_short_version"
+    },
+    {
+      "condition": "upload_to_recruitment_system",
+      "primary_version": "ats_plain_text_version",
+      "secondary_version": "campus_portal_structured_version"
+    },
+    {
+      "condition": "english_or_global_role",
+      "primary_version": "english_resume_version"
+    }
+  ],
+  "hr_trust_score_rubric": {
+    "total": 100,
+    "pass_threshold": 75,
+    "revise_threshold": 60,
+    "dimensions": [
+      {
+        "id": "information_completeness",
+        "name": "信息完整度",
+        "weight": 20,
+        "scoring": "五板块是否齐全，目标岗位是否明确。"
+      },
+      {
+        "id": "evidence_strength",
+        "name": "证据强度",
+        "weight": 25,
+        "scoring": "项目、竞赛、实习、论文、作品链接是否支撑 claim。"
+      },
+      {
+        "id": "role_relevance",
+        "name": "岗位相关度",
+        "weight": 20,
+        "scoring": "技能和项目是否匹配 JD must-have / hidden requirements。"
+      },
+      {
+        "id": "readability_format_stability",
+        "name": "可读性与格式稳定性",
+        "weight": 10,
+        "scoring": "结构是否清楚，是否适合 ATS 和人工快速浏览。"
+      },
+      {
+        "id": "truthfulness_risk",
+        "name": "真实性风险",
+        "weight": 15,
+        "scoring": "夸大、虚构、责任边界、数字来源、NDA 风险越低分越高。"
+      },
+      {
+        "id": "growth_potential_expression",
+        "name": "成长潜力表达",
+        "weight": 10,
+        "scoring": "学习曲线、复盘能力、协作方式是否由经历证明。"
+      }
+    ],
+    "decision": [
+      ">=75: pass if no hard reject condition.",
+      "60-74: user_confirmation_required or revise_required depending on missing evidence.",
+      "<60: revise_required; output missing material checklist only."
+    ]
+  },
+  "validation_rules": [
+    {
+      "rule_id": "base.required_sections.v1",
+      "severity": "hard",
+      "description": "基础五板块必须可解析或可映射。"
+    },
+    {
+      "rule_id": "base.contact.viable.v1",
+      "severity": "hard",
+      "description": "邮箱或电话至少一个可用；禁止身份证、详细住址、家庭信息。"
+    },
+    {
+      "rule_id": "base.school.identity.v1",
+      "severity": "hard",
+      "description": "学校、专业、学历/年级或毕业时间必须清楚。"
+    },
+    {
+      "rule_id": "base.skills.evidence.v1",
+      "severity": "medium",
+      "description": "核心技能需要项目、竞赛、实习或课程证据引用。"
+    },
+    {
+      "rule_id": "base.project.action_result.v1",
+      "severity": "hard",
+      "description": "至少一个项目/竞赛经历必须包含本人动作和结果或证据。"
+    },
+    {
+      "rule_id": "base.potential.evidence.v1",
+      "severity": "medium",
+      "description": "性格和潜力必须由经历证据支撑，不能只写空泛自评。"
+    },
+    {
+      "rule_id": "truth.no_fabrication.v1",
+      "severity": "hard",
+      "description": "禁止编造学历、实习、奖项、论文、专利、项目数据。"
+    },
+    {
+      "rule_id": "truth.no_overclaim.v1",
+      "severity": "hard",
+      "description": "禁止把参与写成主导、把未完成写成上线/量产/发表。"
+    },
+    {
+      "rule_id": "format.ats_readable.v1",
+      "severity": "medium",
+      "description": "招聘系统版本应避免图片化、复杂表格和文本框。"
+    }
+  ],
+  "ban_or_downrank": {
+    "forbidden": [
+      "编造学历、实习、奖项、论文、专利、项目数据。",
+      "身份证号、详细住址、家庭背景、未授权隐私信息。",
+      "未完成项目写成已上线、已量产、已发表。",
+      "使用无法证明的绝对表述：精通全部技术、独立负责整个系统等。"
+    ],
+    "downrank": [
+      "空泛自评：认真负责、吃苦耐劳、抗压强。",
+      "与岗位无关的课程、社团、兴趣爱好。",
+      "没有证据支撑的技能列表。",
+      "低相关、低级别、无结果的奖项。",
+      "过度花哨排版、图片化简历、复杂表格文本框。"
+    ]
+  },
+  "runtime_contract": {
+    "input_summary_shape": {
+      "target_role_family": "",
+      "target_company": "",
+      "major_cluster_id": "",
+      "cross_tags": [],
+      "evidence_refs_available": [],
+      "user_material_sections": []
+    },
+    "output_refs_shape": {
+      "required_rule_refs": [],
+      "version_policy_ref": "",
+      "trust_rubric_ref": "hr_trust_score_rubric.v1"
+    },
+    "token_saving_rule": "Runtime should pass matched rule IDs and section summaries, not the whole database."
+  }
+}

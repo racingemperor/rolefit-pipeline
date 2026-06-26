@@ -38,11 +38,10 @@
     career-pipeline/
       SKILL.md
       references/
-        data-source-policy.md
-        major-cluster-taxonomy.md
-        resume-writing-rules.md
-        job-analysis-rubric.md
-      scripts/
+        data-catalog.md
+        source-policy.md
+        role-output-contracts.md
+      scripts/                  # planned deterministic helpers
         classify_major.py
         parse_resume.py
         normalize_job_postings.py
@@ -51,6 +50,7 @@
 
 .codex/
   agents/
+    career-orchestrator.toml
     major-cluster-classifier.toml
     profile-extractor.toml
     jd-analyzer.toml
@@ -60,6 +60,7 @@
     match-strategist.toml
     learning-path-strategist.toml
     personal-branding-strategist.toml
+    resume-format-gate.toml
     resume-architect.toml
     factual-reviewer.toml
 
@@ -78,15 +79,20 @@ data/
     source_collection_targets.zh-CN.json
     company_hiring_signals.schema.json
     summary.json
+  resume_formats/
+    resume_format_database.zh-CN.json
+    resume_format_schema.json
+    summary.json
 ```
 
 其中：
 
 - `SKILL.md` 是主编排器，定义何时触发 pipeline、何时派 subagent、如何合并结果。
 - `.codex/agents/*.toml` 定义具体角色，每个角色只负责一个清晰切面。
-- `scripts/` 处理确定性任务，例如简历解析、JD 标准化、schema 校验、匹配分计算、文档渲染。
+- `scripts/` 是后续计划中的确定性任务目录，例如简历解析、JD 标准化、schema 校验、匹配分计算、文档渲染；当前阶段先搭 prompt 和数据库，不实际部署脚本。
 - `references/` 存放规则、rubric、数据来源政策和写作准则，避免把大量知识塞进主 prompt。
 - `data/` 提供项目自带的静态数据库。第一批数据库是中国本科工科专业目录与就业导向大类映射；第二批数据库是大厂招聘信号库，用于按公司和工科就业大类整理官方 JD、官方招聘页、已验证 HR 公开信息、招聘软件公开 JD、候选人面经和社媒共识的采信规则。
+- `data/resume_formats/` 提供简历格式数据库，保存基础五板块、岗位方向 overlay、HR 信任评分、多版本选择和格式提交/驳回规则，供 ResumeFormatGate 和 ResumeArchitect 调用。
 
 ## 4. 总体 Pipeline
 
@@ -104,6 +110,7 @@ User Input
   -> MatchStrategist
   -> LearningPathStrategist
   -> PersonalBrandingStrategist
+  -> ResumeFormatGate
   -> ResumeArchitect
   -> FactualReviewer
   -> Final Decision Package
@@ -112,7 +119,7 @@ User Input
 根据任务类型可以裁剪流程：
 
 - 只做专业定位：`MajorClusterClassifier`
-- 只分析简历：`ProfileExtractor -> ResumeArchitect -> FactualReviewer`
+- 只分析简历：`ProfileExtractor -> ResumeFormatGate -> ResumeArchitect -> FactualReviewer`
 - 只分析岗位：`JDAnalyzer -> CompanyIntelligenceAnalyst -> MarketSentimentAnalyzer`
 - 目标岗位定制简历：完整流程
 - 找岗位：`MajorClusterClassifier -> ProfileExtractor -> JobScout -> JDAnalyzer -> MatchStrategist -> LearningPathStrategist`
@@ -628,7 +635,54 @@ User Input
 - 不把所有行业都套用同一套 GitHub / 个人网站模板。
 - 不为了视觉包装牺牲内容真实性。
 
-### 5.11 ResumeArchitect
+### 5.11 ResumeFormatGate
+
+简历格式门禁。负责回答：“用户当前材料是否已经满足简历生成格式，应该进入哪个简历版本？”
+
+这个角色运行在 ResumeArchitect 之前，不负责写简历，只负责提交与驳回。它读取 `data/resume_formats/resume_format_database.zh-CN.json`，检查基础五板块是否可解析、证据密度是否足够、是否存在隐私或真实性风险，并选择默认或定向简历版本。
+
+基础五板块：
+
+- 学校信息。
+- 个人联系方式。
+- 掌握技能。
+- 项目竞赛经历。
+- 个人性格和潜力。
+
+工作方面：
+
+- 板块映射：判断用户材料能否映射到基础五板块。
+- 格式门槛：检查每个板块是否只有标题、口号或空泛描述。
+- 版本选择：无明确目标公司时默认校招通用版；有岗位族时选择软件/AI、硬件/嵌入式/IC、新能源/车辆/电池、科研/算法、实习短版、ATS 纯文本版等。
+- HR 信任评分：按信息完整度、证据强度、岗位相关度、可读性、真实性风险和成长潜力表达评分。
+- 驳回判断：缺联系方式、缺学校/专业/毕业时间、无项目证据、技能无支撑、隐私泄露、夸大责任等情况应驳回或要求用户确认。
+- 生成许可：只有 `format_gate_status = pass` 时，ResumeArchitect 才能继续生成简历草稿。
+
+输出：
+
+```json
+{
+  "format_gate_status": "pass|revise_required|user_confirmation_required",
+  "primary_resume_version": "",
+  "secondary_resume_version": "",
+  "section_status": {},
+  "hr_trust_score": 0,
+  "score_breakdown": {},
+  "reject_reasons": [],
+  "missing_materials": [],
+  "questions_for_user": [],
+  "resume_architect_allowed": true
+}
+```
+
+禁止事项：
+
+- 不写最终简历。
+- 不为缺失板块编造内容。
+- 不把空泛性格描述直接塞进简历。
+- 不批准有隐私、NDA 或事实风险的材料进入生成。
+
+### 5.12 ResumeArchitect
 
 简历架构师。负责回答：“如何把真实经历组织成最适合这个岗位的表达？”
 
@@ -642,6 +696,7 @@ User Input
 
 工作方面：
 
+- 读取 ResumeFormatGate 输出；如果格式未通过，不生成简历，只返回补材料清单。
 - 简历结构设计：教育、技能、项目、实习、论文、奖项的顺序。
 - 版本定位：算法版、工程版、产品版、研究版、实习版、海外版。
 - 项目排序：哪个项目放前面，哪个压缩，哪个删除。
@@ -669,9 +724,9 @@ User Input
 - 不创造不存在的经历。
 - 不把“参与”写成“主导”，除非材料有证据。
 - 不为了 ATS 牺牲可读性。
-- 不绕过 FactualReviewer。
+- 不绕过 ResumeFormatGate 和 FactualReviewer。
 
-### 5.12 FactualReviewer
+### 5.13 FactualReviewer
 
 事实与风险审查员。负责回答：“这份简历和建议是否真实、合规、可防御？”
 
@@ -1014,10 +1069,11 @@ User Input
 6. 投递优先级
 7. 学习路径与能力补齐方案
 8. 个人展示与包装方案
-9. 简历设计方案
-10. 简历改写草稿
-11. 风险审查结果
-12. 面试准备建议
+9. 简历格式门禁结果
+10. 简历设计方案
+11. 简历改写草稿
+12. 风险审查结果
+13. 面试准备建议
 ```
 
 示例结构：
@@ -1031,6 +1087,7 @@ User Input
   "fit_analysis": {},
   "learning_plan": {},
   "personal_branding": {},
+  "resume_format_gate": {},
   "resume_plan": {},
   "resume_draft": "",
   "factual_review": {},
@@ -1059,6 +1116,7 @@ ProfileExtractor
   -> MatchStrategist
   -> LearningPathStrategist
   -> PersonalBrandingStrategist
+  -> ResumeFormatGate
   -> ResumeArchitect
   -> FactualReviewer
 ```
@@ -1071,6 +1129,7 @@ MVP 输出：
 - 匹配分和投递优先级。
 - 学习路径和能力补齐建议。
 - GitHub、个人网站、作品集等个人展示建议。
+- 简历格式门禁结果。
 - 简历结构建议。
 - 针对岗位的简历草稿。
 - 风险审查清单。
