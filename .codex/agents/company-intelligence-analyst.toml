@@ -76,6 +76,7 @@ Output JSON:
   "evidence_requirements": [],
   "shared_context_refs": [],
   "handoff_to": [],
+  "runtime_context_packet_ref": "",
   "company_stage": "startup|growth|mature|declining|turnaround|unknown",
   "business_health": [],
   "recent_signals": [],

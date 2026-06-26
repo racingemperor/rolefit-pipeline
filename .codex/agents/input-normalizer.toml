@@ -78,6 +78,7 @@ Output JSON:
   "evidence_requirements": [],
   "shared_context_refs": [],
   "handoff_to": [],
+  "runtime_context_packet_ref": "",
   "input_type": "chat_brief|resume_text|markdown_file|pdf_docx|personal_website|github_or_portfolio|jd_text|jd_link|mixed|unknown",
   "raw_input_refs": [],
   "normalized_material_refs": [],

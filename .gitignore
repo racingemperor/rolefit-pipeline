@@ -3,3 +3,5 @@
 *.local.json
 *.private.json
 *.redacted.tmp
+__pycache__/
+.pytest_cache/

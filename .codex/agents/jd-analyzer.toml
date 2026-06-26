@@ -76,6 +76,7 @@ Output JSON:
   "evidence_requirements": [],
   "shared_context_refs": [],
   "handoff_to": [],
+  "runtime_context_packet_ref": "",
   "job_profile": {},
   "must_have": [],
   "nice_to_have": [],

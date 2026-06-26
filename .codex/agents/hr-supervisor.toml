@@ -101,6 +101,7 @@ Output JSON:
   "evidence_requirements": [],
   "shared_context_refs": [],
   "handoff_to": [],
+  "runtime_context_packet_ref": "",
   "discipline_domain": "",
   "target_company": "",
   "company_hr_signal_refs": [],

@@ -81,6 +81,7 @@ Output JSON:
   "evidence_requirements": [],
   "shared_context_refs": [],
   "handoff_to": [],
+  "runtime_context_packet_ref": "",
   "discipline_domain": "engineering|science|humanities|social_science|business|arts_design|medicine_health|agriculture|law_public_affairs|interdisciplinary|unknown",
   "taxonomy_status": "implemented|pending_static_database|bridge_layer",
   "normalized_major": "",

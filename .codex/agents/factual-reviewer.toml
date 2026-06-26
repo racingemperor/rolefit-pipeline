@@ -86,6 +86,7 @@ Output JSON:
   "evidence_requirements": [],
   "shared_context_refs": [],
   "handoff_to": [],
+  "runtime_context_packet_ref": "",
   "format_gate_status": "pass|revise_required|user_confirmation_required",
   "incomplete_resume_allowed_with_user_consent": false,
   "incomplete_resume": false,

@@ -88,6 +88,7 @@ Output JSON:
   "evidence_requirements": [],
   "shared_context_refs": [],
   "handoff_to": [],
+  "runtime_context_packet_ref": "",
   "discipline_domain": "",
   "fit_score": null,
   "priority": "high|medium|low|skip|not_available",

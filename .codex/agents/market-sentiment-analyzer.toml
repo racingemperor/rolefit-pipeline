@@ -75,6 +75,7 @@ Output JSON:
   "evidence_requirements": [],
   "shared_context_refs": [],
   "handoff_to": [],
+  "runtime_context_packet_ref": "",
   "external_reputation": {},
   "candidate_experience_signals": [],
   "employee_sentiment": [],

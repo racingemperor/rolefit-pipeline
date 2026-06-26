@@ -82,6 +82,7 @@ Output JSON:
   "evidence_requirements": [],
   "shared_context_refs": [],
   "handoff_to": [],
+  "runtime_context_packet_ref": "",
   "discipline_domain": "",
   "candidate_profile": {},
   "candidate_stage": "non_graduating|graduating|graduate|unknown",

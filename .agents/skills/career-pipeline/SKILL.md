@@ -26,6 +26,13 @@ Read these references as needed:
 - `references/runtime-weight-engine.md` before proposing, checking, or merging any runtime weight, score, priority, ranking, threshold, or confidence adjustment.
 - `references/role-output-contracts.md` before merging subagent outputs.
 
+## Local Contract Scripts
+
+Use these scripts only for local contract validation and simulation. They do not call real subagents, browse recruitment sites, or make career judgments.
+
+- `scripts/validate_runtime_contracts.py` validates repository role prompts, secondary prompt injections, canonical subagent invocation packets, execution manifests, and blocked/final gate consistency.
+- `scripts/simulate_runtime_run.py` creates a private ignored `.career-pipeline-runs/<run_id>/` artifact tree for a no-network blocked run, useful for checking runtime packet shape before building a real runner.
+
 ## Built-In Databases
 
 Use repository-relative paths:
