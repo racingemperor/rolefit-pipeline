@@ -38,7 +38,9 @@ cd .agents/skills/career-pipeline
 python scripts/simulate_runtime_run.py --task-type job_search --route job_search --input-text "computer science sophomore, Python, looking for AI internship" --run-root ../../../.career-pipeline-runs
 python scripts/build_subagent_plan.py --run-dir ../../../.career-pipeline-runs/<run_id> --build-prompt-bundles
 python scripts/build_public_source_plan.py --run-dir ../../../.career-pipeline-runs/<run_id>
-python scripts/fetch_public_sources.py --run-dir ../../../.career-pipeline-runs/<run_id> --sources-json <allowed_public_sources.json>
+python scripts/discover_public_sources.py --run-dir ../../../.career-pipeline-runs/<run_id> --generate-query-plan-only
+python scripts/discover_public_sources.py --run-dir ../../../.career-pipeline-runs/<run_id> --search-results-json <search_results.json>
+python scripts/fetch_public_sources.py --run-dir ../../../.career-pipeline-runs/<run_id> --sources-json ../../../.career-pipeline-runs/<run_id>/evidence/allowed_public_sources.generated.json
 python scripts/backfill_public_evidence.py --run-dir ../../../.career-pipeline-runs/<run_id> --evidence-json ../../../.career-pipeline-runs/<run_id>/evidence/fetched_public_evidence.json
 python scripts/build_subagent_work_orders.py --run-dir ../../../.career-pipeline-runs/<run_id>
 python scripts/execute_subagent_plan.py --run-dir ../../../.career-pipeline-runs/<run_id> --dry-run
@@ -51,6 +53,7 @@ Do not run these commands from the repository root as `scripts/*.py`; the `scrip
 - `scripts/build_subagent_plan.py` creates a plan-only dispatch queue from a simulated run. It must not be treated as proof that local subagents executed.
 - `scripts/build_subagent_prompt_bundle.py` creates the concrete derived prompt bundle for one subagent from the static role prompt, runtime context packet, secondary prompt injection, allowed user facts, source policy, and output contract.
 - `scripts/build_public_source_plan.py` creates a policy-bound public-source research task list for official pages, public JDs, verified HR posts, candidate experience, and weak social signals without browsing or logging in.
+- `scripts/discover_public_sources.py` converts search-adapter results into `evidence/allowed_public_sources.generated.json`, rejecting login/private/backend sources and preserving weak-source limits so users do not need to name recruitment websites.
 - `scripts/fetch_public_sources.py` fetches allowed public `http(s)` or user-provided `file://` sources into evidence packets. It refuses forbidden/login-only source types and does not bypass platform access controls.
 - `scripts/backfill_public_evidence.py` validates and writes externally collected public evidence packets into the run after checking source policy constraints.
 - `scripts/build_subagent_work_orders.py` exports adapter-ready work orders from a plan with prompt bundle refs and backfill contracts. This is a handoff contract, not proof that subagents ran.

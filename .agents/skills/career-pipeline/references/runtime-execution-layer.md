@@ -27,6 +27,8 @@ create run_id and run directory
   -> convert each secondary_prompt_injection into a subagent invocation packet
   -> build subagent prompt bundles from static role prompts, runtime context, allowed facts, source policy, and output contracts
   -> build a public-source research plan before any network-enabled research
+  -> discover allowed public source URLs from a search adapter
+  -> fetch and backfill allowed public evidence when network is enabled
   -> dispatch required role subagents
   -> validate role outputs against role-output-contracts
   -> merge evidence, blocked outputs, runtime weights, and debate fields
@@ -154,6 +156,7 @@ For Codex network configuration, source-policy acknowledgement, and real adapter
 - `build_subagent_plan.py`: turns invocation packets into a plan-only dispatch queue. Plan-only queues are not proof that subagents ran.
 - `build_subagent_prompt_bundle.py`: creates one role-specific derived prompt bundle with the static role prompt, runtime context packet, secondary prompt injection, allowed user facts, source policy, research tasks, hard-data weight tasks, and required output contract. Raw input refs must not appear in the bundle.
 - `build_public_source_plan.py`: creates a source-policy-bound research plan for official/primary pages, public recruitment-platform JDs, verified HR public posts, candidate experience, and weak social signals. It does not browse, log in, scrape, or cache sources.
+- `discover_public_sources.py`: converts search-adapter results into `evidence/allowed_public_sources.generated.json` and `evidence/public_source_discovery_log.json`. It generates search queries from the source plan, rejects login/private/backend/non-public hints, deduplicates URLs, and keeps social media as weak evidence.
 - `fetch_public_sources.py`: fetches allowed public `http(s)` sources or user-provided `file://` snapshots into evidence packets. It refuses forbidden source types, login-only pages, and weak social evidence as final-decision proof.
 - `build_subagent_work_orders.py`: exports adapter-ready work orders with prompt bundle refs, human/source-policy gates, expected output contracts, and backfill requirements. Work orders are not proof of real subagent execution.
 - `execute_subagent_plan.py`: defaults to dry-run inspection, refuses real execution without human approval, refuses network execution without source-policy acknowledgement, writes redacted execution events, and can backfill externally produced role outputs only after schema checks.

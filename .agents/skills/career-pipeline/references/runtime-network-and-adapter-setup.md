@@ -77,19 +77,39 @@ Before any real source fetch:
 1. Build a run with `simulate_runtime_run.py` or the future real runner.
 2. Build prompt bundles and the public source plan.
 3. Have the controller record `source_policy_ack` internally when recruitment-information roles have received the default source matrix and the auto-generated source plan passes policy checks.
-4. Provide an explicit `sources.json` containing only allowed public sources.
-5. Fetch and backfill evidence.
+4. Use a search adapter to search the source-plan queries and write public search results.
+5. Run `discover_public_sources.py` to filter search results into `allowed_public_sources.generated.json`.
+6. Fetch and backfill evidence.
 
 Example:
 
 ```bash
 cd .agents/skills/career-pipeline
 python scripts/build_public_source_plan.py --run-dir ../../../.career-pipeline-runs/<run_id>
-python scripts/fetch_public_sources.py --run-dir ../../../.career-pipeline-runs/<run_id> --sources-json <allowed_public_sources.json>
+python scripts/discover_public_sources.py --run-dir ../../../.career-pipeline-runs/<run_id> --generate-query-plan-only
+python scripts/discover_public_sources.py --run-dir ../../../.career-pipeline-runs/<run_id> --search-results-json <search_results.json>
+python scripts/fetch_public_sources.py --run-dir ../../../.career-pipeline-runs/<run_id> --sources-json ../../../.career-pipeline-runs/<run_id>/evidence/allowed_public_sources.generated.json
 python scripts/backfill_public_evidence.py --run-dir ../../../.career-pipeline-runs/<run_id> --evidence-json ../../../.career-pipeline-runs/<run_id>/evidence/fetched_public_evidence.json
 ```
 
-Minimal `sources.json` shape:
+`--generate-query-plan-only` writes `evidence/public_source_discovery_log.json`; a browser/search/API adapter should execute those queries and save the resulting public URLs as `search_results.json`.
+
+Minimal search adapter result shape:
+
+```json
+{
+  "search_results": [
+    {
+      "task_id": "target-current-jd-verification",
+      "url": "https://careers.example.com/jobs/123",
+      "title": "Backend Engineer Intern",
+      "snippet": "Java, MySQL, distributed systems"
+    }
+  ]
+}
+```
+
+`discover_public_sources.py` writes `evidence/allowed_public_sources.generated.json` in the same shape accepted by `fetch_public_sources.py`:
 
 ```json
 {
@@ -103,6 +123,8 @@ Minimal `sources.json` shape:
   ]
 }
 ```
+
+If no search results are available, `discover_public_sources.py` still writes a discovery log with generated queries and an empty `sources` list. The pipeline should return blocked/degraded public-research outputs rather than asking the user to name websites.
 
 Allowed source types include `official_or_primary`, `official_school_notice`, `recruitment_platform_jd`, `verified_hr_public_post`, `candidate_experience_secondary`, `social_media_weak`, `public_report`, and `user_provided`.
 

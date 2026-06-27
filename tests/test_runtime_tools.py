@@ -28,6 +28,9 @@ ENGINEERING_SMOKE = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" 
 WORK_ORDER_BUILDER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "build_subagent_work_orders.py"
 EVIDENCE_BACKFILL = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "backfill_public_evidence.py"
 PUBLIC_SOURCE_FETCHER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "fetch_public_sources.py"
+PUBLIC_SOURCE_DISCOVERER = (
+    ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "discover_public_sources.py"
+)
 
 
 def run_python(script: Path, *args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
@@ -45,6 +48,7 @@ def test_skill_md_names_skill_relative_script_commands():
 
     assert "cd .agents/skills/career-pipeline" in text
     assert "python scripts/simulate_runtime_run.py" in text
+    assert "python scripts/discover_public_sources.py" in text
     assert "Do not run these commands from the repository root as `scripts/*.py`" in text
 
 
@@ -61,6 +65,8 @@ def test_runtime_setup_reference_documents_real_execution_gates():
     assert "[sandbox_workspace_write]" in text
     assert "network_access = true" in text
     assert "Automatic Recruitment Source Injection" in text
+    assert "discover_public_sources.py" in text
+    assert "allowed_public_sources.generated.json" in text
     assert "default_public_recruitment_source_targets" in text
     assert "user_instruction_required" in text
     assert "source_policy_ack" in text
@@ -76,6 +82,7 @@ def test_runtime_execution_layer_points_to_setup_reference():
 
     assert "runtime-network-and-adapter-setup.md" in text
     assert "Real subagent execution remains blocked until a concrete adapter is configured and tested" in text
+    assert "discover_public_sources.py" in text
 
 
 def test_job_scout_injection_contains_default_recruitment_source_matrix(tmp_path):
@@ -396,6 +403,219 @@ def test_public_source_fetcher_collects_allowed_public_html_and_backfills(tmp_pa
 
     backfill = run_python(EVIDENCE_BACKFILL, "--run-dir", str(run_dir), "--evidence-json", str(evidence_path))
     assert backfill.returncode == 0, backfill.stderr
+
+
+def test_public_source_discoverer_generates_allowed_sources_from_search_results(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "target_job_fit",
+        "--input-text",
+        (
+            "Computer science senior. Assess fit for Tencent backend development internship. "
+            "JD: Java, Spring, MySQL, Redis, distributed systems."
+        ),
+        "--run-root",
+        str(run_root),
+        "--route",
+        "target_job_fit",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(SOURCE_PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+
+    search_results = {
+        "search_results": [
+            {
+                "task_id": "target-current-jd-verification",
+                "url": "https://join.qq.com/post/backend-intern",
+                "title": "Tencent backend development internship",
+                "snippet": "Java Spring MySQL Redis distributed systems internship.",
+            },
+            {
+                "task_id": "target-learning-gap-evidence",
+                "url": "https://careers.tencent.com/hr/backend-campus-guide",
+                "title": "Tencent HR campus backend interview guide",
+                "snippet": "HR public guide for backend preparation and project expectations.",
+            },
+            {
+                "task_id": "social-media-weak-signal",
+                "url": "https://www.xiaohongshu.com/explore/tencent-backend",
+                "title": "Tencent backend internship discussion",
+                "snippet": "Public candidate discussion. Treat as weak signal.",
+            },
+            {
+                "task_id": "target-current-jd-verification",
+                "url": "https://example.com/login?next=/private-job",
+                "title": "Login required private job",
+                "snippet": "Please log in to view private candidate data.",
+            },
+        ]
+    }
+    search_results_path = tmp_path / "search-results.json"
+    search_results_path.write_text(json.dumps(search_results), encoding="utf-8")
+
+    result = run_python(
+        PUBLIC_SOURCE_DISCOVERER,
+        "--run-dir",
+        str(run_dir),
+        "--search-results-json",
+        str(search_results_path),
+    )
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)["public_source_discovery_response"]
+    assert response["exit_status"] == "success"
+    assert response["user_instruction_required"] is False
+    assert response["accepted_count"] == 3
+    assert response["rejected_count"] == 1
+
+    generated = json.loads((run_dir / response["generated_sources_ref"]).read_text(encoding="utf-8"))
+    serialized = json.dumps(generated, ensure_ascii=False)
+    assert "https://join.qq.com/post/backend-intern" in serialized
+    assert "https://example.com/login?next=/private-job" not in serialized
+    assert "target-current-jd-verification" in serialized
+    official = [
+        source
+        for source in generated["sources"]
+        if source["source_ref"] == "https://join.qq.com/post/backend-intern"
+    ][0]
+    assert official["source_type"] == "official_or_primary"
+    weak = [
+        source
+        for source in generated["sources"]
+        if source["source_type"] == "social_media_weak"
+    ][0]
+    assert weak["may_set_final_decision"] is False
+    assert weak["may_set_weight"] is False
+
+    log = json.loads((run_dir / response["discovery_log_ref"]).read_text(encoding="utf-8"))
+    assert log["public_source_discovery"]["source_discovery_mode"] == "auto_search_adapter"
+    query_payload = json.dumps(log["public_source_discovery"]["search_queries"], ensure_ascii=False)
+    assert "BOSS" in query_payload or "牛客" in query_payload
+    assert "user_instruction_required" in query_payload
+
+
+def test_public_source_discoverer_outputs_search_queries_when_no_results(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "Computer science sophomore, Python, looking for AI internship at ByteDance or DJI",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(SOURCE_PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+    empty_results = tmp_path / "empty-search-results.json"
+    empty_results.write_text(json.dumps({"search_results": []}), encoding="utf-8")
+
+    result = run_python(
+        PUBLIC_SOURCE_DISCOVERER,
+        "--run-dir",
+        str(run_dir),
+        "--search-results-json",
+        str(empty_results),
+    )
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)["public_source_discovery_response"]
+    assert response["accepted_count"] == 0
+    generated = json.loads((run_dir / response["generated_sources_ref"]).read_text(encoding="utf-8"))
+    assert generated["sources"] == []
+    log = json.loads((run_dir / response["discovery_log_ref"]).read_text(encoding="utf-8"))
+    queries = log["public_source_discovery"]["search_queries"]
+    assert queries
+    assert all(query["user_instruction_required"] is False for query in queries)
+    query_payload = json.dumps(queries, ensure_ascii=False)
+    assert "ByteDance" in query_payload or "DJI" in query_payload
+
+
+def test_public_source_discoverer_can_generate_query_plan_without_results(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "Computer science sophomore, Python, looking for AI internship at ByteDance or DJI",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(SOURCE_PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+
+    result = run_python(PUBLIC_SOURCE_DISCOVERER, "--run-dir", str(run_dir), "--generate-query-plan-only")
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)["public_source_discovery_response"]
+    assert response["exit_status"] == "needs_search_results"
+    assert response["accepted_count"] == 0
+    assert response["generated_sources_ref"] == ""
+    log = json.loads((run_dir / response["discovery_log_ref"]).read_text(encoding="utf-8"))
+    discovery = log["public_source_discovery"]
+    assert discovery["search_queries"]
+    assert discovery["next_action"] == "run_search_adapter"
+
+
+def test_public_source_discoverer_accepts_bom_encoded_search_results(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "target_job_fit",
+        "--input-text",
+        "Computer science senior. Assess fit for Tencent backend role. JD: Java and MySQL.",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "target_job_fit",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(SOURCE_PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+
+    search_results_path = tmp_path / "bom-search-results.json"
+    search_results_path.write_text(
+        json.dumps(
+            {
+                "search_results": [
+                    {
+                        "task_id": "target-current-jd-verification",
+                        "url": "https://join.qq.com/post/backend-intern",
+                        "title": "Tencent backend intern",
+                        "snippet": "Java MySQL",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8-sig",
+    )
+
+    result = run_python(
+        PUBLIC_SOURCE_DISCOVERER,
+        "--run-dir",
+        str(run_dir),
+        "--search-results-json",
+        str(search_results_path),
+    )
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)["public_source_discovery_response"]
+    assert response["accepted_count"] == 1
 
 
 def test_public_source_fetcher_rejects_login_only_sources(tmp_path):
