@@ -26,17 +26,24 @@ The main Codex controller must:
 2. Group work orders by the plan's `dispatch_batches`.
 3. Run one batch at a time, using each order's `batch_id`.
 4. Spawn no more than `max_parallel_subagents` in the current batch.
-5. For each order, read its `prompt_bundle_ref` and pass the bounded prompt bundle to a child agent with `multi_agent_v1.spawn_agent`.
-6. Require the child agent to return JSON only, containing:
+5. If an order lists `depends_on_agents`, confirm those agents' output artifacts already exist from earlier batches; do not spawn dependent roles in the same parallel batch.
+6. For each order, read its `prompt_bundle_ref` as UTF-8 JSON and pass the serialized prompt bundle content to a child agent with `multi_agent_v1.spawn_agent`.
+7. Require the child agent to return JSON only, containing:
    - `invocation_ref`
    - `role_output_packet`
    - `error_recovery_state`
-7. Use `multi_agent_v1.wait_agent` to collect completed child outputs.
-8. Validate that each returned JSON includes the required top-level fields and the role output fields from the prompt bundle.
-9. Persist each accepted output to the role's `output_artifact_target`.
-10. Use `multi_agent_v1.close_agent` after the role output artifact is persisted.
-11. Start the next batch only after every required output in the current batch is persisted or explicitly blocked.
-12. Pass only artifact refs, evidence refs, and accepted merge fields to later batches; do not rely on closed subagent chat memory.
+8. Use `multi_agent_v1.wait_agent` to collect completed child outputs.
+9. Validate that each returned JSON includes the required top-level fields and the role output fields from the prompt bundle.
+10. Persist each accepted output to the role's `output_artifact_target`.
+11. Use `multi_agent_v1.close_agent` after the role output artifact is persisted.
+12. Start the next batch only after every required output in the current batch is persisted or explicitly blocked.
+13. Pass only artifact refs, evidence refs, and accepted merge fields to later batches; do not rely on closed subagent chat memory.
+
+## Encoding-Safe Prompt Transfer
+
+The controller must not make the child agent rediscover the prompt bundle by looking at terminal-rendered file output. Read the prompt bundle as UTF-8, serialize the bounded content in the spawn message or structured item, and include any role-relevant evidence excerpts in that same UTF-8 payload.
+
+Do not ask the child agent to inspect Chinese JSON through PowerShell terminal rendering. PowerShell may display valid UTF-8 Chinese text as mojibake even when the file is correct; a child role can then falsely mark user facts as corrupted. If the child must read a file directly, instruct it to parse JSON with UTF-8 APIs and verify values structurally, not from console rendering.
 
 The child-agent prompt should include the whole prompt bundle content needed for the role, plus this controller instruction:
 
@@ -55,7 +62,7 @@ python scripts/execute_subagent_plan.py --manual-controller-execution --run-dir 
 python scripts/finalize_runtime_run.py --execution-mode manual-controller --run-dir ../../../.career-pipeline-runs/<run_id> --real-subagent-execution
 ```
 
-Backfill every required role output, not only the example role above. Finalization is allowed only after the finalizer accepts the run.
+Backfill every required role output, not only the example role above. The `--backfill-output` source must be the newly returned child-agent JSON output, not an old `agents/<role>/output.json` mock or seed file from a previous adapter run. If a run directory already contains `mock-blocked` role outputs, overwrite them only with newly persisted real role outputs; never re-label mock outputs as manual-controller execution. The executor rejects mock or seed adapter metadata during manual-controller backfill. Finalization is allowed only after the finalizer accepts the run.
 
 ## Failure Handling
 

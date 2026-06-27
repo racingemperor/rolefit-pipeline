@@ -121,6 +121,9 @@ def test_skill_documents_codex_desktop_subagent_adapter_protocol():
         "finalize_runtime_run.py --execution-mode manual-controller",
         "Python scripts cannot directly call",
         "main Codex controller",
+        "UTF-8",
+        "Do not ask the child agent to inspect Chinese JSON through PowerShell terminal rendering",
+        "pass the serialized prompt bundle content",
     ]
     for term in required_terms:
         assert term in adapter_text
@@ -1286,6 +1289,126 @@ def test_manual_controller_backfill_can_finalize_with_explicit_execution_metadat
     assert final_package["decision_package"]["execution_mode"] == "manual-controller"
 
 
+def test_manual_controller_backfill_overwrites_mock_blocked_outputs(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "Software engineering junior, Python and C++, looking for backend internship",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(PLAN_BUILDER, "--run-dir", str(run_dir), "--build-prompt-bundles").returncode == 0
+    assert run_python(WORK_ORDER_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+    mock = run_python(SUBAGENT_ADAPTER_RUNNER, "--run-dir", str(run_dir), "--mock-blocked")
+    assert mock.returncode == 0, mock.stderr
+
+    plan = json.loads((run_dir / "invocations" / "subagent_invocation_plan.json").read_text(encoding="utf-8"))[
+        "subagent_invocation_plan"
+    ]
+    first = plan["dispatch_queue"][0]
+    first_output_path = run_dir / first["output_artifact_target"]
+    mock_output = json.loads(first_output_path.read_text(encoding="utf-8"))
+    assert mock_output["adapter_metadata"]["adapter_mode"] == "mock-blocked"
+
+    invocation = json.loads((run_dir / first["invocation_ref"]).read_text(encoding="utf-8"))[
+        "subagent_invocation"
+    ]
+    manual_output_path = tmp_path / "manual-output.json"
+    manual_output = {
+        "invocation_ref": first["invocation_ref"],
+        "role_output_packet": {
+            "invocation_id": invocation["invocation_id"],
+            "target_agent": first["target_agent"],
+            "status": "done_with_warnings",
+            "role_output_ref": first["output_artifact_target"],
+            "evidence_packet_refs": [],
+            "runtime_weights_ref": "merge/runtime_weights.json",
+            "artifact_refs": [first["prompt_bundle_ref"]],
+            "blocked_outputs": ["fit_score"],
+            "runtime_research_tasks": [],
+            "needs_user_confirmation": [],
+            "handoff_to": [],
+            "errors": [],
+            "confidence": "medium",
+        },
+        "error_recovery_state": {
+            "status": "degraded",
+            "errors": [],
+            "recovery_actions": ["continue_with_safe_partial_output"],
+            "degraded_outputs": ["fit_score"],
+            "blocked_outputs": ["fit_score"],
+            "safe_outputs": ["role_output_packet"],
+            "next_action": "continue",
+        },
+    }
+    manual_output_path.write_text(json.dumps(manual_output), encoding="utf-8")
+
+    backfill = run_python(
+        PLAN_EXECUTOR,
+        "--run-dir",
+        str(run_dir),
+        "--manual-controller-execution",
+        "--backfill-output",
+        f"{first['target_agent']}={manual_output_path}",
+    )
+
+    assert backfill.returncode == 0, backfill.stderr
+    final_output = json.loads(first_output_path.read_text(encoding="utf-8"))
+    assert final_output["role_output_packet"]["status"] == "done_with_warnings"
+    assert final_output["adapter_metadata"]["adapter_mode"] == "manual-controller"
+    assert final_output["adapter_metadata"]["real_subagent_execution"] is True
+    assert final_output["adapter_metadata"]["mock_or_seed_source"] is False
+
+
+def test_manual_controller_backfill_rejects_existing_mock_output_as_source(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "Software engineering junior, Python and C++, looking for backend internship",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(PLAN_BUILDER, "--run-dir", str(run_dir), "--build-prompt-bundles").returncode == 0
+    assert run_python(WORK_ORDER_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+    mock = run_python(SUBAGENT_ADAPTER_RUNNER, "--run-dir", str(run_dir), "--mock-blocked")
+    assert mock.returncode == 0, mock.stderr
+
+    plan = json.loads((run_dir / "invocations" / "subagent_invocation_plan.json").read_text(encoding="utf-8"))[
+        "subagent_invocation_plan"
+    ]
+    first = plan["dispatch_queue"][0]
+    existing_mock_output = run_dir / first["output_artifact_target"]
+
+    backfill = run_python(
+        PLAN_EXECUTOR,
+        "--run-dir",
+        str(run_dir),
+        "--manual-controller-execution",
+        "--backfill-output",
+        f"{first['target_agent']}={existing_mock_output}",
+    )
+
+    assert backfill.returncode == 1
+    assert "mock" in backfill.stderr.lower()
+    assert "manual-controller" in backfill.stderr
+
+
 def test_subagent_adapter_runner_writes_schema_valid_mock_outputs(tmp_path):
     run_root = tmp_path / ".career-pipeline-runs"
     simulate = run_python(
@@ -1781,8 +1904,17 @@ def test_plan_builder_creates_plan_only_dispatch_queue(tmp_path):
     assert [batch["batch_id"] for batch in plan["subagent_invocation_plan"]["dispatch_batches"]] == [
         "profile_and_taxonomy",
         "public_role_research",
-        "strategy_and_learning",
+        "strategy_match",
+        "strategy_learning",
     ]
+    batch_by_id = {
+        batch["batch_id"]: batch
+        for batch in plan["subagent_invocation_plan"]["dispatch_batches"]
+    }
+    assert batch_by_id["strategy_match"]["target_agents"] == ["match-strategist"]
+    assert batch_by_id["strategy_learning"]["target_agents"] == ["learning-path-strategist"]
+    assert batch_by_id["strategy_learning"]["depends_on_batches"] == ["strategy_match"]
+    assert "agents/match-strategist/output.json" in batch_by_id["strategy_learning"]["depends_on_artifact_refs"]
     assert all(item["batch_id"] for item in queue)
     assert all(item["close_after_artifact_persisted"] is True for item in queue)
 
@@ -1819,7 +1951,8 @@ def test_target_job_fit_plan_batches_agents_for_limited_subagent_concurrency(tmp
     assert list(batches) == [
         "profile_and_taxonomy",
         "public_role_research",
-        "strategy_and_learning",
+        "strategy_match",
+        "strategy_learning",
         "hr_and_factual_gates",
     ]
     assert batches["profile_and_taxonomy"]["target_agents"] == [
@@ -1831,10 +1964,14 @@ def test_target_job_fit_plan_batches_agents_for_limited_subagent_concurrency(tmp
         "company-intelligence-analyst",
         "job-scout",
     ]
-    assert batches["strategy_and_learning"]["depends_on_batches"] == [
+    assert batches["strategy_match"]["depends_on_batches"] == [
         "profile_and_taxonomy",
         "public_role_research",
     ]
+    assert batches["strategy_match"]["target_agents"] == ["match-strategist"]
+    assert batches["strategy_learning"]["target_agents"] == ["learning-path-strategist"]
+    assert batches["strategy_learning"]["depends_on_batches"] == ["strategy_match"]
+    assert "agents/match-strategist/output.json" in batches["strategy_learning"]["depends_on_artifact_refs"]
     assert batches["hr_and_factual_gates"]["target_agents"] == [
         "hr-supervisor",
         "factual-reviewer",
@@ -1848,8 +1985,15 @@ def test_target_job_fit_plan_batches_agents_for_limited_subagent_concurrency(tmp
     ]
     assert "agents/profile-extractor/output.json" in queue_by_agent["match-strategist"]["depends_on_artifact_refs"]
     assert "agents/jd-analyzer/output.json" in queue_by_agent["match-strategist"]["depends_on_artifact_refs"]
+    assert queue_by_agent["learning-path-strategist"]["depends_on_batches"] == [
+        "strategy_match",
+    ]
+    assert queue_by_agent["learning-path-strategist"]["depends_on_agents"] == [
+        "match-strategist",
+    ]
     assert queue_by_agent["hr-supervisor"]["depends_on_batches"] == [
-        "strategy_and_learning",
+        "strategy_match",
+        "strategy_learning",
     ]
     assert all(item["close_after_artifact_persisted"] is True for item in plan["dispatch_queue"])
 
@@ -1910,6 +2054,83 @@ def minimal_batched_subagent_plan(queue_overrides: dict[str, object]) -> dict:
             "dispatch_queue": [queue_item],
         }
     }
+
+
+def test_validator_rejects_same_batch_agent_dependencies(tmp_path):
+    plan = {
+        "subagent_invocation_plan": {
+            "run_id": "run-test",
+            "plan_status": "ready",
+            "created_from_manifest_ref": "manifest.json",
+            "dispatch_strategy": "batched_artifact_handoff",
+            "max_parallel_subagents": 2,
+            "artifact_handoff_required": True,
+            "close_completed_subagents": True,
+            "dispatch_batches": [
+                {
+                    "batch_id": "strategy_and_learning",
+                    "batch_index": 0,
+                    "target_agents": ["match-strategist", "learning-path-strategist"],
+                    "depends_on_batches": [],
+                    "depends_on_artifact_refs": [],
+                    "produces_artifact_refs": [
+                        "agents/match-strategist/output.json",
+                        "agents/learning-path-strategist/output.json",
+                    ],
+                    "max_parallel_subagents": 2,
+                    "close_completed_subagents": True,
+                    "artifact_handoff_required": True,
+                }
+            ],
+            "dispatch_queue": [
+                {
+                    "queue_index": 0,
+                    "target_agent": "match-strategist",
+                    "batch_id": "strategy_and_learning",
+                    "depends_on_batches": [],
+                    "depends_on_agents": [],
+                    "depends_on_artifact_refs": [],
+                    "invocation_ref": "invocations/match-strategist.invocation.json",
+                    "prompt_bundle_ref": "prompts/match-strategist.prompt_bundle.json",
+                    "input_refs": ["input/normalized/runtime_context_packet.json"],
+                    "output_artifact_target": "agents/match-strategist/output.json",
+                    "close_after_artifact_persisted": True,
+                    "dispatch_mode": "plan_only",
+                    "status": "planned",
+                    "allowed_network": False,
+                    "requires_human_approval": True,
+                    "privacy_class": "derived",
+                    "blocked_until": ["human_confirms_real_subagent_execution"],
+                },
+                {
+                    "queue_index": 1,
+                    "target_agent": "learning-path-strategist",
+                    "batch_id": "strategy_and_learning",
+                    "depends_on_batches": [],
+                    "depends_on_agents": ["match-strategist"],
+                    "depends_on_artifact_refs": ["agents/match-strategist/output.json"],
+                    "invocation_ref": "invocations/learning-path-strategist.invocation.json",
+                    "prompt_bundle_ref": "prompts/learning-path-strategist.prompt_bundle.json",
+                    "input_refs": ["input/normalized/runtime_context_packet.json"],
+                    "output_artifact_target": "agents/learning-path-strategist/output.json",
+                    "close_after_artifact_persisted": True,
+                    "dispatch_mode": "plan_only",
+                    "status": "planned",
+                    "allowed_network": False,
+                    "requires_human_approval": True,
+                    "privacy_class": "derived",
+                    "blocked_until": ["human_confirms_real_subagent_execution"],
+                },
+            ],
+        }
+    }
+    plan_path = tmp_path / "same-batch-dependency-plan.json"
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+    result = run_python(VALIDATOR, "--subagent-plan", str(plan_path))
+
+    assert result.returncode == 1
+    assert "must be in an earlier batch" in result.stderr
 
 
 def test_validator_rejects_subagent_plan_that_is_not_plan_only(tmp_path):
@@ -2906,3 +3127,34 @@ def test_manual_controller_flow_documents_codex_side_search_and_subagents():
     assert "close completed subagents" in flow_text
     assert "close_completed_subagents" in network_text
     assert "artifact_handoff_required" in skill_text
+
+
+def test_work_orders_require_serialized_utf8_prompt_bundle_content(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "软件工程大三，Python 和 C++，想找上海后端开发实习",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+
+    plan = run_python(PLAN_BUILDER, "--run-dir", str(run_dir), "--build-prompt-bundles")
+    assert plan.returncode == 0, plan.stderr
+    orders_result = run_python(WORK_ORDER_BUILDER, "--run-dir", str(run_dir))
+    assert orders_result.returncode == 0, orders_result.stderr
+
+    orders = json.loads((run_dir / "invocations" / "subagent_work_orders.json").read_text(encoding="utf-8"))[
+        "subagent_work_orders"
+    ]["orders"]
+    assert orders
+    instruction = orders[0]["execution_instruction"]
+    assert "serialized UTF-8 prompt_bundle_ref content" in instruction
+    assert "Do not rely on PowerShell terminal rendering for Chinese JSON" in instruction

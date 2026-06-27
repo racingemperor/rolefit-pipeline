@@ -57,7 +57,8 @@ def unique_fields(fields: list[str]) -> list[str]:
 BATCH_ORDER = [
     "profile_and_taxonomy",
     "public_role_research",
-    "strategy_and_learning",
+    "strategy_match",
+    "strategy_learning",
     "branding_and_resume",
     "hr_and_factual_gates",
 ]
@@ -71,17 +72,21 @@ BATCH_DEFINITIONS = {
         "description": "Collect current JD, company, market, HR, and public-source evidence.",
         "depends_on_batches": ["profile_and_taxonomy"],
     },
-    "strategy_and_learning": {
-        "description": "Merge user profile and public role evidence into fit, gap, and learning-path strategy.",
+    "strategy_match": {
+        "description": "Merge user profile and public role evidence into fit, gap, and conditional application strategy.",
         "depends_on_batches": ["profile_and_taxonomy", "public_role_research"],
+    },
+    "strategy_learning": {
+        "description": "Turn matched gaps into learning, proof-artifact, and resume-conversion plans.",
+        "depends_on_batches": ["strategy_match"],
     },
     "branding_and_resume": {
         "description": "Prepare personal branding, resume format, and resume drafting artifacts.",
-        "depends_on_batches": ["profile_and_taxonomy", "strategy_and_learning"],
+        "depends_on_batches": ["profile_and_taxonomy", "strategy_learning"],
     },
     "hr_and_factual_gates": {
         "description": "Run HR readability, factual, privacy, and final presentation gates.",
-        "depends_on_batches": ["strategy_and_learning"],
+        "depends_on_batches": ["strategy_learning"],
     },
 }
 
@@ -92,8 +97,8 @@ AGENT_BATCH = {
     "job-scout": "public_role_research",
     "company-intelligence-analyst": "public_role_research",
     "market-sentiment-analyzer": "public_role_research",
-    "match-strategist": "strategy_and_learning",
-    "learning-path-strategist": "strategy_and_learning",
+    "match-strategist": "strategy_match",
+    "learning-path-strategist": "strategy_learning",
     "personal-branding-strategist": "branding_and_resume",
     "resume-format-gate": "branding_and_resume",
     "resume-architect": "branding_and_resume",
@@ -133,7 +138,7 @@ MAX_PARALLEL_SUBAGENTS = 4
 
 
 def batch_for_agent(target_agent: str) -> str:
-    return AGENT_BATCH.get(target_agent, "strategy_and_learning")
+    return AGENT_BATCH.get(target_agent, "strategy_match")
 
 
 def output_refs_for_batches(queue: list[dict[str, Any]], batch_ids: list[str]) -> list[str]:

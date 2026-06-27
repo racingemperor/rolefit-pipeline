@@ -483,6 +483,27 @@ def validate_subagent_plan(payload: dict[str, Any]) -> None:
         require_list(item["depends_on_artifact_refs"], "depends_on_artifact_refs", where)
         if any(ref.replace("\\", "/").startswith("input/raw_refs") for ref in item["input_refs"]):
             raise ValidationError(f"{where}: raw input refs must not be exposed to subagent plans")
+        for dependency_agent in item["depends_on_agents"]:
+            dependency_items = [
+                other for other in queue if other.get("target_agent") == dependency_agent
+            ]
+            if not dependency_items:
+                raise ValidationError(
+                    f"{where}: depends_on_agents references unknown agent `{dependency_agent}`"
+                )
+            dependency_item = dependency_items[0]
+            if dependency_item["batch_id"] == item["batch_id"]:
+                raise ValidationError(
+                    f"{where}: depends_on_agents `{dependency_agent}` must be in an earlier batch"
+                )
+            if dependency_item["queue_index"] >= item["queue_index"]:
+                raise ValidationError(
+                    f"{where}: depends_on_agents `{dependency_agent}` must appear earlier in the dispatch queue"
+                )
+            if dependency_item["output_artifact_target"] not in item["depends_on_artifact_refs"]:
+                raise ValidationError(
+                    f"{where}: missing output artifact ref for dependency agent `{dependency_agent}`"
+                )
 
 
 def validate_source_plan(payload: dict[str, Any]) -> None:

@@ -191,11 +191,12 @@ Default batch pattern:
 
 - `profile_and_taxonomy`: `MajorClusterClassifier`, `ProfileExtractor`.
 - `public_role_research`: `JDAnalyzer`, `JobScout`, `CompanyIntelligenceAnalyst`, `MarketSentimentAnalyzer` when present.
-- `strategy_and_learning`: `MatchStrategist`, `LearningPathStrategist`.
+- `strategy_match`: `MatchStrategist`.
+- `strategy_learning`: `LearningPathStrategist`, after `MatchStrategist` output is persisted.
 - `branding_and_resume`: `PersonalBrandingStrategist`, `ResumeFormatGate`, `ResumeArchitect` when present.
 - `hr_and_factual_gates`: `HRSupervisor`, `FactualReviewer`.
 
-Run only one batch at a time. Within a batch, do not exceed `max_parallel_subagents` from the plan. For every completed role, persist `agents/<role>/output.json`, append the execution event, and close completed subagents before the next batch starts. Later batches must read `depends_on_artifact_refs`; they must not rely on closed subagent chat memory.
+Run only one batch at a time. Within a batch, do not exceed `max_parallel_subagents` from the plan. For every completed role, persist `agents/<role>/output.json`, append the execution event, and close completed subagents before the next batch starts. Later batches must read `depends_on_artifact_refs`; they must not rely on closed subagent chat memory. If a role lists `depends_on_agents`, those agents must be in earlier batches, never merely earlier within the same parallel batch.
 
 ## Debate And Merge
 

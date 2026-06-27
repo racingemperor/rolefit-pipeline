@@ -246,6 +246,13 @@ def parse_backfill_args(items: list[str]) -> dict[str, Path]:
 
 
 def attach_manual_controller_metadata(payload: dict[str, Any]) -> None:
+    metadata = payload.get("adapter_metadata")
+    if isinstance(metadata, dict):
+        if metadata.get("adapter_mode") == "mock-blocked" or metadata.get("mock_or_seed_source") is True:
+            raise ExecutionError(
+                "manual-controller backfill source is a mock/seed adapter output; "
+                "provide the real separated subagent JSON output instead"
+            )
     payload.setdefault("adapter_metadata", {})
     payload["adapter_metadata"].update(
         {

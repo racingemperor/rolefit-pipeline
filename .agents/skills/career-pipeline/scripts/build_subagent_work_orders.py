@@ -68,10 +68,13 @@ def build_orders(run_dir: Path, plan_ref: str, output_ref: str) -> dict[str, Any
                 "dispatch_status": "ready_for_external_adapter",
                 "execution_instruction": (
                     "Dispatch according to batch_id and depends_on_artifact_refs. Pass the "
-                    "prompt_bundle_ref content to a real Codex subagent only after human approval "
-                    "and source-policy acknowledgement. Return a role output matching "
-                    "expected_backfill_contract, persist_role_output_before_close, then close the "
-                    "completed subagent when close_after_artifact_persisted is true."
+                    "serialized UTF-8 prompt_bundle_ref content to a real Codex subagent only after "
+                    "human approval and source-policy acknowledgement. Do not rely on PowerShell "
+                    "terminal rendering for Chinese JSON; child agents should receive parsed or "
+                    "serialized UTF-8 prompt bundle content, not terminal-displayed text. Return a "
+                    "role output matching expected_backfill_contract, "
+                    "persist_role_output_before_close, then close the completed subagent when "
+                    "close_after_artifact_persisted is true."
                 ),
                 "expected_backfill_contract": {
                     "required_top_level_fields": [
