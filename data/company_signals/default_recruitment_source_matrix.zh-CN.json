@@ -1,0 +1,183 @@
+{
+  "metadata": {
+    "version": "0.1.0",
+    "language": "zh-CN",
+    "purpose": "Default public recruitment source targets injected into recruitment-information roles. This is a source discovery matrix, not evidence by itself.",
+    "user_instruction_required": false,
+    "privacy_rule": "Use public pages and public posts only. Do not log in, bypass CAPTCHA, scrape private resumes, access recruiter backends, or use private chats."
+  },
+  "default_public_recruitment_source_targets": [
+    {
+      "group_id": "official_primary",
+      "priority": 1,
+      "source_type": "official_or_primary",
+      "display_sources": [
+        "公司官方招聘页",
+        "公司官方校招页",
+        "公司官方实习生招聘页",
+        "公司官方微信公众号/视频号招聘公告",
+        "公司官方技术博客或业务公告"
+      ],
+      "use_for": [
+        "current_jd_text",
+        "hiring_channel",
+        "campus_or_internship_program",
+        "role_family",
+        "business_context",
+        "final_decision_when_current"
+      ],
+      "may_set_weight": true,
+      "may_set_final_decision": true,
+      "requires_login": false
+    },
+    {
+      "group_id": "school_primary",
+      "priority": 1,
+      "source_type": "official_school_notice",
+      "display_sources": [
+        "学校就业信息网",
+        "学院官网就业/实习通知",
+        "学校双选会/宣讲会日历",
+        "校企合作或实习基地公告"
+      ],
+      "use_for": [
+        "school_company_signal",
+        "campus_channel",
+        "school_specific_advantage",
+        "internship_or_full_time_stage"
+      ],
+      "may_set_weight": true,
+      "may_set_final_decision": true,
+      "requires_login": false
+    },
+    {
+      "group_id": "public_recruitment_platform",
+      "priority": 2,
+      "source_type": "recruitment_platform_jd",
+      "display_sources": [
+        "BOSS直聘公开页",
+        "猎聘公开页",
+        "拉勾公开页",
+        "牛客企业招聘页",
+        "实习僧公开页",
+        "LinkedIn public job page",
+        "Indeed public job page"
+      ],
+      "use_for": [
+        "current_jd_requirement",
+        "skill_frequency",
+        "location_degree_stage",
+        "compensation_or_internship_period_when_public",
+        "role_family_comparison"
+      ],
+      "may_set_weight": true,
+      "may_set_final_decision": true,
+      "requires_login": false,
+      "degrade_rule": "If the page requires login, is app-only, blocks public access, or exposes non-public candidate data, skip it and use official sources or ask for a user-provided JD/link."
+    },
+    {
+      "group_id": "verified_hr_public",
+      "priority": 3,
+      "source_type": "verified_hr_public_post",
+      "display_sources": [
+        "已验证大厂 HR 公开账号",
+        "官方列名 HR 或招聘官公开帖",
+        "企业认证招聘号公开内容",
+        "公开内推官说明帖"
+      ],
+      "use_for": [
+        "screening_preference",
+        "interview_process",
+        "resume_review_focus",
+        "hidden_expectations",
+        "preparation_notes"
+      ],
+      "may_set_weight": true,
+      "may_set_final_decision": false,
+      "requires_login": false,
+      "verification_required": true
+    },
+    {
+      "group_id": "candidate_experience_secondary",
+      "priority": 4,
+      "source_type": "candidate_experience_secondary",
+      "display_sources": [
+        "牛客面经",
+        "OfferShow/看准等公开经验",
+        "知乎公开经验帖",
+        "公开博客复盘",
+        "GitHub/技术社区公开面试复盘"
+      ],
+      "use_for": [
+        "interview_risk",
+        "process_variation",
+        "preparation_questions",
+        "hidden_expectation_hint"
+      ],
+      "may_set_weight": true,
+      "may_set_final_decision": false,
+      "requires_login": false,
+      "privacy_rule": "Aggregate and de-identify. Do not store private candidate identity or private chat content."
+    },
+    {
+      "group_id": "social_media_weak",
+      "priority": 5,
+      "source_type": "social_media_weak",
+      "display_sources": [
+        "小红书公开帖",
+        "脉脉公开讨论",
+        "知乎公开讨论",
+        "公众号公开评论或复盘",
+        "Reddit/Blind/Glassdoor public discussion where lawful and accessible"
+      ],
+      "use_for": [
+        "market_sentiment",
+        "team_atmosphere_hint",
+        "candidate_preparation_note",
+        "risk_signal"
+      ],
+      "may_set_weight": false,
+      "may_set_final_decision": false,
+      "requires_login": false,
+      "degrade_rule": "Treat as weak signal only. Never use a single anonymous post as a final basis."
+    },
+    {
+      "group_id": "public_report",
+      "priority": 3,
+      "source_type": "public_report",
+      "display_sources": [
+        "公司财报/招股书",
+        "公开行业报告",
+        "主流媒体公开报道",
+        "公开投融资信息",
+        "监管披露"
+      ],
+      "use_for": [
+        "company_development_status",
+        "business_health",
+        "industry_trend",
+        "role_strategic_value"
+      ],
+      "may_set_weight": true,
+      "may_set_final_decision": true,
+      "requires_login": false
+    }
+  ],
+  "forbidden_source_types": [
+    "private_resume",
+    "private_chat",
+    "private_hr_message",
+    "recruiter_backend",
+    "login_only_page",
+    "non_public_candidate_profile"
+  ],
+  "default_query_template_slots": [
+    "{company} {role} 校园招聘 官方",
+    "{company} {role} 实习 招聘 JD",
+    "{company} {role} BOSS直聘 猎聘 拉勾 牛客",
+    "{company} {role} HR 校招 公开",
+    "{company} {role} 面经 offer 复盘",
+    "{company} 发展 状况 财报 融资 行业 报告"
+  ],
+  "runtime_instruction": "Recruitment-information roles must automatically use this matrix when creating public research tasks. The user does not need to name websites. If network access is unavailable, return blocked/degraded outputs with this matrix and ask only for user-owned facts or a user-provided JD/link."
+}

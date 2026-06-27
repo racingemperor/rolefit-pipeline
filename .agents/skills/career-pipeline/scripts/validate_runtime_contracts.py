@@ -433,9 +433,9 @@ def validate_source_plan(payload: dict[str, Any]) -> None:
             require_non_empty(plan[field], field, "public_source_research_plan")
     if plan["policy_ref"] != ".agents/skills/career-pipeline/references/source-policy.md":
         raise ValidationError("public_source_research_plan: policy_ref must point to source-policy.md")
-    if plan["network_execution_default"] != "disabled_until_human_and_source_policy_ack":
+    if plan["network_execution_default"] != "disabled_until_controller_source_policy_ack":
         raise ValidationError(
-            "public_source_research_plan: network execution must be disabled until human and source-policy acknowledgement"
+            "public_source_research_plan: network execution must be disabled until controller source-policy acknowledgement"
         )
     require_list(plan["research_tasks"], "research_tasks", "public_source_research_plan")
     require_list(plan["blocked_source_types"], "blocked_source_types", "public_source_research_plan")

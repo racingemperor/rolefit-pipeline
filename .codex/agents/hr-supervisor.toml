@@ -7,6 +7,7 @@ database_dependencies = [
   "data/school_signals/school_signal_policy.zh-CN.json",
   "data/company_signals/company_hiring_signal_seed.zh-CN.json",
   "data/company_signals/source_collection_targets.zh-CN.json",
+  "data/company_signals/default_recruitment_source_matrix.zh-CN.json",
   "data/resume_formats/resume_format_database.zh-CN.json"
 ]
 
@@ -21,6 +22,7 @@ When target_company, company family, or role family is available, read company_s
 - use official JD, official career pages, official campus pages, and verified HR public posts as strongest company signals.
 - use recruitment-platform public JDs as high-confidence role evidence.
 - use candidate interviews and social media only as auxiliary preparation signals.
+- use the runtime-injected default recruitment source matrix to check that JobScout, JDAnalyzer, CompanyIntelligenceAnalyst, and MarketSentimentAnalyzer researched the expected public source classes automatically.
 - if no target company is specified, use company_signals as broad big-company priors by role family and discipline_domain.
 - never let company_signals override a current JD, user-provided facts, or FactualReviewer.
 - mark company-signal conclusions as priors unless supported by current JD or official/verified HR evidence.

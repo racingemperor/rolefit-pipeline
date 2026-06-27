@@ -60,6 +60,9 @@ def test_runtime_setup_reference_documents_real_execution_gates():
 
     assert "[sandbox_workspace_write]" in text
     assert "network_access = true" in text
+    assert "Automatic Recruitment Source Injection" in text
+    assert "default_public_recruitment_source_targets" in text
+    assert "user_instruction_required" in text
     assert "source_policy_ack" in text
     assert "subagent_work_orders.json" in text
     assert "Codex Desktop" in text
@@ -73,6 +76,87 @@ def test_runtime_execution_layer_points_to_setup_reference():
 
     assert "runtime-network-and-adapter-setup.md" in text
     assert "Real subagent execution remains blocked until a concrete adapter is configured and tested" in text
+
+
+def test_job_scout_injection_contains_default_recruitment_source_matrix(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "Computer science sophomore, Python, looking for AI internship",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+
+    injection = json.loads(
+        (run_dir / "injections" / "job-scout.secondary_prompt_injection.json").read_text(
+            encoding="utf-8"
+        )
+    )["secondary_prompt_injection"]
+
+    auto = injection["role_specific_context"]["automatic_public_recruitment_research"]
+    assert auto["enabled"] is True
+    assert auto["user_instruction_required"] is False
+    assert auto["source_matrix_ref"] == "data/company_signals/default_recruitment_source_matrix.zh-CN.json"
+    serialized = json.dumps(auto, ensure_ascii=False)
+    assert "public_recruitment_platform" in serialized
+    assert "recruitment_platform_jd" in serialized
+    assert "official_primary" in serialized
+    assert "official_or_primary" in serialized
+    assert "login_only_page" in serialized
+
+    research_tasks = json.dumps(injection["research_tasks"], ensure_ascii=False)
+    assert "Automatically collect recruitment information" in research_tasks
+    assert "user_instruction_required" in research_tasks
+
+
+def test_source_plan_uses_auto_injected_recruitment_source_matrix(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "target_job_fit",
+        "--input-text",
+        "Computer science senior. Assess fit for Tencent backend role. JD: Java and MySQL.",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "target_job_fit",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+
+    result = run_python(SOURCE_PLAN_BUILDER, "--run-dir", str(run_dir))
+
+    assert result.returncode == 0, result.stderr
+    source_plan_ref = json.loads(result.stdout)["source_plan_response"]["source_plan_ref"]
+    source_plan = json.loads((run_dir / source_plan_ref).read_text(encoding="utf-8"))[
+        "public_source_research_plan"
+    ]
+    assert source_plan["source_matrix_ref"] == "data/company_signals/default_recruitment_source_matrix.zh-CN.json"
+    assert source_plan["source_discovery_mode"] == "auto_injected_by_recruitment_roles"
+    assert source_plan["user_instruction_required"] is False
+    task_payload = json.dumps(source_plan["research_tasks"], ensure_ascii=False)
+    assert "public_recruitment_platform" in task_payload
+    assert "recruitment_platform_jd" in task_payload
+    assert "official_primary" in task_payload
+    assert "official_or_primary" in task_payload
+    assert "public_report" in task_payload
+    target_tasks = {
+        task["task_id"]: task
+        for task in source_plan["research_tasks"]
+        if task["task_id"] in {"target-current-jd-verification", "target-learning-gap-evidence"}
+    }
+    assert target_tasks["target-current-jd-verification"]["display_sources"]
+    assert target_tasks["target-learning-gap-evidence"]["display_sources"]
 
 
 def test_engineering_smoke_test_writes_results_for_ten_profiles(tmp_path):
@@ -538,7 +622,7 @@ def test_simulator_creates_private_blocked_run_artifacts(tmp_path):
         "--task-type",
         "resume_generation",
         "--input-text",
-        "我是计算机专业大二，会 Python，想找 AI 实习。",
+        "Computer science sophomore, Python, looking for AI internship.",
         "--run-root",
         str(tmp_path / ".career-pipeline-runs"),
     )
@@ -568,7 +652,7 @@ def test_simulator_redacts_contact_like_input_from_raw_refs(tmp_path):
         "--task-type",
         "resume_generation",
         "--input-text",
-        "我是计算机专业大二，电话 13812345678，邮箱 test@example.com，会 Python。",
+        "Computer science sophomore, phone 13812345678, email test@example.com, Python.",
         "--run-root",
         str(tmp_path / ".career-pipeline-runs"),
     )
@@ -589,7 +673,7 @@ def test_simulator_marks_user_derived_artifacts_as_private(tmp_path):
         "--task-type",
         "resume_generation",
         "--input-text",
-        "我是计算机专业大二，会 Python，想找 AI 实习。",
+        "Computer science sophomore, Python, looking for AI internship.",
         "--run-root",
         str(tmp_path / ".career-pipeline-runs"),
     )
@@ -628,7 +712,7 @@ def test_plan_builder_creates_plan_only_dispatch_queue(tmp_path):
         "--task-type",
         "job_search",
         "--input-text",
-        "我是计算机专业大二，会 Python，想找 AI 实习。",
+        "Computer science sophomore, Python, looking for AI internship.",
         "--run-root",
         str(run_root),
         "--route",
@@ -879,7 +963,7 @@ def test_executor_network_execution_rejects_invalid_source_plan(tmp_path):
                 "public_source_research_plan": {
                     "run_id": run_id,
                     "policy_ref": ".agents/skills/career-pipeline/references/source-policy.md",
-                    "network_execution_default": "disabled_until_human_and_source_policy_ack",
+                    "network_execution_default": "disabled_until_controller_source_policy_ack",
                     "research_tasks": [
                         {
                             "task_id": "login-only-jd",
@@ -1325,12 +1409,13 @@ def test_public_source_plan_builder_creates_policy_bound_tasks(tmp_path):
     ]
     assert source_plan["run_id"] == run_id
     assert source_plan["policy_ref"] == ".agents/skills/career-pipeline/references/source-policy.md"
-    assert source_plan["network_execution_default"] == "disabled_until_human_and_source_policy_ack"
+    assert source_plan["network_execution_default"] == "disabled_until_controller_source_policy_ack"
     source_types = {task["source_type"] for task in source_plan["research_tasks"]}
     assert "official_or_primary" in source_types
     assert "recruitment_platform_jd" in source_types
     assert "verified_hr_public_post" in source_types
     assert "social_media_weak" in source_types
+    assert "public_report" in source_types
     assert all(task["allowed"] is True for task in source_plan["research_tasks"])
     assert source_plan["blocked_source_types"]
 
@@ -1376,7 +1461,7 @@ def test_source_policy_validator_rejects_login_only_and_private_sources(tmp_path
         "public_source_research_plan": {
             "run_id": "run-test",
             "policy_ref": ".agents/skills/career-pipeline/references/source-policy.md",
-            "network_execution_default": "disabled_until_human_and_source_policy_ack",
+            "network_execution_default": "disabled_until_controller_source_policy_ack",
             "research_tasks": [
                 {
                     "task_id": "bad-private-resume",
@@ -1427,7 +1512,7 @@ def test_source_policy_validator_rejects_weak_social_media_as_final_basis(tmp_pa
         "public_source_research_plan": {
             "run_id": "run-test",
             "policy_ref": ".agents/skills/career-pipeline/references/source-policy.md",
-            "network_execution_default": "disabled_until_human_and_source_policy_ack",
+            "network_execution_default": "disabled_until_controller_source_policy_ack",
             "research_tasks": [
                 {
                     "task_id": "weak-social",

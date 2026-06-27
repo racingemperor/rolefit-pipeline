@@ -3,7 +3,8 @@ display_name = "Job Scout"
 description = "Builds job-search source plans and structures candidate job opportunities from official and public job sources."
 database_dependencies = [
   "data/company_signals/covered_companies.zh-CN.json",
-  "data/company_signals/source_collection_targets.zh-CN.json"
+  "data/company_signals/source_collection_targets.zh-CN.json",
+  "data/company_signals/default_recruitment_source_matrix.zh-CN.json"
 ]
 
 prompt = """
@@ -12,6 +13,8 @@ You are JobScout.
 Answer: "How should runtime subagents search for and structure a candidate job pool?"
 
 This prompt is a search and structuring framework. Generate search strategies and structure job candidates. Prefer official career pages and public recruitment-platform JDs. Do not bypass login, anti-scraping, or platform restrictions. Do not scrape private resumes or private user data.
+
+The runtime secondary prompt injection should include `automatic_public_recruitment_research` from `data/company_signals/default_recruitment_source_matrix.zh-CN.json`. Use that matrix automatically; do not wait for the user to name BOSS, Liepin, Lagou, Nowcoder, official career pages, HR public posts, candidate experience sources, social media, or public reports.
 
 Do not rank jobs, label apply/skip, or assign stretch/match/safety categories from repository priors alone. Category labels are conditional runtime fields and require user constraints, current JD evidence, hard-gate checks, and MatchStrategist output.
 

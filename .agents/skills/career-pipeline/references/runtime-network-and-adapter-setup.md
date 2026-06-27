@@ -9,9 +9,42 @@ The runtime has two separate gates:
 
 Do not treat platform network access as permission to crawl recruitment platforms, login-only pages, private candidate data, private chats, HR backends, or non-public resumes.
 
+## Automatic Recruitment Source Injection
+
+Keep recruitment-source selection inside the role prompt injection. Recruitment-information roles must receive `automatic_public_recruitment_research` in their `secondary_prompt_injection` and must use `data/company_signals/default_recruitment_source_matrix.zh-CN.json` as the default source matrix.
+
+The user does not need to name websites. When the pipeline reaches `JobScout`, `JDAnalyzer`, `CompanyIntelligenceAnalyst`, `MarketSentimentAnalyzer`, or `HRSupervisor`, these roles should automatically create public-source research tasks for official career pages, official campus pages, public recruitment-platform JDs, verified HR public posts, candidate experience sources, social-media weak signals, and public reports.
+
+The injected field should include:
+
+```json
+{
+  "automatic_public_recruitment_research": {
+    "enabled": true,
+    "user_instruction_required": false,
+    "source_matrix_ref": "data/company_signals/default_recruitment_source_matrix.zh-CN.json",
+    "default_public_recruitment_source_targets": [],
+    "forbidden_source_types": [
+      "private_resume",
+      "private_chat",
+      "private_hr_message",
+      "recruiter_backend",
+      "login_only_page",
+      "non_public_candidate_profile"
+    ]
+  }
+}
+```
+
+The runtime controller or adapter records `source_policy_ack` internally only after the auto-generated public source plan passes policy checks. Do not expose `source_policy_ack` as a separate end-user question.
+
+If Codex platform network permission is unavailable, do not ask the user to edit config as the first response. Return a graceful degraded package: the public-source research plan, what outputs remain blocked, and a compact request for either current JD text, official links, or permission to continue in a network-enabled Codex session.
+
+If a source in the default matrix is login-only, private, blocked by access controls, or exposes non-public candidate or HR data, skip it and explain that only public evidence can be used. Automatic source injection never authorizes login bypass, CAPTCHA bypass, private-message access, backend access, or scraping non-public resumes.
+
 ## Codex Network Permission
 
-For repeatable local runs, configure Codex command network access in `~/.codex/config.toml` or a trusted project `.codex/config.toml`:
+For repeatable local runs, the user or local administrator may configure Codex command network access in `~/.codex/config.toml` or a trusted project `.codex/config.toml`. This is an installation concern, not a normal end-user question inside the career pipeline:
 
 ```toml
 [sandbox_workspace_write]
@@ -43,7 +76,7 @@ Before any real source fetch:
 
 1. Build a run with `simulate_runtime_run.py` or the future real runner.
 2. Build prompt bundles and the public source plan.
-3. Ask the user or controller to acknowledge the source policy.
+3. Have the controller record `source_policy_ack` internally when recruitment-information roles have received the default source matrix and the auto-generated source plan passes policy checks.
 4. Provide an explicit `sources.json` containing only allowed public sources.
 5. Fetch and backfill evidence.
 

@@ -158,7 +158,7 @@ def load_source_plan(run_dir: Path, source_plan_ref: str) -> dict[str, Any]:
     plan = payload.get("public_source_research_plan")
     if not isinstance(plan, dict):
         raise ExecutionError(f"{source_plan_ref}: missing public_source_research_plan")
-    if plan.get("network_execution_default") != "disabled_until_human_and_source_policy_ack":
+    if plan.get("network_execution_default") != "disabled_until_controller_source_policy_ack":
         raise ExecutionError(f"{source_plan_ref}: invalid network execution default")
     errors = []
     tasks = plan.get("research_tasks")

@@ -2,7 +2,8 @@ id = "jd-analyzer"
 display_name = "JD Analyzer"
 description = "Extracts a concrete job description into evidence-bound requirements, keywords, risks, and runtime handoff fields."
 database_dependencies = [
-  "data/company_signals/company_hiring_signal_seed.zh-CN.json"
+  "data/company_signals/company_hiring_signal_seed.zh-CN.json",
+  "data/company_signals/default_recruitment_source_matrix.zh-CN.json"
 ]
 
 prompt = """
@@ -11,6 +12,8 @@ You are JDAnalyzer.
 Answer: "What does the provided or current public JD explicitly support, and what needs runtime evidence before interpretation?"
 
 This role may make evidence-bound judgments only from the current JD text or current public JD. You may read company_signals only as broad prior context. Do not use repository priors, social media, or candidate experiences to override the JD.
+
+When no JD text is provided, use the runtime-injected `automatic_public_recruitment_research` matrix to retrieve or request public JD evidence from official career pages and public recruitment-platform JDs. Do not wait for the user to name websites. If the relevant page is login-only or blocked, return runtime_research_tasks and evidence_requirements instead of guessing.
 
 If no current JD text or public JD evidence is available, return runtime_research_tasks and evidence_requirements instead of extracting requirements.
 

@@ -89,6 +89,7 @@ Core files:
 - `company_hiring_signal_seed.zh-CN.json`: company summaries, major-cluster templates, and source evidence.
 - `covered_companies.zh-CN.json`: company coverage list.
 - `source_collection_targets.zh-CN.json`: source collection plan and search templates.
+- `default_recruitment_source_matrix.zh-CN.json`: default public recruitment source matrix automatically injected into recruitment-information roles.
 - `company_hiring_signals.schema.json`: schema.
 - `summary.json`: coverage counts and status.
 
@@ -97,6 +98,7 @@ Usage:
 - `CompanyIntelligenceAnalyst` reads company summaries and source evidence.
 - `MarketSentimentAnalyzer` reads source evidence and collection targets.
 - `JDAnalyzer` may use major-cluster requirement templates only as broad priors.
+- `JobScout`, `JDAnalyzer`, `CompanyIntelligenceAnalyst`, `MarketSentimentAnalyzer`, and `HRSupervisor` use `default_recruitment_source_matrix.zh-CN.json` as the automatic source-discovery matrix; users do not need to name recruitment websites.
 - `MatchStrategist`, `LearningPathStrategist`, and `ResumeArchitect` may use company x cluster priors only after marking them as priors.
 - `HRSupervisor` may read company summaries, source evidence, and collection targets to simulate big-company HR screening bias for a target company or comparable company family.
 

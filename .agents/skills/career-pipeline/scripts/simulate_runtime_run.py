@@ -106,6 +106,146 @@ COMPANY_ALIASES = {
     "Huawei": ["huawei", "华为"],
 }
 
+RECRUITMENT_INFORMATION_AGENTS = {
+    "job-scout",
+    "jd-analyzer",
+    "company-intelligence-analyst",
+    "market-sentiment-analyzer",
+    "hr-supervisor",
+}
+
+DEFAULT_RECRUITMENT_SOURCE_MATRIX_REF = (
+    "data/company_signals/default_recruitment_source_matrix.zh-CN.json"
+)
+
+DEFAULT_PUBLIC_RECRUITMENT_SOURCE_TARGETS = [
+    {
+        "group_id": "official_primary",
+        "priority": 1,
+        "source_type": "official_or_primary",
+        "display_sources": [
+            "公司官方招聘页",
+            "公司官方校招页",
+            "公司官方实习生招聘页",
+            "公司官方微信公众号/视频号招聘公告",
+        ],
+        "may_set_weight": True,
+        "may_set_final_decision": True,
+        "requires_login": False,
+    },
+    {
+        "group_id": "school_primary",
+        "priority": 1,
+        "source_type": "official_school_notice",
+        "display_sources": [
+            "学校就业信息网",
+            "学院官网就业/实习通知",
+            "学校双选会/宣讲会日历",
+        ],
+        "may_set_weight": True,
+        "may_set_final_decision": True,
+        "requires_login": False,
+    },
+    {
+        "group_id": "public_recruitment_platform",
+        "priority": 2,
+        "source_type": "recruitment_platform_jd",
+        "display_sources": [
+            "BOSS直聘公开页",
+            "猎聘公开页",
+            "拉勾公开页",
+            "牛客企业招聘页",
+            "实习僧公开页",
+            "LinkedIn public job page",
+            "Indeed public job page",
+        ],
+        "may_set_weight": True,
+        "may_set_final_decision": True,
+        "requires_login": False,
+        "degrade_rule": "Skip login-only, app-only, blocked, or non-public candidate data pages.",
+    },
+    {
+        "group_id": "verified_hr_public",
+        "priority": 3,
+        "source_type": "verified_hr_public_post",
+        "display_sources": [
+            "已验证大厂 HR 公开账号",
+            "官方列名 HR 或招聘官公开帖",
+            "企业认证招聘号公开内容",
+        ],
+        "may_set_weight": True,
+        "may_set_final_decision": False,
+        "requires_login": False,
+        "verification_required": True,
+    },
+    {
+        "group_id": "candidate_experience_secondary",
+        "priority": 4,
+        "source_type": "candidate_experience_secondary",
+        "display_sources": [
+            "牛客面经",
+            "OfferShow/看准等公开经验",
+            "知乎公开经验帖",
+            "公开博客复盘",
+        ],
+        "may_set_weight": True,
+        "may_set_final_decision": False,
+        "requires_login": False,
+        "privacy_rule": "Aggregate and de-identify candidate signals.",
+    },
+    {
+        "group_id": "social_media_weak",
+        "priority": 5,
+        "source_type": "social_media_weak",
+        "display_sources": [
+            "小红书公开帖",
+            "脉脉公开讨论",
+            "知乎公开讨论",
+            "公众号公开评论或复盘",
+        ],
+        "may_set_weight": False,
+        "may_set_final_decision": False,
+        "requires_login": False,
+        "degrade_rule": "Weak signal only; never final basis.",
+    },
+    {
+        "group_id": "public_report",
+        "priority": 3,
+        "source_type": "public_report",
+        "display_sources": [
+            "公司财报/招股书",
+            "公开行业报告",
+            "主流媒体公开报道",
+            "公开投融资信息",
+            "监管披露",
+        ],
+        "may_set_weight": True,
+        "may_set_final_decision": True,
+        "requires_login": False,
+    },
+]
+
+
+def automatic_public_recruitment_research(target_agent: str) -> dict[str, Any]:
+    return {
+        "enabled": target_agent in RECRUITMENT_INFORMATION_AGENTS,
+        "user_instruction_required": False,
+        "source_matrix_ref": DEFAULT_RECRUITMENT_SOURCE_MATRIX_REF,
+        "default_public_recruitment_source_targets": DEFAULT_PUBLIC_RECRUITMENT_SOURCE_TARGETS,
+        "forbidden_source_types": [
+            "private_resume",
+            "private_chat",
+            "private_hr_message",
+            "recruiter_backend",
+            "login_only_page",
+            "non_public_candidate_profile",
+        ],
+        "degrade_when_network_unavailable": (
+            "Return runtime_research_tasks and blocked/degraded outputs. Ask only for user-owned "
+            "facts or an optional user-provided JD/link, not for a website list."
+        ),
+    }
+
 
 def write_json(path: Path, payload: dict[str, Any]) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -611,6 +751,9 @@ def build_injection(
         "distinguish_current_fit_from_growth_path": target_job_fit_requested,
         "final_fit_requires_current_jd_public_evidence": target_job_fit_requested,
     }
+    auto_recruitment_research = automatic_public_recruitment_research(target_agent)
+    if auto_recruitment_research["enabled"]:
+        role_specific_context["automatic_public_recruitment_research"] = auto_recruitment_research
     research_tasks = [
         {
             "research_question": "Gather current public JD/company/school evidence before setting fit or priority.",
@@ -623,6 +766,38 @@ def build_injection(
             "needed_for_outputs": ["runtime_weights", "application_strategy"],
         }
     ]
+    if auto_recruitment_research["enabled"]:
+        research_tasks.insert(
+            0,
+            {
+                "research_question": "Automatically collect recruitment information from the default public recruitment source matrix; do not wait for the user to name websites.",
+                "source_matrix_ref": DEFAULT_RECRUITMENT_SOURCE_MATRIX_REF,
+                "user_instruction_required": False,
+                "target_sources": [
+                    source
+                    for group in DEFAULT_PUBLIC_RECRUITMENT_SOURCE_TARGETS
+                    for source in group["display_sources"]
+                ],
+                "source_priority_order": [
+                    "official_or_primary",
+                    "official_school_notice",
+                    "recruitment_platform_jd",
+                    "verified_hr_public_post",
+                    "candidate_experience_secondary",
+                    "social_media_weak",
+                    "public_report",
+                ],
+                "forbidden_source_types": auto_recruitment_research["forbidden_source_types"],
+                "required_freshness": "0_6_months preferred; otherwise mark weak or stale",
+                "needed_for_outputs": [
+                    "current_jd_text",
+                    "skill_weight",
+                    "company_signal",
+                    "hr_screening_signal",
+                    "market_sentiment",
+                ],
+            },
+        )
     hard_data_weight_tasks = [
         {
             "parameter": "skill_weight",
@@ -724,6 +899,8 @@ def build_injection(
         "data/major_taxonomy/summary.json",
         "data/company_signals/summary.json",
     ]
+    if auto_recruitment_research["enabled"]:
+        database_files_to_read.append(DEFAULT_RECRUITMENT_SOURCE_MATRIX_REF)
     return {
         "target_agent": target_agent,
         "base_prompt_ref": base_prompt_ref,

@@ -8,7 +8,10 @@ from typing import Any
 
 
 POLICY_REF = ".agents/skills/career-pipeline/references/source-policy.md"
-NETWORK_DEFAULT = "disabled_until_human_and_source_policy_ack"
+NETWORK_DEFAULT = "disabled_until_controller_source_policy_ack"
+DEFAULT_RECRUITMENT_SOURCE_MATRIX_REF = (
+    "data/company_signals/default_recruitment_source_matrix.zh-CN.json"
+)
 
 
 class SourcePlanError(Exception):
@@ -55,6 +58,23 @@ def load_invocations(run_dir: Path) -> list[dict[str, Any]]:
         invocation = unwrap(load_json(run_dir / ref), "subagent_invocation", run_dir / ref)
         invocations.append(invocation)
     return invocations
+
+
+def repo_root() -> Path:
+    return Path(__file__).resolve().parents[4]
+
+
+def load_default_source_matrix() -> dict[str, Any]:
+    return load_json(repo_root() / DEFAULT_RECRUITMENT_SOURCE_MATRIX_REF)
+
+
+def source_display_by_type() -> dict[str, list[str]]:
+    source_matrix = load_default_source_matrix()
+    matrix_groups = source_matrix["default_public_recruitment_source_targets"]
+    return {
+        group["source_type"]: group["display_sources"]
+        for group in matrix_groups
+    }
 
 
 def target_terms(context: dict[str, Any]) -> list[str]:
@@ -116,6 +136,7 @@ def build_tasks(invocations: list[dict[str, Any]], terms: list[str]) -> list[dic
     query = " ".join(terms[:6])
     agents = {invocation["target_agent"] for invocation in invocations}
     default_agent = "job-scout" if "job-scout" in agents else invocations[0]["target_agent"]
+    display_sources_by_type = source_display_by_type()
     tasks = [
         task(
             "official-company-career",
@@ -128,7 +149,13 @@ def build_tasks(invocations: list[dict[str, Any]], terms: list[str]) -> list[dic
             True,
             "strong",
             "cache_metadata_and_short_excerpt",
-        ),
+        )
+        | {
+            "source_group_id": "official_primary",
+            "source_matrix_ref": DEFAULT_RECRUITMENT_SOURCE_MATRIX_REF,
+            "user_instruction_required": False,
+            "display_sources": display_sources_by_type["official_or_primary"],
+        },
         task(
             "recruitment-platform-public-jd",
             default_agent,
@@ -140,7 +167,13 @@ def build_tasks(invocations: list[dict[str, Any]], terms: list[str]) -> list[dic
             True,
             "medium",
             "cache_metadata_only",
-        ),
+        )
+        | {
+            "source_group_id": "public_recruitment_platform",
+            "source_matrix_ref": DEFAULT_RECRUITMENT_SOURCE_MATRIX_REF,
+            "user_instruction_required": False,
+            "display_sources": display_sources_by_type["recruitment_platform_jd"],
+        },
         task(
             "verified-hr-public-post",
             "hr-supervisor" if "hr-supervisor" in agents else default_agent,
@@ -152,7 +185,13 @@ def build_tasks(invocations: list[dict[str, Any]], terms: list[str]) -> list[dic
             False,
             "medium",
             "cache_metadata_and_short_excerpt",
-        ),
+        )
+        | {
+            "source_group_id": "verified_hr_public",
+            "source_matrix_ref": DEFAULT_RECRUITMENT_SOURCE_MATRIX_REF,
+            "user_instruction_required": False,
+            "display_sources": display_sources_by_type["verified_hr_public_post"],
+        },
         task(
             "candidate-experience-secondary",
             "market-sentiment-analyzer" if "market-sentiment-analyzer" in agents else default_agent,
@@ -164,7 +203,13 @@ def build_tasks(invocations: list[dict[str, Any]], terms: list[str]) -> list[dic
             False,
             "weak",
             "aggregate_deidentified_only",
-        ),
+        )
+        | {
+            "source_group_id": "candidate_experience_secondary",
+            "source_matrix_ref": DEFAULT_RECRUITMENT_SOURCE_MATRIX_REF,
+            "user_instruction_required": False,
+            "display_sources": display_sources_by_type["candidate_experience_secondary"],
+        },
         task(
             "social-media-weak-signal",
             "market-sentiment-analyzer" if "market-sentiment-analyzer" in agents else default_agent,
@@ -176,7 +221,31 @@ def build_tasks(invocations: list[dict[str, Any]], terms: list[str]) -> list[dic
             False,
             "weak",
             "aggregate_deidentified_only",
-        ),
+        )
+        | {
+            "source_group_id": "social_media_weak",
+            "source_matrix_ref": DEFAULT_RECRUITMENT_SOURCE_MATRIX_REF,
+            "user_instruction_required": False,
+            "display_sources": display_sources_by_type["social_media_weak"],
+        },
+        task(
+            "public-company-development-report",
+            "company-intelligence-analyst" if "company-intelligence-analyst" in agents else default_agent,
+            "company_development_status",
+            "public_report",
+            3,
+            f"{query} public report financial filing industry trend funding regulation",
+            True,
+            True,
+            "medium",
+            "cache_metadata_and_short_excerpt",
+        )
+        | {
+            "source_group_id": "public_report",
+            "source_matrix_ref": DEFAULT_RECRUITMENT_SOURCE_MATRIX_REF,
+            "user_instruction_required": False,
+            "display_sources": display_sources_by_type["public_report"],
+        },
         task(
             "official-school-career-signal",
             "job-scout" if "job-scout" in agents else default_agent,
@@ -188,7 +257,13 @@ def build_tasks(invocations: list[dict[str, Any]], terms: list[str]) -> list[dic
             True,
             "strong",
             "cache_metadata_and_short_excerpt",
-        ),
+        )
+        | {
+            "source_group_id": "school_primary",
+            "source_matrix_ref": DEFAULT_RECRUITMENT_SOURCE_MATRIX_REF,
+            "user_instruction_required": False,
+            "display_sources": display_sources_by_type["official_school_notice"],
+        },
     ]
     return tasks
 
@@ -213,6 +288,7 @@ def build_target_job_fit_tasks(
         if "learning-path-strategist" in agents
         else jd_agent
     )
+    display_sources_by_type = source_display_by_type()
     return [
         task(
             "target-current-jd-verification",
@@ -225,7 +301,13 @@ def build_target_job_fit_tasks(
             True,
             "medium",
             "cache_metadata_and_short_excerpt",
-        ),
+        )
+        | {
+            "source_group_id": "public_recruitment_platform",
+            "source_matrix_ref": DEFAULT_RECRUITMENT_SOURCE_MATRIX_REF,
+            "user_instruction_required": False,
+            "display_sources": display_sources_by_type["recruitment_platform_jd"],
+        },
         task(
             "target-learning-gap-evidence",
             learning_agent,
@@ -237,7 +319,13 @@ def build_target_job_fit_tasks(
             False,
             "medium",
             "cache_metadata_and_short_excerpt",
-        ),
+        )
+        | {
+            "source_group_id": "verified_hr_public",
+            "source_matrix_ref": DEFAULT_RECRUITMENT_SOURCE_MATRIX_REF,
+            "user_instruction_required": False,
+            "display_sources": display_sources_by_type["verified_hr_public_post"],
+        },
     ]
 
 
@@ -268,11 +356,15 @@ def build_source_plan(run_dir: Path, output_ref: str) -> dict[str, Any]:
         "public_source_research_plan": {
             "run_id": invocations[0]["run_id"],
             "policy_ref": POLICY_REF,
+            "source_matrix_ref": DEFAULT_RECRUITMENT_SOURCE_MATRIX_REF,
+            "source_discovery_mode": "auto_injected_by_recruitment_roles",
+            "user_instruction_required": False,
             "network_execution_default": NETWORK_DEFAULT,
             "created_from": [
                 "runtime_context_packet",
                 "subagent_invocations",
                 "repository_source_policy",
+                DEFAULT_RECRUITMENT_SOURCE_MATRIX_REF,
             ],
             "target_terms": terms,
             "target_companies_detected": detect_target_companies(context),

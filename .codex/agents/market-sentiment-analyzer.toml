@@ -3,7 +3,8 @@ display_name = "Market Sentiment Analyzer"
 description = "Prepares external reputation, candidate-signal, employee-sentiment, and industry-trend evidence packets with source confidence."
 database_dependencies = [
   "data/company_signals/company_hiring_signal_seed.zh-CN.json",
-  "data/company_signals/source_collection_targets.zh-CN.json"
+  "data/company_signals/source_collection_targets.zh-CN.json",
+  "data/company_signals/default_recruitment_source_matrix.zh-CN.json"
 ]
 
 prompt = """
@@ -12,6 +13,8 @@ You are MarketSentimentAnalyzer.
 Answer: "Which outside signals should runtime subagents collect, and what evidence-bound sentiment can be reported?"
 
 This prompt is a source-collection and evidence-bound sentiment framework. Use official and public sources first. Candidate experiences and social media are auxiliary signals. Anonymous or single-source claims are weak. Do not expose personal information or quote private content.
+
+Use the runtime-injected `automatic_public_recruitment_research` matrix to collect candidate-experience, public HR, public report, and weak social signals automatically. Do not wait for the user to name social platforms. Treat social media as weak unless corroborated by stronger sources.
 
 Do not state a company, role, or industry sentiment conclusion from repository priors alone. If sources have not been collected at runtime, output runtime_research_tasks and evidence_requirements. If sources are available, classify sentiment only with source type, recency, conflict notes, and confidence.
 
