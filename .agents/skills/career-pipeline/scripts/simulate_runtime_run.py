@@ -120,6 +120,26 @@ def utc_now() -> str:
 def detect_major(text: str) -> str:
     lowered = text.lower()
     if (
+        "电子" in text
+        or "通信" in text
+        or "electronic information" in lowered
+        or "electronics" in lowered
+        or "communication" in lowered
+        or "chip" in lowered
+        or "embedded" in lowered
+    ):
+        return "电子信息类"
+    if (
+        "机械" in text
+        or "车辆" in text
+        or "mechanical" in lowered
+        or "vehicle" in lowered
+        or "automotive" in lowered
+        or "manufacturing" in lowered
+        or "bms" in lowered
+    ):
+        return "机械车辆制造类"
+    if (
         "计算机" in text
         or "软件" in text
         or "人工智能" in text
@@ -128,21 +148,63 @@ def detect_major(text: str) -> str:
         or "artificial intelligence" in lowered
     ):
         return "计算机类"
-    if "机械" in text:
-        return "机械类"
-    if "电子" in text or "通信" in text:
-        return "电子信息类"
+    if (
+        "自动化" in text
+        or "机器人" in text
+        or "automation" in lowered
+        or "robotics" in lowered
+        or "robot" in lowered
+    ):
+        return "自动化类"
+    if "材料" in text or "materials" in lowered or "battery cathode" in lowered:
+        return "材料类"
+    if (
+        "土木" in text
+        or "智能建造" in text
+        or "civil engineering" in lowered
+        or "construction" in lowered
+        or "bim" in lowered
+    ):
+        return "土木建筑类"
+    if (
+        "生物医学" in text
+        or "biomedical" in lowered
+        or "medical device" in lowered
+        or "medical image" in lowered
+    ):
+        return "生物医学工程类"
+    if (
+        "环境工程" in text
+        or "environmental engineering" in lowered
+        or "environmental monitoring" in lowered
+        or "esg" in lowered
+    ):
+        return "资源环境安全类"
+    if "航空" in text or "航天" in text or "aerospace" in lowered:
+        return "航空航天类"
     return ""
 
 
 def detect_candidate_stage(text: str) -> str:
     lowered = text.lower()
     if any(token in text for token in ["大一", "大二", "大三", "研一", "研二", "非毕业"]) or any(
-        token in lowered for token in ["freshman", "sophomore", "junior", "non-graduating"]
+        token in lowered
+        for token in [
+            "freshman",
+            "sophomore",
+            "junior",
+            "master year 1",
+            "master year 2",
+            "phd year 1",
+            "phd year 2",
+            "phd year 3",
+            "non-graduating",
+        ]
     ):
         return "non_graduating"
     if any(token in text for token in ["大四", "研三", "应届", "毕业"]) or any(
-        token in lowered for token in ["senior", "graduating", "graduate"]
+        token in lowered
+        for token in ["senior", "master year 3", "phd final", "graduating", "graduate"]
     ):
         return "graduating"
     return "unknown"
@@ -176,6 +238,9 @@ def extract_jd_excerpt(text: str) -> str:
 
 
 def extract_target_job_title(text: str) -> str:
+    lowered = text.lower()
+    if "no target company" in lowered and "broad campus recruitment resume" in lowered:
+        return ""
     patterns = [
         r"(?:apply for|target|assess fit for)\s+(.+?)(?:\.|。|,|，|\bJD\b|:|：)",
         r"想投(?:递)?(.+?)(?:。|，|,|\bJD\b|:|：)",
@@ -194,6 +259,73 @@ def extract_target_job_title(text: str) -> str:
         return "target internship"
     if "岗位" in text:
         return "target role"
+    return ""
+
+
+def detect_grade_or_year(text: str) -> str:
+    lowered = text.lower()
+    chinese_tokens = [
+        "大一",
+        "大二",
+        "大三",
+        "大四",
+        "研一",
+        "研二",
+        "研三",
+        "博一",
+        "博二",
+        "博三",
+    ]
+    for token in chinese_tokens:
+        if token in text:
+            return token
+    english_tokens = [
+        ("freshman", "本科大一"),
+        ("sophomore", "本科大二"),
+        ("junior", "本科大三"),
+        ("senior", "本科大四"),
+        ("master year 1", "硕士一年级"),
+        ("master year 2", "硕士二年级"),
+        ("master year 3", "硕士三年级"),
+        ("phd year 1", "博士一年级"),
+        ("phd year 2", "博士二年级"),
+        ("phd year 3", "博士三年级"),
+    ]
+    for needle, label in english_tokens:
+        if needle in lowered:
+            return label
+    return ""
+
+
+def detect_degree_level(text: str) -> str:
+    lowered = text.lower()
+    if "phd" in lowered or "博士" in text:
+        return "doctor"
+    if "master" in lowered or "硕士" in text or "研究生" in text:
+        return "master"
+    if (
+        "undergraduate" in lowered
+        or "bachelor" in lowered
+        or "freshman" in lowered
+        or "sophomore" in lowered
+        or "junior" in lowered
+        or "senior" in lowered
+        or "本科" in text
+        or "大一" in text
+        or "大二" in text
+        or "大三" in text
+        or "大四" in text
+    ):
+        return "bachelor"
+    return ""
+
+
+def detect_target_kind(text: str) -> str:
+    lowered = text.lower()
+    if "campus role" in lowered or "campus recruitment" in lowered or "校招" in text:
+        return "full_time"
+    if "internship" in lowered or "实习" in text:
+        return "internship"
     return ""
 
 
@@ -289,7 +421,7 @@ def build_profile(input_text: str, task_type: str = "") -> dict[str, Any]:
     candidate_stage = detect_candidate_stage(input_text)
     skills = extract_skills(input_text)
     target_roles = ["AI 实习"] if re.search(r"AI|人工智能|大模型|LLM", input_text, re.I) else []
-    target_kind = "internship" if "实习" in input_text or "internship" in input_text.lower() else ""
+    target_kind = detect_target_kind(input_text)
     return {
         "identity_and_contact": {
             "name_or_preferred_label": "",
@@ -301,8 +433,8 @@ def build_profile(input_text: str, task_type: str = "") -> dict[str, Any]:
             "school_name": "",
             "college_or_department": "",
             "major_name": major_name,
-            "degree_level": "",
-            "grade_or_year": "大二" if "大二" in input_text or "sophomore" in input_text.lower() else "",
+            "degree_level": detect_degree_level(input_text),
+            "grade_or_year": detect_grade_or_year(input_text),
             "graduation_window": "",
             "education_status": candidate_stage,
         },
@@ -362,7 +494,13 @@ def build_context_packet(
             "needed_for_outputs": ["application_direction", "runtime_weights", "resume_tailoring"],
         }
     ]
-    blocked_outputs = ["application_direction", "final_resume_draft"]
+    blocked_outputs = [
+        "application_direction",
+        "final_resume_draft",
+        "fit_score",
+        "application_strategy",
+        "application_priority",
+    ]
     next_possible_actions = [
         "Ask user once for missing user-owned facts.",
         "Run public research subagents for current JD/company/school evidence.",
@@ -408,6 +546,9 @@ def build_context_packet(
             "learning_plan_before_application",
             "targeted_resume_tailoring",
             "final_resume_draft",
+            "fit_score",
+            "application_strategy",
+            "application_priority",
         ]
         next_possible_actions = [
             "Summarize the candidate facts and concrete target job currently known.",

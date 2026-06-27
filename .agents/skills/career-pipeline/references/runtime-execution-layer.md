@@ -139,6 +139,8 @@ Suggested exit semantics:
 - `degraded`: only safe partial outputs are available.
 - `failed`: runner or schema validation failed before a safe package could be produced.
 
+For Codex network configuration, source-policy acknowledgement, and real adapter options, read `runtime-network-and-adapter-setup.md` before moving from simulation to execution.
+
 ## Non-Goals
 
 - This protocol does not define a specific CLI command.
@@ -152,9 +154,12 @@ Suggested exit semantics:
 - `build_subagent_plan.py`: turns invocation packets into a plan-only dispatch queue. Plan-only queues are not proof that subagents ran.
 - `build_subagent_prompt_bundle.py`: creates one role-specific derived prompt bundle with the static role prompt, runtime context packet, secondary prompt injection, allowed user facts, source policy, research tasks, hard-data weight tasks, and required output contract. Raw input refs must not appear in the bundle.
 - `build_public_source_plan.py`: creates a source-policy-bound research plan for official/primary pages, public recruitment-platform JDs, verified HR public posts, candidate experience, and weak social signals. It does not browse, log in, scrape, or cache sources.
+- `fetch_public_sources.py`: fetches allowed public `http(s)` sources or user-provided `file://` snapshots into evidence packets. It refuses forbidden source types, login-only pages, and weak social evidence as final-decision proof.
+- `build_subagent_work_orders.py`: exports adapter-ready work orders with prompt bundle refs, human/source-policy gates, expected output contracts, and backfill requirements. Work orders are not proof of real subagent execution.
 - `execute_subagent_plan.py`: defaults to dry-run inspection, refuses real execution without human approval, refuses network execution without source-policy acknowledgement, writes redacted execution events, and can backfill externally produced role outputs only after schema checks.
+- `backfill_public_evidence.py`: validates externally collected evidence packets against the public-source plan, rejects forbidden/login-only/weak-final-decision evidence, and appends accepted packets to the run evidence index.
 - `continue_runtime_run.py`: accepts one compact batch of user-owned facts and updates the same run so dispatch can continue without starting over.
 
 `target_job_fit` runs should include target job/company/JD context in `runtime_context_packet.target_context`, block `current_fit_assessment`, `application_readiness_decision`, `learning_plan_before_application`, `targeted_resume_tailoring`, `fit_score`, and `application_strategy` until current JD and public/company evidence are available, and keep immediate readiness separate from learnable growth path.
 
-Real subagent execution remains blocked until a concrete adapter is configured and tested. Any adapter must keep the same privacy, source-policy, weight-provenance, role-output, HR, factual-review, and blocked/final gates.
+Real subagent execution remains blocked until a concrete adapter is configured and tested. See `runtime-network-and-adapter-setup.md` for Codex Desktop manual-controller, Codex CLI, and API adapter patterns. Any adapter must keep the same privacy, source-policy, weight-provenance, role-output, HR, factual-review, and blocked/final gates.

@@ -12,6 +12,22 @@ PLAN_EXECUTOR = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "e
 RUN_CONTINUER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "continue_runtime_run.py"
 PROMPT_BUNDLE_BUILDER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "build_subagent_prompt_bundle.py"
 SOURCE_PLAN_BUILDER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "build_public_source_plan.py"
+SKILL_MD = ROOT / ".agents" / "skills" / "career-pipeline" / "SKILL.md"
+RUNTIME_EXECUTION_LAYER = (
+    ROOT / ".agents" / "skills" / "career-pipeline" / "references" / "runtime-execution-layer.md"
+)
+RUNTIME_NETWORK_ADAPTER_SETUP = (
+    ROOT
+    / ".agents"
+    / "skills"
+    / "career-pipeline"
+    / "references"
+    / "runtime-network-and-adapter-setup.md"
+)
+ENGINEERING_SMOKE = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "smoke_test_engineering_profiles.py"
+WORK_ORDER_BUILDER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "build_subagent_work_orders.py"
+EVIDENCE_BACKFILL = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "backfill_public_evidence.py"
+PUBLIC_SOURCE_FETCHER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "fetch_public_sources.py"
 
 
 def run_python(script: Path, *args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
@@ -22,6 +38,317 @@ def run_python(script: Path, *args: str, cwd: Path | None = None) -> subprocess.
         capture_output=True,
         check=False,
     )
+
+
+def test_skill_md_names_skill_relative_script_commands():
+    text = SKILL_MD.read_text(encoding="utf-8")
+
+    assert "cd .agents/skills/career-pipeline" in text
+    assert "python scripts/simulate_runtime_run.py" in text
+    assert "Do not run these commands from the repository root as `scripts/*.py`" in text
+
+
+def test_skill_md_links_runtime_network_and_adapter_setup():
+    text = SKILL_MD.read_text(encoding="utf-8")
+
+    assert "references/runtime-network-and-adapter-setup.md" in text
+    assert "before enabling real network fetches or real subagent execution" in text
+
+
+def test_runtime_setup_reference_documents_real_execution_gates():
+    text = RUNTIME_NETWORK_ADAPTER_SETUP.read_text(encoding="utf-8")
+
+    assert "[sandbox_workspace_write]" in text
+    assert "network_access = true" in text
+    assert "source_policy_ack" in text
+    assert "subagent_work_orders.json" in text
+    assert "Codex Desktop" in text
+    assert "spawn_agent" in text
+    assert "role_output_packet" in text
+    assert "login-only" in text
+
+
+def test_runtime_execution_layer_points_to_setup_reference():
+    text = RUNTIME_EXECUTION_LAYER.read_text(encoding="utf-8")
+
+    assert "runtime-network-and-adapter-setup.md" in text
+    assert "Real subagent execution remains blocked until a concrete adapter is configured and tested" in text
+
+
+def test_engineering_smoke_test_writes_results_for_ten_profiles(tmp_path):
+    output_dir = tmp_path / "manual-skill-reliability-test"
+    result = run_python(
+        ENGINEERING_SMOKE,
+        "--output-dir",
+        str(output_dir),
+        "--run-root",
+        str(output_dir / "runs"),
+        "--run-id-prefix",
+        "test-smoke",
+    )
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)["smoke_test_response"]
+    assert response["exit_status"] == "success"
+    results_md = output_dir / "results.md"
+    results_json = output_dir / "results.json"
+    user_report = output_dir / "user_report.md"
+    assert results_md.is_file()
+    assert results_json.is_file()
+    assert user_report.is_file()
+
+    payload = json.loads(results_json.read_text(encoding="utf-8"))
+    assert payload["scope"] == "engineering_only"
+    assert payload["network"] == "disabled"
+    assert payload["real_subagent_execution"] is False
+    assert len(payload["profiles"]) == 10
+    assert payload["overall"]["fail"] == 0
+    assert payload["overall"]["partial"] == 0
+    assert all(profile["blocked_outputs"] for profile in payload["profiles"])
+    assert all(profile["discipline_domain"] == "engineering" for profile in payload["profiles"])
+    for profile in payload["profiles"]:
+        package = profile["user_facing_package"]
+        assert package["evidence_status"] == "research_plan_created_not_executed"
+        assert package["execution_status"] == "dry_run_no_real_subagent"
+        assert len(package["next_three_actions"]) == 3
+        assert "fit_score" in package["blocked_until_evidence"]
+        assert package["hr_supervision_note"]
+    md_text = results_md.read_text(encoding="utf-8")
+    assert "本科大二 计算机 AI 实习探索" in md_text
+    assert "用户端可读包" in md_text
+    assert "公开来源研究计划已生成但尚未执行" in md_text
+    assert "run_dir" not in user_report.read_text(encoding="utf-8")
+
+
+def test_work_order_builder_exports_subagent_ready_orders(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "Computer science sophomore, Python, looking for AI internship",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(PLAN_BUILDER, "--run-dir", str(run_dir), "--build-prompt-bundles").returncode == 0
+
+    result = run_python(WORK_ORDER_BUILDER, "--run-dir", str(run_dir))
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)["work_order_response"]
+    orders_path = run_dir / response["work_orders_ref"]
+    orders = json.loads(orders_path.read_text(encoding="utf-8"))["subagent_work_orders"]
+    assert orders["adapter_status"] == "not_configured"
+    assert orders["real_execution_ready"] is False
+    assert len(orders["orders"]) == 6
+    first = orders["orders"][0]
+    assert first["prompt_bundle_ref"].startswith("prompts/")
+    assert "input/raw_refs.json" not in json.dumps(orders, ensure_ascii=False)
+    assert first["expected_backfill_contract"]["required_top_level_fields"] == [
+        "invocation_ref",
+        "role_output_packet",
+        "error_recovery_state",
+    ]
+
+
+def test_public_evidence_backfill_accepts_safe_public_evidence(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "target_job_fit",
+        "--input-text",
+        "Computer science senior. Assess fit for Tencent backend role. JD: Java and MySQL.",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "target_job_fit",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(SOURCE_PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+
+    evidence = {
+        "evidence_packets": [
+            {
+                "evidence_packet": {
+                    "evidence_id": "ev-official-jd",
+                    "claim_id": "target-current-jd-verification",
+                    "field": "current_jd_text",
+                    "source_type": "official_or_primary",
+                    "source_ref": "https://careers.example.com/jobs/1",
+                    "artifact_ref": "",
+                    "retrieved_or_published_date": "2026-06-27",
+                    "freshness": "0_6_months",
+                    "evidence_strength": "strong",
+                    "inference_level": "none",
+                    "privacy_class": "public",
+                    "confidence": "high",
+                    "may_set_final_decision": True,
+                    "may_set_weight": True,
+                }
+            }
+        ]
+    }
+    evidence_path = tmp_path / "evidence.json"
+    evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+
+    result = run_python(EVIDENCE_BACKFILL, "--run-dir", str(run_dir), "--evidence-json", str(evidence_path))
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)["evidence_backfill_response"]
+    assert response["accepted_count"] == 1
+    evidence_jsonl = run_dir / response["evidence_packets_ref"]
+    assert evidence_jsonl.is_file()
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert response["evidence_packets_ref"] in manifest["execution_manifest"]["evidence_packet_refs"]
+
+
+def test_public_evidence_backfill_rejects_weak_social_as_final_basis(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "Computer science sophomore, Python, looking for AI internship",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(SOURCE_PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+
+    evidence = {
+        "evidence_packets": [
+            {
+                "evidence_packet": {
+                    "evidence_id": "ev-weak-social",
+                    "claim_id": "social-media-weak-signal",
+                    "field": "company_reputation",
+                    "source_type": "social_media_weak",
+                    "source_ref": "https://example.com/post",
+                    "artifact_ref": "",
+                    "retrieved_or_published_date": "2026-06-27",
+                    "freshness": "0_6_months",
+                    "evidence_strength": "weak",
+                    "inference_level": "medium",
+                    "privacy_class": "public",
+                    "confidence": "low",
+                    "may_set_final_decision": True,
+                    "may_set_weight": False,
+                }
+            }
+        ]
+    }
+    evidence_path = tmp_path / "weak-evidence.json"
+    evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+
+    result = run_python(EVIDENCE_BACKFILL, "--run-dir", str(run_dir), "--evidence-json", str(evidence_path))
+
+    assert result.returncode == 1
+    assert "social_media_weak" in result.stderr
+    assert "final decision" in result.stderr
+
+
+def test_public_source_fetcher_collects_allowed_public_html_and_backfills(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "target_job_fit",
+        "--input-text",
+        "Computer science senior. Assess fit for Tencent backend role. JD: Java and MySQL.",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "target_job_fit",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(SOURCE_PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+
+    html = tmp_path / "official-career.html"
+    html.write_text(
+        "<html><title>Backend Engineer Intern</title><body>"
+        "<h1>Backend Engineer Intern</h1><p>Requirements: Java, MySQL, distributed systems.</p>"
+        "</body></html>",
+        encoding="utf-8",
+    )
+    sources = {
+        "sources": [
+            {
+                "task_id": "target-current-jd-verification",
+                "source_type": "official_or_primary",
+                "source_ref": html.as_uri(),
+                "field": "current_jd_text",
+            }
+        ]
+    }
+    sources_path = tmp_path / "sources.json"
+    sources_path.write_text(json.dumps(sources), encoding="utf-8")
+
+    fetch = run_python(PUBLIC_SOURCE_FETCHER, "--run-dir", str(run_dir), "--sources-json", str(sources_path))
+
+    assert fetch.returncode == 0, fetch.stderr
+    response = json.loads(fetch.stdout)["public_source_fetch_response"]
+    assert response["accepted_count"] == 1
+    evidence_path = run_dir / response["evidence_json_ref"]
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))["evidence_packets"][0]["evidence_packet"]
+    assert evidence["source_type"] == "official_or_primary"
+    assert evidence["claim_id"] == "target-current-jd-verification"
+    assert evidence["may_set_final_decision"] is True
+
+    backfill = run_python(EVIDENCE_BACKFILL, "--run-dir", str(run_dir), "--evidence-json", str(evidence_path))
+    assert backfill.returncode == 0, backfill.stderr
+
+
+def test_public_source_fetcher_rejects_login_only_sources(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "Computer science sophomore, Python, looking for AI internship",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(SOURCE_PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+
+    sources = {
+        "sources": [
+            {
+                "task_id": "recruitment-platform-public-jd",
+                "source_type": "login_only_page",
+                "source_ref": "https://example.com/login-only",
+                "field": "jd_requirement",
+            }
+        ]
+    }
+    sources_path = tmp_path / "bad-sources.json"
+    sources_path.write_text(json.dumps(sources), encoding="utf-8")
+
+    result = run_python(PUBLIC_SOURCE_FETCHER, "--run-dir", str(run_dir), "--sources-json", str(sources_path))
+
+    assert result.returncode == 1
+    assert "login_only_page" in result.stderr
 
 
 def test_validator_rejects_injection_without_runtime_context_packet(tmp_path):

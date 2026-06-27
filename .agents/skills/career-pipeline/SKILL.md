@@ -17,6 +17,7 @@ Read these references as needed:
 - `references/source-policy.md` before analyzing job, company, HR, candidate, or social media information.
 - `references/runtime-collaboration-protocol.md` before dispatching or merging role prompts.
 - `references/runtime-execution-layer.md` before running, simulating, or implementing the local user-side execution shell.
+- `references/runtime-network-and-adapter-setup.md` before enabling real network fetches or real subagent execution.
 - `references/runtime-subagent-injection-protocol.md` before creating user-side subagent prompts.
 - `references/subagent-invocation-contract.md` before converting a secondary prompt injection into a concrete local subagent invocation.
 - `references/runtime-orchestration-protocol.md` before running or simulating the user-side pipeline state machine.
@@ -30,15 +31,33 @@ Read these references as needed:
 
 Use these scripts only for local contract validation and simulation. They do not call real subagents, browse recruitment sites, or make career judgments.
 
+Run the scripts from this skill directory, not from the repository root:
+
+```bash
+cd .agents/skills/career-pipeline
+python scripts/simulate_runtime_run.py --task-type job_search --route job_search --input-text "computer science sophomore, Python, looking for AI internship" --run-root ../../../.career-pipeline-runs
+python scripts/build_subagent_plan.py --run-dir ../../../.career-pipeline-runs/<run_id> --build-prompt-bundles
+python scripts/build_public_source_plan.py --run-dir ../../../.career-pipeline-runs/<run_id>
+python scripts/fetch_public_sources.py --run-dir ../../../.career-pipeline-runs/<run_id> --sources-json <allowed_public_sources.json>
+python scripts/backfill_public_evidence.py --run-dir ../../../.career-pipeline-runs/<run_id> --evidence-json ../../../.career-pipeline-runs/<run_id>/evidence/fetched_public_evidence.json
+python scripts/build_subagent_work_orders.py --run-dir ../../../.career-pipeline-runs/<run_id>
+python scripts/execute_subagent_plan.py --run-dir ../../../.career-pipeline-runs/<run_id> --dry-run
+```
+
+Do not run these commands from the repository root as `scripts/*.py`; the `scripts/` path is relative to `.agents/skills/career-pipeline/`. If already at the repository root, use `.agents/skills/career-pipeline/scripts/<script>.py`.
+
 - `scripts/validate_runtime_contracts.py` validates repository role prompts, secondary prompt injections, canonical subagent invocation packets, execution manifests, and blocked/final gate consistency.
 - `scripts/simulate_runtime_run.py` creates a private ignored `.career-pipeline-runs/<run_id>/` artifact tree for a no-network blocked run, useful for checking runtime packet shape before building a real runner.
 - `scripts/build_subagent_plan.py` creates a plan-only dispatch queue from a simulated run. It must not be treated as proof that local subagents executed.
 - `scripts/build_subagent_prompt_bundle.py` creates the concrete derived prompt bundle for one subagent from the static role prompt, runtime context packet, secondary prompt injection, allowed user facts, source policy, and output contract.
 - `scripts/build_public_source_plan.py` creates a policy-bound public-source research task list for official pages, public JDs, verified HR posts, candidate experience, and weak social signals without browsing or logging in.
+- `scripts/fetch_public_sources.py` fetches allowed public `http(s)` or user-provided `file://` sources into evidence packets. It refuses forbidden/login-only source types and does not bypass platform access controls.
+- `scripts/backfill_public_evidence.py` validates and writes externally collected public evidence packets into the run after checking source policy constraints.
+- `scripts/build_subagent_work_orders.py` exports adapter-ready work orders from a plan with prompt bundle refs and backfill contracts. This is a handoff contract, not proof that subagents ran.
 - `scripts/execute_subagent_plan.py` inspects a plan-only queue, enforces human/source-policy gates before real execution, writes redacted execution events, and can backfill externally produced role outputs after schema checks.
 - `scripts/continue_runtime_run.py` updates the same run with one compact batch of user-owned facts, refreshes the runtime context packet, and returns the run to `injection_ready`.
 
-These scripts are a local deterministic execution shell. They do not yet call real Codex subagents or browse public sources unless a future adapter is explicitly configured.
+These scripts are a local deterministic execution shell. They do not yet call real Codex subagents or browse public sources unless a future adapter is explicitly configured. Read `references/runtime-network-and-adapter-setup.md` before enabling real network fetches or real subagent execution.
 
 ## Built-In Databases
 
