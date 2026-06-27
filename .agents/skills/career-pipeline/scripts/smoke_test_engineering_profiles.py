@@ -451,15 +451,15 @@ def summarize_profile(profile: Profile, run_dir: Path) -> dict[str, Any]:
             "生成可继续检索的公开来源任务",
         ],
         "blocked_until_evidence": [
-            "current_fit_assessment",
-            "fit_score",
-            "application_priority",
-            "application_strategy",
-            "company-specific resume tailoring",
+            "精确适配评分",
+            "最终投递优先级",
+            "公司特定技能权重",
+            "公司定制版简历",
         ],
         "not_ready_for_user_output": [
             "精确适配评分",
             "最终投递优先级",
+            "公司特定技能权重",
             "公司定制版简历",
         ],
         "ask_hr_about": [

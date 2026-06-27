@@ -104,7 +104,7 @@ Usage:
 - `MatchStrategist`, `LearningPathStrategist`, and `ResumeArchitect` may use company x cluster priors only after marking them as priors.
 - `HRSupervisor` may read company summaries, source evidence, and collection targets to simulate big-company HR screening bias for a target company or comparable company family.
 
-Important: this is a seed database with expanded public source links, not a complete evidence corpus. Official entrypoints can support exploration or "inspect here" actions, but specific role analysis still requires current JD text or a current public JD URL.
+Important: this is a seed database with expanded public source links, not a complete evidence corpus. Official entrypoints can support exploration or "inspect here" actions. Public JD text, current public JD URLs, or role-family public evidence can support prepare-first planning when limitations are stated. Exact role-specific claims, apply-now decisions, final priority, fit scores, company-specific skill weights, and targeted resume tailoring require stronger current JD/user evidence. Missing operational details from a public page should become `ask_hr_about`, not a request for the user to manually fill recruitment-site fields.
 
 ## Resume Formats
 

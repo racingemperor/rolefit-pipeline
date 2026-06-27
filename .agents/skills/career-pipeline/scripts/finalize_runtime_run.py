@@ -8,6 +8,15 @@ from typing import Any
 
 
 SUCCESS_ROLE_OUTPUT_STATUSES = {"done", "done_with_warnings"}
+ALLOWED_LIMITED_FINAL_BLOCKED_OUTPUTS = {
+    "fit_score",
+    "application_priority",
+    "final_application_priority",
+    "targeted_resume_tailoring",
+    "company_specific_skill_weight_ranking",
+    "unsupported_weight",
+    "unsupported_weights",
+}
 
 
 class FinalizerError(Exception):
@@ -66,7 +75,7 @@ def validate_final_role_output(
     target_agent: str,
     real_subagent_execution_required: bool,
     execution_mode: str,
-) -> None:
+) -> list[str]:
     packet = payload["role_output_packet"]
     if packet.get("target_agent") != target_agent:
         raise FinalizerError(f"{target_agent}: role output target_agent mismatch")
@@ -76,8 +85,21 @@ def validate_final_role_output(
     recovery = payload.get("error_recovery_state")
     if not isinstance(recovery, dict):
         raise FinalizerError(f"{target_agent}: missing error_recovery_state")
-    if recovery.get("blocked_outputs"):
-        raise FinalizerError(f"{target_agent}: blocked_outputs must be empty before final package")
+    blocked_outputs = sorted(
+        {
+            str(item)
+            for item in (packet.get("blocked_outputs") or []) + (recovery.get("blocked_outputs") or [])
+            if item
+        }
+    )
+    unsupported_blockers = [
+        item for item in blocked_outputs if item not in ALLOWED_LIMITED_FINAL_BLOCKED_OUTPUTS
+    ]
+    if unsupported_blockers:
+        raise FinalizerError(
+            f"{target_agent}: blocked_outputs contain final-package blockers: "
+            + ", ".join(unsupported_blockers)
+        )
     metadata = payload.get("adapter_metadata")
     if real_subagent_execution_required:
         if not isinstance(metadata, dict) or metadata.get("real_subagent_execution") is not True:
@@ -93,6 +115,7 @@ def validate_final_role_output(
                 raise FinalizerError(
                     f"{target_agent}: manual-controller execution must be explicitly acknowledged"
                 )
+    return blocked_outputs
 
 
 def evidence_refs_from_manifest(manifest_payload: dict[str, Any]) -> list[str]:
@@ -124,6 +147,8 @@ def update_manifest_for_final(
     final_ref: str,
     role_output_refs: list[str],
     real_subagent_execution: bool,
+    blocked_outputs: list[str],
+    degraded_outputs: list[str],
 ) -> None:
     manifest = manifest_payload["execution_manifest"]
     run_state = manifest_payload["run_state"]
@@ -149,8 +174,8 @@ def update_manifest_for_final(
     ]
     run_state["blocked_agents"] = []
     run_state["failed_invocations"] = []
-    run_state["blocked_outputs"] = []
-    run_state["degraded_outputs"] = []
+    run_state["blocked_outputs"] = blocked_outputs
+    run_state["degraded_outputs"] = degraded_outputs
     run_state["recovery_actions"] = []
     run_state["next_action"] = "return_final_package"
     run_state["shared_context_refs"] = list(dict.fromkeys(run_state.get("shared_context_refs", []) + role_output_refs))
@@ -169,17 +194,20 @@ def finalize(args: argparse.Namespace) -> dict[str, Any]:
     )
     role_output_refs = []
     role_packets = []
+    limited_blocked_outputs: list[str] = []
     for item in plan["dispatch_queue"]:
         output_ref = item["output_artifact_target"]
         payload = load_role_output(run_dir, output_ref)
-        validate_final_role_output(
+        role_blocked_outputs = validate_final_role_output(
             payload,
             item["target_agent"],
             args.real_subagent_execution,
             args.execution_mode,
         )
+        limited_blocked_outputs.extend(role_blocked_outputs)
         role_output_refs.append(output_ref)
         role_packets.append(payload["role_output_packet"])
+    limited_blocked_outputs = sorted(set(limited_blocked_outputs))
     final_ref = args.output
     final_path = run_dir / final_ref
     decision_package = {
@@ -206,12 +234,14 @@ def finalize(args: argparse.Namespace) -> dict[str, Any]:
                 "merge/runtime_weights.json",
             ),
             "gate_evidence_refs": role_output_refs + source_gate_refs,
-            "blocked_outputs": [],
-            "degraded_outputs": [],
+            "blocked_outputs": limited_blocked_outputs,
+            "degraded_outputs": limited_blocked_outputs,
             "decision_summary": (
                 "All required role outputs passed runtime schema/status checks. "
                 "This package records final readiness for the local run; role-specific "
-                "career text remains evidence-bound to the accepted role outputs."
+                "career text remains evidence-bound to the accepted role outputs. "
+                "Fields listed in blocked_outputs are unavailable exact fields, not blockers "
+                "for safe prepare-first or exploration guidance."
             ),
         }
     }
@@ -222,6 +252,8 @@ def finalize(args: argparse.Namespace) -> dict[str, Any]:
         final_ref,
         role_output_refs,
         args.real_subagent_execution,
+        limited_blocked_outputs,
+        limited_blocked_outputs,
     )
     return {
         "finalizer_response": {

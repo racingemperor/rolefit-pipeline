@@ -175,5 +175,6 @@ Set `final_package_ready` only when:
 - resume drafts have passed `ResumeFormatGate` and `FactualReviewer` when a resume is produced.
 - HR-supervised outputs have a `positioning_verdict`.
 - all weights used in decisions have `runtime_weights` and/or `weight_provenance`, and unsupported weights are marked `not_available` or `needs_more_sources`.
+- a limited final package may still be returned when only exact fields are blocked, such as `fit_score`, final application priority, company-specific skill-weight ranking, or targeted resume tailoring. These blocked exact fields must remain visible as unavailable limitations and must not block safe prepare-first, exploration, learning-path, or public-URL guidance.
 
 Blocked required gates do not satisfy final readiness. If completion is impossible, set `stage = "blocked"` and return a `blocked_package` with the minimum missing user facts, missing public research tasks, failed gates, and outputs that cannot be produced. If safe partial outputs exist, list them under `degraded_outputs` or `safe_outputs`, not `final_package_ready`.

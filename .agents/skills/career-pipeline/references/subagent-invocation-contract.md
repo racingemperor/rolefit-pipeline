@@ -105,7 +105,7 @@ Use `needs_context` only when the missing context is owned by the orchestrator o
 - `done`: output validates and can be merged.
 - `done_with_warnings`: output validates but contains weak evidence, stale evidence, or non-blocking gaps.
 - `needs_context`: runtime context, another role output, or database subset is missing.
-- `blocked`: user-owned facts, consent, current JD, public evidence, or source permission is missing.
+- `blocked`: user-owned facts, consent, required public URL evidence, source permission, or evidence needed for an exact downstream field is missing. Missing JD operational details such as city, onsite days, deadline, headcount, or internship duration should usually become `ask_hr_about`, not a whole-role block.
 - `failed`: the role could not complete after allowed retry or recovery.
 - `malformed`: output is not parseable or violates required schema.
 
@@ -117,7 +117,7 @@ Roles may challenge other roles but should not take over their decisions:
 
 - `HRSupervisor` checks readability and presentation readiness, not factual truth.
 - `FactualReviewer` checks truthfulness and privacy, not career fit.
-- `MatchStrategist` prepares conditional application options only when runtime evidence is sufficient.
+- `MatchStrategist` prepares conditional application options when runtime evidence is sufficient for the level of claim being made; `prepare_first` and `explore` need less evidence than exact fit scores or final priority.
 - `ResumeArchitect` drafts only from user facts and accepted format gates.
 - `LearningPathStrategist` may propose future learning evidence, but must not write unfinished learning as completed resume facts.
-- For `target_job_fit`, `MatchStrategist` owns current fit and application readiness only after current JD/public evidence exists; `LearningPathStrategist` owns evidence-backed skills, projects, proof artifacts, and resume-conversion conditions needed before applying. Both must return blockers instead of final judgments when current JD evidence is missing.
+- For `target_job_fit`, `MatchStrategist` owns current fit framing, prepare-first/explore options, and application readiness limits from available user and public evidence. It must block exact fit scores, final priority, unsupported weights, and targeted resume tailoring when stronger JD evidence is missing. `LearningPathStrategist` owns evidence-backed skills, projects, proof artifacts, and resume-conversion conditions needed before applying, and should still return a useful learning path when the exact JD is incomplete.

@@ -47,7 +47,7 @@ It must not:
 - treat static company priors as current JD evidence.
 - treat official entrypoints as concrete open jobs.
 - show recommended application targets without a public URL.
-- treat missing opening status, city, onsite days, arrival time, deadline, headcount, or internship duration as user-owned facts; these are HR confirmation items when the public page is silent.
+- ask the user to fill opening status, city, onsite days, arrival time, deadline, headcount, or internship duration when the public page is silent; these are HR confirmation items for `ask_hr_about`.
 - turn planned learning into completed resume evidence.
 - mark `real_subagent_execution = true` unless actual role outputs were produced by separated role execution.
 

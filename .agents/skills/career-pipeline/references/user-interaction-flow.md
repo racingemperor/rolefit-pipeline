@@ -59,7 +59,8 @@ Group missing facts into one compact prompt and allow partial answers.
 
 - If the user gives only a vague profile, return known facts, missing facts, and what can be done next; do not recommend application direction.
 - If the user gives a resume but no target role/company, default to broad campus-recruitment resume review/generation.
-- If the user gives a JD or target company, allow targeted analysis only after current JD/company evidence is available.
+- If the user gives a JD or target company, allow safe targeted framing, prepare-first learning paths, exploration targets, and public URL recommendations from available evidence. Exact fit scores, final application priority, apply-now decisions, company-specific weights, targeted resume tailoring, and final ready-to-apply claims still require stronger current JD/company evidence plus user evidence.
+- If a public JD or application page lacks opening status, city, onsite days, arrival time, deadline, headcount, or internship duration, put those items in `ask_hr_about` rather than asking the user to supply recruitment-site details.
 - If the user is non-graduating, split current internship analysis from future full-time preparation.
 - If the user refuses missing facts, ask for explicit consent before an incomplete resume draft.
 - If incomplete-resume consent is granted, draft only sections supported by facts; omit missing sections and block application direction recommendations.

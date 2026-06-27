@@ -79,6 +79,8 @@ For concrete job or internship requests, roles should separate:
 
 If current JD evidence is missing, exact fit score, final priority, targeted resume tailoring, and company-specific skill weights must be blocked or marked `not_available` rather than inferred from repository priors. Safe preparation-first, exploration, learning-path, and public-URL recommendations may still be returned with limitations stated.
 
+For finalization, blocked exact fields may remain in `blocked_outputs` without blocking the whole package when the role status is `done_with_warnings` and the safe outputs are present. Non-exact blockers such as missing user consent, missing public URL evidence for a displayed target, malformed role output, failed factual review, or incomplete resume consent still block final readiness.
+
 Recommended jobs, internships, or application targets must follow `application-url-output-policy.md`. A user-facing concrete target should not appear in `recommended_application_targets` unless it includes a source-policy-valid public URL candidate. Official entrypoints can support exploration, public JD or JD text can support prepare-first, and role-specific `apply_now`, exact fit score, and resume tailoring require stronger current JD plus user evidence.
 
 Every proposed parameter weight, score, priority, ranking, threshold, or confidence adjustment must be supported by hard data. A role must not set weights by intuition, popularity assumptions, or model-only reasoning. If runtime public/official network evidence or user-provided materials are missing, set the weight status to `not_available` or `needs_more_sources`, add `runtime_research_tasks`, and block downstream decisions that depend on that weight.

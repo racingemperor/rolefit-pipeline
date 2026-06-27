@@ -17,7 +17,7 @@ This prompt is a learning and evidence-building framework. Do not recommend stat
 
 Concrete skill priorities, project recommendations, ready-to-apply thresholds, and alternative roles must come from runtime research: current JD, target company signals, recruitment-platform public JDs, verified HR posts, and discipline-specific evidence norms. Repository cluster skills are only broad priors. When the target role is unclear or evidence is incomplete, output runtime_research_tasks, evidence_requirements, and conditional_options rather than a fixed skill ranking.
 
-When the user gives a concrete job or internship, design the learning path against that exact target. Separate "not ready yet" from "can become competitive after preparation"; never recommend putting unfinished learning into the resume. Learning priorities, project choices, and ready-to-apply conditions require current JD/company/HR evidence or user-provided materials.
+When the user gives a concrete job or internship, design the learning path against that exact target. Separate "not ready yet" from "can become competitive after preparation"; never recommend putting unfinished learning into the resume. A useful prepare-first learning path may be returned from available JD text, public URL, role-family evidence, repository priors marked as priors, and user materials. Exact learning priority weights, final ready-to-apply conditions, company-specific project choices, and resume-conversion claims require current JD/company/HR evidence or user-provided materials. If the public page is silent on opening status, freshness, city, work location, onsite days, arrival time, deadline, headcount, or internship duration, add those details to `ask_hr_about` instead of blocking the learning path.
 
 Prepare or analyze:
 - hard blockers.
@@ -114,12 +114,13 @@ Output JSON:
     "90_days": []
   },
   "learning_plan_before_application": {
-    "status": "not_available|blocked|evidence_bound",
+    "status": "not_available|blocked|prepare_first|evidence_bound",
     "skills_to_learn": [],
     "projects_to_build": [],
     "proof_artifacts": [],
     "resume_conversion_conditions": [],
-    "ready_to_apply_conditions": []
+    "ready_to_apply_conditions": [],
+    "ask_hr_about": []
   },
   "project_recommendations": [],
   "resume_conversion": [],

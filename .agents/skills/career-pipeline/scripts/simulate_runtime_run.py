@@ -528,8 +528,8 @@ def build_target_context(input_text: str, base_target: dict[str, Any], task_type
             "current_jd_text_excerpt": jd_excerpt,
             "current_jd_text_ref": "user_provided_chat_excerpt" if jd_excerpt else "",
             "current_jd_public_retrieval_required": not bool(jd_excerpt),
-            "current_fit_assessment_status": "blocked_until_current_jd_and_evidence",
-            "growth_path_assessment_status": "blocked_until_current_jd_and_gap_evidence",
+            "current_fit_assessment_status": "safe_framing_allowed_exact_score_blocked",
+            "growth_path_assessment_status": "prepare_first_allowed_with_evidence_limits",
             "fit_vs_growth_policy": "separate_current_fit_from_learning_path_before_application",
         }
     )
@@ -699,8 +699,8 @@ def build_context_packet(
                         "user-provided JD text or link",
                     ],
                     "needed_for_outputs": [
-                        "current_fit_assessment",
-                        "application_readiness_decision",
+                        "exact_fit_score",
+                        "final_application_priority",
                         "resume_tailoring",
                     ],
                 },
@@ -721,21 +721,18 @@ def build_context_packet(
             ]
         )
         blocked_outputs = [
-            "current_fit_assessment",
-            "application_readiness_decision",
             "application_direction",
-            "learning_plan_before_application",
             "targeted_resume_tailoring",
             "final_resume_draft",
             "fit_score",
-            "application_strategy",
             "application_priority",
+            "company_specific_skill_weight_ranking",
         ]
         next_possible_actions = [
             "Summarize the candidate facts and concrete target job currently known.",
             "Verify or retrieve the current JD and target-company evidence.",
             "Separate immediate fit from learnable gaps and preparation before application.",
-            "Keep application readiness and targeted resume advice blocked until JD evidence exists.",
+            "Keep exact scores, final priority, and targeted resume advice blocked until stronger JD evidence exists.",
         ]
     return {
         "packet_id": f"{run_id}-context",
@@ -788,10 +785,11 @@ def build_injection(
     target_job_fit_requested = bool(target_context.get("target_job_fit_requested"))
     role_specific_context = {
         "simulation_scope": "contract_only_no_network_no_real_subagent",
-        "must_return_blockers_instead_of_final_judgment": True,
+        "must_return_blockers_instead_of_precise_unsupported_claims": True,
         "target_job_fit_assessment_requested": target_job_fit_requested,
         "distinguish_current_fit_from_growth_path": target_job_fit_requested,
-        "final_fit_requires_current_jd_public_evidence": target_job_fit_requested,
+        "safe_prepare_first_and_explore_allowed": target_job_fit_requested,
+        "exact_score_priority_and_tailoring_require_current_jd_public_evidence": target_job_fit_requested,
     }
     auto_recruitment_research = automatic_public_recruitment_research(target_agent)
     if auto_recruitment_research["enabled"]:
@@ -868,8 +866,8 @@ def build_injection(
                     ],
                     "required_freshness": "current JD or mark stale/weak",
                     "needed_for_outputs": [
-                        "current_fit_assessment",
-                        "application_readiness_decision",
+                        "exact_fit_score",
+                        "final_application_priority",
                         "targeted_resume_tailoring",
                     ],
                 },
@@ -894,7 +892,7 @@ def build_injection(
             [
                 {
                     "parameter": "current_fit_assessment_weight",
-                    "rule": "fit/readiness must be supported by current JD plus user evidence; otherwise not_available",
+                    "rule": "exact fit/readiness weights must be supported by current JD plus user evidence; otherwise not_available",
                 },
                 {
                     "parameter": "learning_gap_priority",
@@ -902,7 +900,7 @@ def build_injection(
                 },
                 {
                     "parameter": "application_readiness_decision",
-                    "rule": "apply-now, prepare-first, or skip decisions require current JD and public evidence",
+                    "rule": "apply-now and final priority require current JD and public evidence; prepare-first or explore may be returned with evidence limits and HR confirmation items",
                 },
             ]
         )
@@ -915,12 +913,10 @@ def build_injection(
             ]
         )
         blocked_outputs = [
-            "current_fit_assessment",
-            "application_readiness_decision",
             "fit_score",
-            "application_strategy",
-            "learning_plan_before_application",
+            "application_priority",
             "targeted_resume_tailoring",
+            "company_specific_skill_weight_ranking",
             "final_resume_draft",
         ]
         handoff_contract.extend(
@@ -932,7 +928,7 @@ def build_injection(
         debate_contract.extend(
             [
                 "separate current readiness from future growth potential",
-                "challenge any apply-now recommendation without current JD evidence",
+                "challenge any apply-now, exact score, final priority, or targeted tailoring recommendation without current JD evidence",
             ]
         )
 

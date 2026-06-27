@@ -268,7 +268,9 @@ def test_engineering_smoke_test_writes_results_for_ten_profiles(tmp_path):
         assert package["evidence_status"] == "research_plan_created_not_executed"
         assert package["execution_status"] == "dry_run_no_real_subagent"
         assert len(package["next_three_actions"]) == 3
-        assert "fit_score" in package["blocked_until_evidence"]
+        assert "精确适配评分" in package["blocked_until_evidence"]
+        assert "current_fit_assessment" not in package["blocked_until_evidence"]
+        assert "application_strategy" not in package["blocked_until_evidence"]
         assert package["hr_supervision_note"]
     md_text = results_md.read_text(encoding="utf-8")
     assert "本科大二 计算机 AI 实习探索" in md_text
@@ -277,6 +279,8 @@ def test_engineering_smoke_test_writes_results_for_ten_profiles(tmp_path):
     user_report_text = user_report.read_text(encoding="utf-8")
     assert "run_dir" not in user_report_text
     assert "fit_score" not in user_report_text
+    assert "current_fit_assessment" not in user_report_text
+    assert "application_strategy" not in user_report_text
     assert "blocked_outputs" not in user_report_text
     assert "下一步建议" in user_report_text
     assert "HR 确认项" in user_report_text
@@ -1024,6 +1028,70 @@ json.dump(result, open(args.output_json, "w", encoding="utf-8"), ensure_ascii=Fa
     )
 
 
+def prepare_run_with_external_public_source(
+    tmp_path: Path,
+    task_type: str = "job_search",
+    route: str = "job_search",
+    input_text: str = "Computer science sophomore, Python, looking for AI internship",
+    task_id: str = "recruitment-platform-public-jd",
+) -> tuple[Path, str]:
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        task_type,
+        "--input-text",
+        input_text,
+        "--run-root",
+        str(run_root),
+        "--route",
+        route,
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(PLAN_BUILDER, "--run-dir", str(run_dir), "--build-prompt-bundles").returncode == 0
+    assert run_python(SOURCE_PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+    assert run_python(PUBLIC_SOURCE_DISCOVERER, "--run-dir", str(run_dir), "--generate-query-plan-only").returncode == 0
+    external_results = tmp_path / f"{run_id}-external-search-results.json"
+    external_results.write_text(
+        json.dumps(
+            {
+                "search_results": [
+                    {
+                        "task_id": task_id,
+                        "url": "https://www.nowcoder.com/jobs/backend-intern",
+                        "title": "Backend intern public JD",
+                        "snippet": "Python Java internship",
+                        "source_type": "recruitment_platform_jd",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    source_search = run_python(
+        PUBLIC_SOURCE_SEARCHER,
+        "--run-dir",
+        str(run_dir),
+        "--provider",
+        "external-json",
+        "--search-results-json",
+        str(external_results),
+    )
+    assert source_search.returncode == 0, source_search.stderr
+    search_ref = json.loads(source_search.stdout)["public_source_search_response"]["search_results_ref"]
+    discover = run_python(
+        PUBLIC_SOURCE_DISCOVERER,
+        "--run-dir",
+        str(run_dir),
+        "--search-results-json",
+        str(run_dir / search_ref),
+    )
+    assert discover.returncode == 0, discover.stderr
+    return run_dir, run_id
+
+
 def test_subagent_adapter_runner_executes_external_command_outputs(tmp_path):
     run_root = tmp_path / ".career-pipeline-runs"
     simulate = run_python(
@@ -1067,60 +1135,7 @@ def test_subagent_adapter_runner_executes_external_command_outputs(tmp_path):
 
 
 def test_finalizer_writes_final_package_when_role_outputs_are_done(tmp_path):
-    run_root = tmp_path / ".career-pipeline-runs"
-    simulate = run_python(
-        SIMULATOR,
-        "--task-type",
-        "job_search",
-        "--input-text",
-        "Computer science sophomore, Python, looking for AI internship",
-        "--run-root",
-        str(run_root),
-        "--route",
-        "job_search",
-    )
-    assert simulate.returncode == 0, simulate.stderr
-    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
-    run_dir = run_root / run_id
-    assert run_python(PLAN_BUILDER, "--run-dir", str(run_dir), "--build-prompt-bundles").returncode == 0
-    assert run_python(SOURCE_PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
-    assert run_python(PUBLIC_SOURCE_DISCOVERER, "--run-dir", str(run_dir), "--generate-query-plan-only").returncode == 0
-    external_results = tmp_path / "external-search-results.json"
-    external_results.write_text(
-        json.dumps(
-            {
-                "search_results": [
-                    {
-                        "task_id": "recruitment-platform-public-jd",
-                        "url": "https://www.nowcoder.com/jobs/backend-intern",
-                        "title": "Backend intern public JD",
-                        "snippet": "Python Java internship",
-                        "source_type": "recruitment_platform_jd",
-                    }
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
-    source_search = run_python(
-        PUBLIC_SOURCE_SEARCHER,
-        "--run-dir",
-        str(run_dir),
-        "--provider",
-        "external-json",
-        "--search-results-json",
-        str(external_results),
-    )
-    assert source_search.returncode == 0, source_search.stderr
-    search_ref = json.loads(source_search.stdout)["public_source_search_response"]["search_results_ref"]
-    discover = run_python(
-        PUBLIC_SOURCE_DISCOVERER,
-        "--run-dir",
-        str(run_dir),
-        "--search-results-json",
-        str(run_dir / search_ref),
-    )
-    assert discover.returncode == 0, discover.stderr
+    run_dir, run_id = prepare_run_with_external_public_source(tmp_path)
     assert run_python(WORK_ORDER_BUILDER, "--run-dir", str(run_dir)).returncode == 0
     adapter_script = tmp_path / "external_adapter.py"
     write_external_adapter_script(adapter_script)
@@ -1150,6 +1165,178 @@ def test_finalizer_writes_final_package_when_role_outputs_are_done(tmp_path):
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["execution_manifest"]["current_stage"] == "final_package_ready"
     assert manifest["run_state"]["stage"] == "final_package_ready"
+
+
+def test_finalizer_allows_limited_final_package_with_only_exact_fields_blocked(tmp_path):
+    run_dir, run_id = prepare_run_with_external_public_source(
+        tmp_path,
+        task_type="target_job_fit",
+        route="target_job_fit",
+        input_text=(
+            "Computer science sophomore, Python and Java. "
+            "Target: Tencent backend development internship. "
+            "JD: Java, Spring, MySQL, Redis, distributed systems."
+        ),
+        task_id="target-current-jd-verification",
+    )
+    plan = json.loads((run_dir / "invocations" / "subagent_invocation_plan.json").read_text(encoding="utf-8"))[
+        "subagent_invocation_plan"
+    ]
+    exact_blocked = [
+        "fit_score",
+        "application_priority",
+        "targeted_resume_tailoring",
+        "company_specific_skill_weight_ranking",
+    ]
+    for item in plan["dispatch_queue"]:
+        invocation = json.loads((run_dir / item["invocation_ref"]).read_text(encoding="utf-8"))[
+            "subagent_invocation"
+        ]
+        output = {
+            "invocation_ref": item["invocation_ref"],
+            "role": item["target_agent"],
+            "task_summary": "Prepared safe target-job fit output with exact fields unavailable.",
+            "inputs_used": [item["prompt_bundle_ref"]],
+            "database_files_used": [],
+            "source_notes": [],
+            "runtime_scope": "conditional_runtime_judgment",
+            "judgment_allowed": "conditional_with_runtime_evidence",
+            "judgment_status": "evidence_bound_judgment",
+            "decision_owner": "local_subagent",
+            "runtime_preconditions": {
+                "has_current_jd": True,
+                "has_target_company": True,
+                "has_user_constraints": False,
+                "has_user_consent": False,
+                "job_direction_blocked": False,
+            },
+            "evidence_basis": [],
+            "repository_prior_usage": [],
+            "weight_provenance": [
+                {
+                    "parameter": "exact_fit_score",
+                    "proposed_weight": None,
+                    "weight_status": "not_available",
+                    "source_refs": [],
+                    "source_types": [],
+                    "retrieved_or_published_dates": [],
+                    "sample_size_or_source_count": "0",
+                    "evidence_strength": "missing",
+                    "confidence": "low",
+                    "cannot_decide_alone": True,
+                }
+            ],
+            "role_output_packet": {
+                "invocation_id": invocation["invocation_id"],
+                "target_agent": item["target_agent"],
+                "status": "done_with_warnings",
+                "role_output_ref": item["output_artifact_target"],
+                "evidence_packet_refs": [],
+                "runtime_weights_ref": "merge/runtime_weights.json",
+                "artifact_refs": [item["prompt_bundle_ref"]],
+                "blocked_outputs": exact_blocked,
+                "runtime_research_tasks": [],
+                "needs_user_confirmation": [],
+                "handoff_to": [],
+                "errors": [],
+                "confidence": "medium",
+            },
+            "error_recovery_state": {
+                "status": "degraded",
+                "errors": [],
+                "recovery_actions": ["continue_with_prepare_first_package"],
+                "degraded_outputs": exact_blocked,
+                "blocked_outputs": exact_blocked,
+                "safe_outputs": [
+                    "current_fit_assessment",
+                    "application_readiness_decision",
+                    "learning_plan_before_application",
+                    "recommended_application_targets",
+                ],
+                "next_action": "continue",
+            },
+            "current_fit_assessment": {"status": "evidence_bound"},
+            "application_readiness_decision": {"status": "prepare_first"},
+            "learning_plan_before_application": {"status": "prepare_first"},
+        }
+        output_path = run_dir / item["output_artifact_target"]
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output["adapter_metadata"] = {
+            "run_id": run_id,
+            "target_agent": item["target_agent"],
+            "adapter_mode": "external-command",
+            "real_subagent_execution": True,
+            "mock_or_seed_source": False,
+        }
+        output_path.write_text(json.dumps(output), encoding="utf-8")
+
+    result = run_python(FINALIZER, "--run-dir", str(run_dir), "--real-subagent-execution")
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)["finalizer_response"]
+    final_package = json.loads((run_dir / response["final_package_ref"]).read_text(encoding="utf-8"))[
+        "decision_package"
+    ]
+    assert final_package["run_id"] == run_id
+    assert set(final_package["blocked_outputs"]) == set(exact_blocked)
+    assert "current_fit_assessment" not in final_package["blocked_outputs"]
+    assert "learning_plan_before_application" not in final_package["blocked_outputs"]
+    assert final_package["degraded_outputs"]
+
+
+def test_finalizer_rejects_limited_package_with_non_exact_blockers(tmp_path):
+    run_dir, run_id = prepare_run_with_external_public_source(tmp_path)
+    plan = json.loads((run_dir / "invocations" / "subagent_invocation_plan.json").read_text(encoding="utf-8"))[
+        "subagent_invocation_plan"
+    ]
+    for index, item in enumerate(plan["dispatch_queue"]):
+        invocation = json.loads((run_dir / item["invocation_ref"]).read_text(encoding="utf-8"))[
+            "subagent_invocation"
+        ]
+        blockers = ["blocked_application_targets_without_public_url"] if index == 0 else []
+        output = {
+            "invocation_ref": item["invocation_ref"],
+            "role_output_packet": {
+                "invocation_id": invocation["invocation_id"],
+                "target_agent": item["target_agent"],
+                "status": "done_with_warnings",
+                "role_output_ref": item["output_artifact_target"],
+                "evidence_packet_refs": [],
+                "runtime_weights_ref": "merge/runtime_weights.json",
+                "artifact_refs": [item["prompt_bundle_ref"]],
+                "blocked_outputs": blockers,
+                "runtime_research_tasks": [],
+                "needs_user_confirmation": [],
+                "handoff_to": [],
+                "errors": [],
+                "confidence": "medium",
+            },
+            "error_recovery_state": {
+                "status": "degraded" if blockers else "not_applicable",
+                "errors": [],
+                "recovery_actions": [],
+                "degraded_outputs": blockers,
+                "blocked_outputs": blockers,
+                "safe_outputs": ["role_output_packet"],
+                "next_action": "continue",
+            },
+            "adapter_metadata": {
+                "run_id": run_id,
+                "target_agent": item["target_agent"],
+                "adapter_mode": "external-command",
+                "real_subagent_execution": True,
+                "mock_or_seed_source": False,
+            },
+        }
+        output_path = run_dir / item["output_artifact_target"]
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(output), encoding="utf-8")
+
+    result = run_python(FINALIZER, "--run-dir", str(run_dir), "--real-subagent-execution")
+
+    assert result.returncode == 1
+    assert "final-package blockers" in result.stderr
+    assert "blocked_application_targets_without_public_url" in result.stderr
 
 
 def test_manual_controller_backfill_can_finalize_with_explicit_execution_metadata(tmp_path):
@@ -2724,8 +2911,22 @@ def test_simulator_supports_target_job_fit_route_with_target_context(tmp_path):
     assert target["target_company"] == "ByteDance"
     assert "LLM application engineer internship" in target["target_job_title"]
     assert "RAG applications" in target["current_jd_text_excerpt"]
-    assert "current_fit_assessment" in context["blocked_outputs"]
-    assert "learning_plan_before_application" in context["blocked_outputs"]
+    assert target["current_fit_assessment_status"] == "safe_framing_allowed_exact_score_blocked"
+    assert target["growth_path_assessment_status"] == "prepare_first_allowed_with_evidence_limits"
+    for safe_output in [
+        "current_fit_assessment",
+        "application_readiness_decision",
+        "learning_plan_before_application",
+        "application_strategy",
+    ]:
+        assert safe_output not in context["blocked_outputs"]
+    for exact_output in [
+        "fit_score",
+        "application_priority",
+        "targeted_resume_tailoring",
+        "company_specific_skill_weight_ranking",
+    ]:
+        assert exact_output in context["blocked_outputs"]
 
 
 def test_target_job_fit_prompt_bundle_requires_fit_and_learning_gap_fields(tmp_path):
@@ -2765,6 +2966,20 @@ def test_target_job_fit_prompt_bundle_requires_fit_and_learning_gap_fields(tmp_p
         role_context = bundle["prompt_sections"]["secondary_prompt_injection"]["content"]["role_specific_context"]
         assert role_context["target_job_fit_assessment_requested"] is True
         assert role_context["distinguish_current_fit_from_growth_path"] is True
+        injection = bundle["prompt_sections"]["secondary_prompt_injection"]["content"]
+        for safe_output in [
+            "current_fit_assessment",
+            "application_readiness_decision",
+            "learning_plan_before_application",
+            "application_strategy",
+        ]:
+            assert safe_output not in injection["blocked_outputs"]
+        for exact_output in [
+            "fit_score",
+            "targeted_resume_tailoring",
+            "company_specific_skill_weight_ranking",
+        ]:
+            assert exact_output in injection["blocked_outputs"]
 
 
 def test_prompt_bundle_builder_creates_subagent_ready_context(tmp_path):
@@ -3063,6 +3278,92 @@ def test_role_prompts_gate_application_recommendations_on_public_urls():
     assert "professional, concise, resume-like user-facing summary" in hr_supervisor
     assert "application_url_fact_review" in factual_reviewer
     assert "missing HR-operational fields" in factual_reviewer
+
+
+def test_target_job_fit_policy_does_not_overblock_when_current_jd_details_are_missing():
+    orchestrator = (ROOT / ".codex" / "agents" / "career-orchestrator.toml").read_text(
+        encoding="utf-8"
+    )
+    runtime_execution = (
+        ROOT
+        / ".agents"
+        / "skills"
+        / "career-pipeline"
+        / "references"
+        / "runtime-execution-layer.md"
+    ).read_text(encoding="utf-8")
+    invocation_contract = (
+        ROOT
+        / ".agents"
+        / "skills"
+        / "career-pipeline"
+        / "references"
+        / "subagent-invocation-contract.md"
+    ).read_text(encoding="utf-8")
+    readme_text = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    for text in [orchestrator, runtime_execution, invocation_contract, readme_text]:
+        assert "prepare-first" in text or "prepare_first" in text
+        assert "ask_hr_about" in text
+
+    forbidden_fragments = [
+        "block final readiness without current JD/public evidence",
+        "requires current JD text or current public JD retrieval before final resume tailoring",
+        "block `current_fit_assessment`, `application_readiness_decision`, `learning_plan_before_application`",
+        "Both must return blockers instead of final judgments when current JD evidence is missing",
+        "apply-now decisions, role-specific fit claims, and tailored resume advice require current JD text or a current public JD URL",
+    ]
+    for fragment in forbidden_fragments:
+        assert fragment not in orchestrator
+        assert fragment not in runtime_execution
+        assert fragment not in invocation_contract
+        assert fragment not in readme_text
+
+
+def test_target_job_fit_prepare_first_policy_is_consistent_across_role_docs():
+    learning_prompt = (
+        ROOT / ".codex" / "agents" / "learning-path-strategist.toml"
+    ).read_text(encoding="utf-8")
+    data_catalog = (
+        ROOT
+        / ".agents"
+        / "skills"
+        / "career-pipeline"
+        / "references"
+        / "data-catalog.md"
+    ).read_text(encoding="utf-8")
+    interaction_flow = (
+        ROOT
+        / ".agents"
+        / "skills"
+        / "career-pipeline"
+        / "references"
+        / "user-interaction-flow.md"
+    ).read_text(encoding="utf-8")
+    manual_flow = (
+        ROOT
+        / ".agents"
+        / "skills"
+        / "career-pipeline"
+        / "references"
+        / "manual-controller-runtime-flow.md"
+    ).read_text(encoding="utf-8")
+
+    for text in [learning_prompt, data_catalog, interaction_flow, manual_flow]:
+        assert "prepare-first" in text or "prepare_first" in text
+        assert "ask_hr_about" in text
+
+    forbidden_fragments = [
+        "Learning priorities, project choices, and ready-to-apply conditions require current JD/company/HR evidence or user-provided materials.",
+        "specific role analysis still requires current JD text or a current public JD URL",
+        "allow targeted analysis only after current JD/company evidence is available",
+        "treat missing opening status, city, onsite days, arrival time, deadline, headcount, or internship duration as user-owned facts",
+    ]
+    for fragment in forbidden_fragments:
+        assert fragment not in learning_prompt
+        assert fragment not in data_catalog
+        assert fragment not in interaction_flow
+        assert fragment not in manual_flow
 
 
 def test_factual_reviewer_prompt_requires_controller_evidence_correction():
