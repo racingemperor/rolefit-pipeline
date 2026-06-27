@@ -52,6 +52,7 @@ python scripts/build_subagent_work_orders.py --run-dir ../../../.career-pipeline
 python scripts/run_subagent_adapter.py --run-dir ../../../.career-pipeline-runs/<run_id> --mock-blocked
 python scripts/run_subagent_adapter.py --run-dir ../../../.career-pipeline-runs/<run_id> --adapter-command <adapter-executable> --adapter-arg <adapter-script-or-config>
 python scripts/finalize_runtime_run.py --run-dir ../../../.career-pipeline-runs/<run_id> --real-subagent-execution
+python scripts/finalize_runtime_run.py --run-dir ../../../.career-pipeline-runs/<run_id> --real-subagent-execution --execution-mode manual-controller
 python scripts/execute_subagent_plan.py --run-dir ../../../.career-pipeline-runs/<run_id> --dry-run
 ```
 
@@ -65,12 +66,12 @@ Do not run these commands from the repository root as `scripts/*.py`; the `scrip
 - `scripts/build_public_source_plan.py` creates a policy-bound public-source research task list for official pages, public JDs, verified HR posts, candidate experience, and weak social signals without browsing or logging in.
 - `scripts/discover_public_sources.py` converts search-adapter results into `evidence/allowed_public_sources.generated.json`, rejecting login/private/backend sources and preserving weak-source limits so users do not need to name recruitment websites.
 - `scripts/search_public_sources.py` runs a public-source search adapter. The built-in `seed` provider is deterministic and local: it turns query plans into source-candidate URLs from repository collection targets, not live web search. The `external-json` provider accepts browser/search/API results from outside the script and marks them as real-time URL candidates, still requiring discovery, fetch, and backfill checks before evidence use.
-- `scripts/fetch_public_sources.py` fetches allowed public `http(s)` or user-provided `file://` sources into evidence packets. It refuses forbidden/login-only source types and does not bypass platform access controls.
+- `scripts/fetch_public_sources.py` fetches allowed public `http(s)` or user-provided `file://` sources into evidence packets. It detects common Chinese charsets, refuses forbidden/login-only source types, and does not bypass platform access controls. For dynamic public pages that static fetch sees only as a JavaScript shell, pass a local browser-rendered text snapshot as `rendered_text_ref` while keeping the public URL in `source_ref`.
 - `scripts/backfill_public_evidence.py` validates and writes externally collected public evidence packets into the run after checking source policy constraints.
 - `scripts/build_subagent_work_orders.py` exports adapter-ready work orders from a plan with prompt bundle refs and backfill contracts. This is a handoff contract, not proof that subagents ran.
 - `scripts/run_subagent_adapter.py` is the adapter runner entrypoint. `--mock-blocked` writes schema-valid blocked role outputs and always sets `real_subagent_execution = false`; `--adapter-command` runs an external command adapter per work order and sets `real_subagent_execution = true` only when every role output validates and finishes as `done` or `done_with_warnings`.
-- `scripts/finalize_runtime_run.py` assembles `final/decision_package.json` only after required role outputs are present, non-blocked, validated, and produced by a real adapter.
-- `scripts/execute_subagent_plan.py` inspects a plan-only queue, enforces human/source-policy gates before real execution, writes redacted execution events, and can backfill externally produced role outputs after schema checks.
+- `scripts/finalize_runtime_run.py` assembles `final/decision_package.json` only after required role outputs are present, non-blocked, validated, and produced by a real adapter or an explicitly marked Manual Controller MVP run.
+- `scripts/execute_subagent_plan.py` inspects a plan-only queue, enforces human/source-policy gates before real execution, writes redacted execution events, and can backfill externally produced role outputs after schema checks. Use `--manual-controller-execution` only when the main Codex controller actually dispatched separated role subagents or separated role passes; it stamps backfilled outputs with manual-controller real-execution metadata for finalizer review.
 - `scripts/continue_runtime_run.py` updates the same run with one compact batch of user-owned facts, refreshes the runtime context packet, and returns the run to `injection_ready`.
 
 These scripts are a local deterministic execution shell. The `seed` source adapter is not live web search, and `--mock-blocked` is not real subagent execution. Read `references/runtime-network-and-adapter-setup.md` before enabling real network fetches or real subagent execution.

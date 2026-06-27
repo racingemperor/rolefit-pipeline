@@ -111,6 +111,8 @@ python scripts/backfill_public_evidence.py --run-dir ../../../.career-pipeline-r
 
 If these scripts cannot fetch a source, the controller may still pass source metadata and short public excerpts as role evidence, but it must mark the output as degraded and keep unsupported final claims blocked.
 
+For dynamic public pages where static fetch returns only a JavaScript shell, the controller may capture a browser-rendered public text snapshot with Codex Browser or Playwright and include it as `rendered_text_ref` in the source item. Keep the inspectable public URL in `source_ref`; `rendered_text_ref` must be a local text file or `file://` URI containing only public rendered text. `fetch_public_sources.py` records `extraction_method = "browser_rendered_text"` and still applies the same source policy.
+
 `source_policy_ack` is recorded internally after the source plan passes policy checks. It is not an extra user question.
 
 ## Manual Subagent Execution
@@ -139,6 +141,25 @@ For every role:
    - `confidence`
 
 If a role fails, returns malformed JSON, or makes unsupported final claims, the controller should ask for a corrected role output once. If it still fails, merge only safe fields and block dependent final outputs.
+
+After separated role outputs are produced as JSON files, backfill them with:
+
+```bash
+python scripts/execute_subagent_plan.py \
+  --run-dir ../../../.career-pipeline-runs/<run_id> \
+  --manual-controller-execution \
+  --backfill-output job-scout=C:/path/to/job-scout.output.json \
+  --backfill-output hr-supervisor=C:/path/to/hr-supervisor.output.json
+```
+
+Then finalize only if all required role outputs, source gates, HR review, and factual review pass:
+
+```bash
+python scripts/finalize_runtime_run.py \
+  --run-dir ../../../.career-pipeline-runs/<run_id> \
+  --real-subagent-execution \
+  --execution-mode manual-controller
+```
 
 ## Suggested Manual Dispatch Order
 
@@ -234,4 +255,3 @@ Return a final package or a blocked package.
 ```
 
 This instruction can live in the user-side first message or in a wrapper prompt for the skill.
-

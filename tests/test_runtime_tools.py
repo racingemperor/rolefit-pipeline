@@ -409,6 +409,150 @@ def test_public_source_fetcher_collects_allowed_public_html_and_backfills(tmp_pa
     assert backfill.returncode == 0, backfill.stderr
 
 
+def test_public_source_fetcher_decodes_chinese_charset_html(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "target_job_fit",
+        "--input-text",
+        "Computer science senior. Assess fit for Tencent backend role. JD: Java and MySQL.",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "target_job_fit",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(SOURCE_PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+
+    html = tmp_path / "gbk-official-career.html"
+    html.write_bytes(
+        (
+            '<html><head><meta charset="gb2312"><title>后端开发实习生</title></head>'
+            "<body><h1>后端开发实习生</h1><p>岗位要求：计算机基础、Java、MySQL、Redis。</p></body></html>"
+        ).encode("gbk")
+    )
+    sources = {
+        "sources": [
+            {
+                "task_id": "target-current-jd-verification",
+                "source_type": "official_or_primary",
+                "source_ref": html.as_uri(),
+                "field": "current_jd_text",
+            }
+        ]
+    }
+    sources_path = tmp_path / "sources.json"
+    sources_path.write_text(json.dumps(sources), encoding="utf-8")
+
+    fetch = run_python(PUBLIC_SOURCE_FETCHER, "--run-dir", str(run_dir), "--sources-json", str(sources_path))
+
+    assert fetch.returncode == 0, fetch.stderr
+    response = json.loads(fetch.stdout)["public_source_fetch_response"]
+    evidence_path = run_dir / response["evidence_json_ref"]
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))["evidence_packets"][0]["evidence_packet"]
+    assert "后端开发实习生" in evidence["excerpt"]
+    assert "岗位要求" in evidence["excerpt"]
+    assert "璁" not in evidence["excerpt"]
+
+
+def test_public_source_fetcher_accepts_browser_rendered_text_snapshot_for_dynamic_pages(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "target_job_fit",
+        "--input-text",
+        "Computer science senior. Assess fit for ByteDance LLM backend internship.",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "target_job_fit",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(SOURCE_PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+
+    rendered = tmp_path / "bytedance-rendered.txt"
+    rendered.write_text(
+        "大数据大模型应用后端开发实习生-音视频技术。职责：LLM 上下文工程、智能诊断、指标监控。"
+        "要求：计算机基础、Go/Python、MySQL、Redis、消息队列、RAG 或 Agent 经验优先。",
+        encoding="utf-8",
+    )
+    sources = {
+        "sources": [
+            {
+                "task_id": "target-current-jd-verification",
+                "source_type": "official_or_primary",
+                "source_ref": "https://jobs.bytedance.com/campus/position/detail/7594472256522357045",
+                "field": "current_jd_text",
+                "rendered_text_ref": str(rendered),
+            }
+        ]
+    }
+    sources_path = tmp_path / "sources.json"
+    sources_path.write_text(json.dumps(sources), encoding="utf-8")
+
+    fetch = run_python(PUBLIC_SOURCE_FETCHER, "--run-dir", str(run_dir), "--sources-json", str(sources_path))
+
+    assert fetch.returncode == 0, fetch.stderr
+    response = json.loads(fetch.stdout)["public_source_fetch_response"]
+    evidence_path = run_dir / response["evidence_json_ref"]
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))["evidence_packets"][0]["evidence_packet"]
+    assert "大数据大模型应用后端开发实习生" in evidence["excerpt"]
+    assert evidence["source_ref"] == "https://jobs.bytedance.com/campus/position/detail/7594472256522357045"
+    assert evidence["extraction_method"] == "browser_rendered_text"
+    source_index = json.loads((run_dir / response["fetched_source_index_ref"]).read_text(encoding="utf-8"))
+    assert source_index["fetched_source_index"][0]["extraction_method"] == "browser_rendered_text"
+
+
+def test_public_source_fetcher_rejects_dynamic_shell_without_rendered_snapshot(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "target_job_fit",
+        "--input-text",
+        "Computer science senior. Assess fit for ByteDance LLM backend internship.",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "target_job_fit",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(SOURCE_PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+
+    shell = tmp_path / "dynamic-shell.html"
+    shell.write_text(
+        "<html><body><noscript>Please enable JavaScript to continue.</noscript>"
+        "<div id='root'></div><script src='app.js'></script></body></html>",
+        encoding="utf-8",
+    )
+    sources = {
+        "sources": [
+            {
+                "task_id": "target-current-jd-verification",
+                "source_type": "official_or_primary",
+                "source_ref": shell.as_uri(),
+                "field": "current_jd_text",
+            }
+        ]
+    }
+    sources_path = tmp_path / "sources.json"
+    sources_path.write_text(json.dumps(sources), encoding="utf-8")
+
+    fetch = run_python(PUBLIC_SOURCE_FETCHER, "--run-dir", str(run_dir), "--sources-json", str(sources_path))
+
+    assert fetch.returncode == 1
+    assert "dynamic page shell" in fetch.stderr
+    assert "rendered_text_ref" in fetch.stderr
+
+
 def test_public_source_discoverer_generates_allowed_sources_from_search_results(tmp_path):
     run_root = tmp_path / ".career-pipeline-runs"
     simulate = run_python(
@@ -937,6 +1081,148 @@ def test_finalizer_writes_final_package_when_role_outputs_are_done(tmp_path):
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["execution_manifest"]["current_stage"] == "final_package_ready"
     assert manifest["run_state"]["stage"] == "final_package_ready"
+
+
+def test_manual_controller_backfill_can_finalize_with_explicit_execution_metadata(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "Computer science sophomore, Python, looking for AI internship",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(PLAN_BUILDER, "--run-dir", str(run_dir), "--build-prompt-bundles").returncode == 0
+    assert run_python(SOURCE_PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+    assert run_python(PUBLIC_SOURCE_DISCOVERER, "--run-dir", str(run_dir), "--generate-query-plan-only").returncode == 0
+    external_results = tmp_path / "external-search-results.json"
+    external_results.write_text(
+        json.dumps(
+            {
+                "search_results": [
+                    {
+                        "task_id": "recruitment-platform-public-jd",
+                        "url": "https://www.nowcoder.com/jobs/backend-intern",
+                        "title": "Backend intern public JD",
+                        "snippet": "Python Java internship",
+                        "source_type": "recruitment_platform_jd",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    source_search = run_python(
+        PUBLIC_SOURCE_SEARCHER,
+        "--run-dir",
+        str(run_dir),
+        "--provider",
+        "external-json",
+        "--search-results-json",
+        str(external_results),
+    )
+    assert source_search.returncode == 0, source_search.stderr
+    search_ref = json.loads(source_search.stdout)["public_source_search_response"]["search_results_ref"]
+    discover = run_python(
+        PUBLIC_SOURCE_DISCOVERER,
+        "--run-dir",
+        str(run_dir),
+        "--search-results-json",
+        str(run_dir / search_ref),
+    )
+    assert discover.returncode == 0, discover.stderr
+
+    plan = json.loads((run_dir / "invocations" / "subagent_invocation_plan.json").read_text(encoding="utf-8"))[
+        "subagent_invocation_plan"
+    ]
+    backfill_args = []
+    for item in plan["dispatch_queue"]:
+        invocation = json.loads((run_dir / item["invocation_ref"]).read_text(encoding="utf-8"))[
+            "subagent_invocation"
+        ]
+        output_path = tmp_path / f"{item['target_agent']}.manual-output.json"
+        output = {
+            "invocation_ref": item["invocation_ref"],
+            "role": item["target_agent"],
+            "task_summary": "Manual controller separated subagent output.",
+            "inputs_used": [item["prompt_bundle_ref"]],
+            "database_files_used": [],
+            "source_notes": [],
+            "runtime_scope": "evidence_collection",
+            "judgment_allowed": "evidence_bound_only",
+            "judgment_status": "evidence_bound_judgment",
+            "decision_owner": "local_subagent",
+            "runtime_preconditions": {
+                "has_current_jd": True,
+                "has_target_company": True,
+                "has_user_constraints": False,
+                "has_user_consent": False,
+                "job_direction_blocked": False,
+            },
+            "evidence_basis": [],
+            "repository_prior_usage": [],
+            "weight_provenance": [],
+            "role_output_packet": {
+                "invocation_id": invocation["invocation_id"],
+                "target_agent": item["target_agent"],
+                "status": "done_with_warnings",
+                "role_output_ref": item["output_artifact_target"],
+                "evidence_packet_refs": [],
+                "runtime_weights_ref": "merge/runtime_weights.json",
+                "artifact_refs": [item["prompt_bundle_ref"]],
+                "blocked_outputs": [],
+                "runtime_research_tasks": [],
+                "needs_user_confirmation": [],
+                "handoff_to": [],
+                "errors": [],
+                "confidence": "medium",
+            },
+            "error_recovery_state": {
+                "status": "not_applicable",
+                "errors": [],
+                "recovery_actions": [],
+                "degraded_outputs": [],
+                "blocked_outputs": [],
+                "safe_outputs": ["role_output_packet"],
+                "next_action": "continue",
+            },
+        }
+        output_path.write_text(json.dumps(output), encoding="utf-8")
+        backfill_args.extend(["--backfill-output", f"{item['target_agent']}={output_path}"])
+
+    backfill = run_python(
+        PLAN_EXECUTOR,
+        "--run-dir",
+        str(run_dir),
+        "--manual-controller-execution",
+        *backfill_args,
+    )
+    assert backfill.returncode == 0, backfill.stderr
+    first_output = json.loads((run_dir / plan["dispatch_queue"][0]["output_artifact_target"]).read_text(encoding="utf-8"))
+    assert first_output["adapter_metadata"]["adapter_mode"] == "manual-controller"
+    assert first_output["adapter_metadata"]["real_subagent_execution"] is True
+
+    result = run_python(
+        FINALIZER,
+        "--run-dir",
+        str(run_dir),
+        "--real-subagent-execution",
+        "--execution-mode",
+        "manual-controller",
+    )
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)["finalizer_response"]
+    final_package = json.loads((run_dir / response["final_package_ref"]).read_text(encoding="utf-8"))
+    assert final_package["decision_package"]["real_subagent_execution"] is True
+    assert final_package["decision_package"]["execution_mode"] == "manual-controller"
 
 
 def test_subagent_adapter_runner_writes_schema_valid_mock_outputs(tmp_path):
@@ -2278,6 +2564,18 @@ def test_role_prompts_gate_application_recommendations_on_public_urls():
     assert "public URL" in hr_supervisor
     assert "application_url_review" in hr_supervisor
     assert "application_url_fact_review" in factual_reviewer
+
+
+def test_factual_reviewer_prompt_requires_controller_evidence_correction():
+    factual_reviewer = (
+        ROOT / ".codex" / "agents" / "factual-reviewer.toml"
+    ).read_text(encoding="utf-8")
+
+    assert "controller_public_evidence" in factual_reviewer
+    assert "controller evidence wins" in factual_reviewer
+    assert "stale role claim" in factual_reviewer
+    assert "evidence_challenges" in factual_reviewer
+    assert "disagreements_with" in factual_reviewer
 
 
 def test_real_user_deployment_flow_documents_subagent_sources_and_judgment_basis():

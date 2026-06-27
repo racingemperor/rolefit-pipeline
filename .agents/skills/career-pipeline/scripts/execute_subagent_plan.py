@@ -245,7 +245,31 @@ def parse_backfill_args(items: list[str]) -> dict[str, Path]:
     return mapping
 
 
-def backfill_outputs(run_dir: Path, plan: dict[str, Any], backfills: dict[str, Path]) -> list[dict[str, Any]]:
+def attach_manual_controller_metadata(payload: dict[str, Any]) -> None:
+    payload.setdefault("adapter_metadata", {})
+    payload["adapter_metadata"].update(
+        {
+            "adapter_kind": "manual-controller",
+            "adapter_mode": "manual-controller",
+            "real_subagent_execution": True,
+            "manual_controller_execution": True,
+            "created_at": utc_now(),
+            "mock_or_seed_source": False,
+            "note": (
+                "Role output was produced by an explicit Manual Controller MVP run "
+                "using separated subagents or separated role passes, then backfilled "
+                "through execute_subagent_plan.py."
+            ),
+        }
+    )
+
+
+def backfill_outputs(
+    run_dir: Path,
+    plan: dict[str, Any],
+    backfills: dict[str, Path],
+    manual_controller_execution: bool = False,
+) -> list[dict[str, Any]]:
     queue_by_agent = {item["target_agent"]: item for item in plan["dispatch_queue"]}
     events = []
     for agent, source_path in backfills.items():
@@ -259,9 +283,14 @@ def backfill_outputs(run_dir: Path, plan: dict[str, Any], backfills: dict[str, P
             raise ExecutionError(
                 f"backfill output target_agent `{packet['target_agent']}` does not match `{agent}`"
             )
+        if manual_controller_execution:
+            attach_manual_controller_metadata(payload)
         target = run_dir / queue_by_agent[agent]["output_artifact_target"]
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(source_path, target)
+        if manual_controller_execution:
+            write_json(target, payload)
+        else:
+            shutil.copyfile(source_path, target)
         events.append(
             {
                 "execution_event": {
@@ -275,6 +304,7 @@ def backfill_outputs(run_dir: Path, plan: dict[str, Any], backfills: dict[str, P
                     "status": packet["status"],
                     "timestamp_or_sequence": utc_now(),
                     "redaction_applied": True,
+                    "execution_mode": "manual-controller" if manual_controller_execution else "backfill",
                 }
             }
         )
@@ -293,7 +323,7 @@ def execute(args: argparse.Namespace) -> dict[str, Any]:
 
     backfills = parse_backfill_args(args.backfill_output)
     if backfills:
-        events.extend(backfill_outputs(run_dir, plan, backfills))
+        events.extend(backfill_outputs(run_dir, plan, backfills, args.manual_controller_execution))
 
     event_log_path = run_dir / "logs" / "subagent_execution_events.jsonl"
     append_jsonl(event_log_path, events)
@@ -305,7 +335,8 @@ def execute(args: argparse.Namespace) -> dict[str, Any]:
             "dispatch_count": len(plan["dispatch_queue"]),
             "backfilled_outputs": sorted(backfills),
             "execution_events_ref": rel(event_log_path, run_dir),
-            "real_subagent_execution": False,
+            "real_subagent_execution": bool(args.manual_controller_execution and backfills),
+            "execution_mode": "manual-controller" if args.manual_controller_execution else mode,
             "next_action": "configure_real_adapter" if args.execute else "review_plan_or_backfill_outputs",
         }
     }
@@ -324,6 +355,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--source-policy-ack", action="store_true")
     parser.add_argument("--source-plan-ref", default="evidence/public_source_research_plan.json")
     parser.add_argument("--adapter", default="", help="Reserved name/path for a future real subagent adapter")
+    parser.add_argument(
+        "--manual-controller-execution",
+        action="store_true",
+        help=(
+            "Mark backfilled role outputs as produced by an explicit Manual Controller MVP "
+            "run with separated subagents or separated role passes."
+        ),
+    )
     parser.add_argument(
         "--backfill-output",
         action="append",

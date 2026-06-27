@@ -61,7 +61,12 @@ def load_role_output(run_dir: Path, output_ref: str) -> dict[str, Any]:
     return payload
 
 
-def validate_final_role_output(payload: dict[str, Any], target_agent: str, real_subagent_execution_required: bool) -> None:
+def validate_final_role_output(
+    payload: dict[str, Any],
+    target_agent: str,
+    real_subagent_execution_required: bool,
+    execution_mode: str,
+) -> None:
     packet = payload["role_output_packet"]
     if packet.get("target_agent") != target_agent:
         raise FinalizerError(f"{target_agent}: role output target_agent mismatch")
@@ -79,6 +84,15 @@ def validate_final_role_output(payload: dict[str, Any], target_agent: str, real_
             raise FinalizerError(f"{target_agent}: real adapter metadata is required before final package")
         if metadata.get("adapter_mode") == "mock-blocked" or metadata.get("mock_or_seed_source") is True:
             raise FinalizerError(f"{target_agent}: mock outputs cannot be finalized")
+        if execution_mode == "manual-controller":
+            if metadata.get("adapter_mode") != "manual-controller":
+                raise FinalizerError(
+                    f"{target_agent}: manual-controller execution mode requires manual-controller metadata"
+                )
+            if metadata.get("manual_controller_execution") is not True:
+                raise FinalizerError(
+                    f"{target_agent}: manual-controller execution must be explicitly acknowledged"
+                )
 
 
 def evidence_refs_from_manifest(manifest_payload: dict[str, Any]) -> list[str]:
@@ -158,7 +172,12 @@ def finalize(args: argparse.Namespace) -> dict[str, Any]:
     for item in plan["dispatch_queue"]:
         output_ref = item["output_artifact_target"]
         payload = load_role_output(run_dir, output_ref)
-        validate_final_role_output(payload, item["target_agent"], args.real_subagent_execution)
+        validate_final_role_output(
+            payload,
+            item["target_agent"],
+            args.real_subagent_execution,
+            args.execution_mode,
+        )
         role_output_refs.append(output_ref)
         role_packets.append(payload["role_output_packet"])
     final_ref = args.output
@@ -169,6 +188,7 @@ def finalize(args: argparse.Namespace) -> dict[str, Any]:
             "created_at": utc_now(),
             "task_type": manifest_payload["execution_manifest"].get("task_type", ""),
             "real_subagent_execution": args.real_subagent_execution,
+            "execution_mode": args.execution_mode,
             "source_discovery_ready": source_discovery_ready,
             "finalizer_validation_status": "passed",
             "role_output_refs": role_output_refs,
@@ -221,6 +241,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--plan-ref", default="invocations/subagent_invocation_plan.json")
     parser.add_argument("--output", default="final/decision_package.json")
     parser.add_argument("--real-subagent-execution", action="store_true")
+    parser.add_argument(
+        "--execution-mode",
+        choices=["external-command", "manual-controller"],
+        default="external-command",
+    )
     parser.add_argument("--search-results-ref", default="evidence/search_results.generated.json")
     parser.add_argument("--allowed-sources-ref", default="evidence/allowed_public_sources.generated.json")
     args = parser.parse_args(argv)

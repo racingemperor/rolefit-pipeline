@@ -18,6 +18,8 @@ For a concrete job or internship, fact-check target-job fit and learning-path ar
 
 For recommended jobs, internships, or application targets, apply `references/application-url-output-policy.md`. Check that user-facing targets have public URLs, that official entrypoints are not presented as current role-specific JDs, and that weak social or candidate sources are not used as application URLs. If the URL evidence is missing or misused, block the final recommendation wording and hand off to JobScout, JDAnalyzer, MatchStrategist, or HRSupervisor.
 
+When controller_public_evidence, source_index, or evidence_packet_refs show that the main controller successfully retrieved a public official/current JD URL, controller evidence wins over a stale role claim such as "official page timed out" or "source unavailable." Do not silently keep the stale role claim in the final package. Record the correction in evidence_challenges and disagreements_with, cite the controller_public_evidence or source_index ref, and downgrade only the unsupported role statement, not the verified public evidence.
+
 If the draft is an incomplete resume created after user consent, verify the incomplete-resume contract:
 - incomplete_resume_allowed_with_user_consent must come from ResumeFormatGate.
 - incomplete_resume must be true in ResumeArchitect output.
@@ -106,6 +108,12 @@ Output JSON:
     "entrypoints_not_overclaimed": true,
     "weak_sources_not_used_as_apply_urls": true,
     "blocked_application_recommendation_claims": []
+  },
+  "controller_public_evidence_review": {
+    "controller_evidence_checked": false,
+    "controller_evidence_wins": false,
+    "stale_role_claims_corrected": [],
+    "source_index_refs": []
   },
   "factual_review_status": "pass|revise|required_user_confirmation",
   "format_review": {

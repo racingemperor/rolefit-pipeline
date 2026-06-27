@@ -65,6 +65,48 @@ def rel(path: Path, root: Path) -> str:
     return path.relative_to(root).as_posix()
 
 
+def charset_from_content_type(content_type: str) -> str:
+    match = re.search(r"charset\s*=\s*['\"]?([^;,'\"\s]+)", content_type, flags=re.I)
+    return match.group(1).strip() if match else ""
+
+
+def charset_from_html(raw: bytes) -> str:
+    head = raw[:4096]
+    match = re.search(br"charset\s*=\s*['\"]?([A-Za-z0-9_\-]+)", head, flags=re.I)
+    return match.group(1).decode("ascii", errors="ignore") if match else ""
+
+
+def normalize_charset(charset: str) -> str:
+    lowered = charset.strip().lower()
+    if lowered in {"gb2312", "gbk", "gb18030"}:
+        return "gb18030"
+    if lowered in {"utf8", "utf-8"}:
+        return "utf-8-sig"
+    return lowered
+
+
+def decode_public_text(raw: bytes, content_type: str = "") -> str:
+    candidates = [
+        charset_from_content_type(content_type),
+        charset_from_html(raw),
+        "utf-8-sig",
+        "utf-8",
+        "gb18030",
+        "big5",
+    ]
+    seen = set()
+    for candidate in candidates:
+        encoding = normalize_charset(candidate)
+        if not encoding or encoding in seen:
+            continue
+        seen.add(encoding)
+        try:
+            return raw.decode(encoding)
+        except (LookupError, UnicodeDecodeError):
+            continue
+    return raw.decode("utf-8", errors="replace")
+
+
 def load_source_plan(run_dir: Path, source_plan_ref: str) -> dict[str, Any]:
     payload = load_json(run_dir / source_plan_ref)
     plan = payload.get("public_source_research_plan")
@@ -93,7 +135,7 @@ def fetch_text(source_ref: str, timeout_seconds: int) -> str:
         path = unquote(parsed.path)
         if re.match(r"^/[A-Za-z]:/", path):
             path = path[1:]
-        return Path(path).read_text(encoding="utf-8", errors="replace")
+        return decode_public_text(Path(path).read_bytes())
     if parsed.scheme not in {"http", "https"}:
         raise PublicSourceFetchError(f"unsupported source scheme `{parsed.scheme}`")
     request = urllib.request.Request(
@@ -105,7 +147,44 @@ def fetch_text(source_ref: str, timeout_seconds: int) -> str:
         if "text" not in content_type and "html" not in content_type and "json" not in content_type:
             raise PublicSourceFetchError(f"unsupported content-type `{content_type}`")
         raw = response.read(512_000)
-    return raw.decode("utf-8", errors="replace")
+    return decode_public_text(raw, content_type)
+
+
+def read_local_text_ref(text_ref: str) -> str:
+    parsed = urlparse(text_ref)
+    if parsed.scheme == "file":
+        path = unquote(parsed.path)
+        if re.match(r"^/[A-Za-z]:/", path):
+            path = path[1:]
+        return decode_public_text(Path(path).read_bytes())
+    if parsed.scheme in {"http", "https"}:
+        raise PublicSourceFetchError("rendered_text_ref must be a local file path or file:// URI")
+    return decode_public_text(Path(text_ref).read_bytes())
+
+
+def fetch_or_load_public_text(source: dict[str, Any], timeout_seconds: int) -> tuple[str, str]:
+    rendered_text_ref = source.get("rendered_text_ref")
+    if rendered_text_ref:
+        return read_local_text_ref(str(rendered_text_ref)), "browser_rendered_text"
+    return fetch_text(source["source_ref"], timeout_seconds), "static_fetch"
+
+
+def looks_like_dynamic_page_shell(raw: str, plain: str) -> bool:
+    lowered_raw = raw.lower()
+    lowered_plain = plain.lower()
+    shell_markers = [
+        "please enable javascript",
+        "enable javascript to continue",
+        "id='root'",
+        'id="root"',
+        "__next",
+        "app.js",
+        "webpack",
+    ]
+    marker_hits = sum(1 for marker in shell_markers if marker in lowered_raw or marker in lowered_plain)
+    has_script = "<script" in lowered_raw
+    has_substantive_text = len(plain) >= 120
+    return marker_hits >= 1 and has_script and not has_substantive_text
 
 
 def to_plain_text(raw: str) -> str:
@@ -165,10 +244,15 @@ def fetch_sources(args: argparse.Namespace) -> dict[str, Any]:
     source_index = []
     for index, source in enumerate(sources):
         source = validate_source(dict(source), tasks)
-        raw = fetch_text(source["source_ref"], args.timeout_seconds)
+        raw, extraction_method = fetch_or_load_public_text(source, args.timeout_seconds)
         plain = to_plain_text(raw)
         if not plain:
             raise PublicSourceFetchError(f"source[{index}] produced empty text")
+        if extraction_method == "static_fetch" and looks_like_dynamic_page_shell(raw, plain):
+            raise PublicSourceFetchError(
+                f"source[{index}] looks like a dynamic page shell; provide rendered_text_ref "
+                "from a public browser-rendered snapshot"
+            )
         excerpt = plain[: args.max_excerpt_chars]
         source_type = source["source_type"]
         evidence_id = source.get("evidence_id") or f"ev-{source['task_id']}-{index}"
@@ -188,6 +272,7 @@ def fetch_sources(args: argparse.Namespace) -> dict[str, Any]:
                 "confidence": source.get("confidence") or confidence_for(source_type),
                 "may_set_final_decision": source["may_set_final_decision"],
                 "may_set_weight": source["may_set_weight"],
+                "extraction_method": extraction_method,
                 "excerpt": excerpt,
             }
         }
@@ -198,6 +283,7 @@ def fetch_sources(args: argparse.Namespace) -> dict[str, Any]:
                 "task_id": source["task_id"],
                 "source_type": source_type,
                 "source_ref": source["source_ref"],
+                "extraction_method": extraction_method,
                 "excerpt_chars": len(excerpt),
             }
         )

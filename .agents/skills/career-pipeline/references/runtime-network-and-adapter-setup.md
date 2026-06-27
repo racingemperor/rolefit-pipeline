@@ -130,6 +130,24 @@ Minimal search adapter result shape:
 }
 ```
 
+For dynamic public pages, keep `source_ref` as the inspectable public URL and add `rendered_text_ref` only after a browser-controlled public rendering step:
+
+```json
+{
+  "sources": [
+    {
+      "task_id": "target-current-jd-verification",
+      "source_type": "official_or_primary",
+      "source_ref": "https://jobs.example.com/position/123",
+      "field": "current_jd_text",
+      "rendered_text_ref": "C:/path/to/browser-rendered-public-text.txt"
+    }
+  ]
+}
+```
+
+The rendered snapshot must contain only public text visible without login, private messages, backend access, or access-control bypass. If static fetch sees only a JavaScript shell and no `rendered_text_ref` is provided, `fetch_public_sources.py` should fail with a degraded research task instead of treating the shell as evidence. The fetcher also detects common Chinese charsets such as GB2312/GBK/GB18030.
+
 If no search results are available, `discover_public_sources.py` still writes a discovery log with generated queries and an empty `sources` list. The pipeline should return blocked/degraded public-research outputs rather than asking the user to name websites.
 
 Allowed source types include `official_or_primary`, `official_school_notice`, `recruitment_platform_jd`, `verified_hr_public_post`, `candidate_experience_secondary`, `social_media_weak`, `public_report`, and `user_provided`.
@@ -193,6 +211,23 @@ python scripts/execute_subagent_plan.py \
   --backfill-output job-scout=C:/path/to/job-scout.output.json \
   --backfill-output hr-supervisor=C:/path/to/hr-supervisor.output.json
 ```
+
+For Manual Controller MVP runs, where the main Codex conversation actually dispatched separated role subagents or separated role passes, use explicit manual-controller metadata:
+
+```bash
+python scripts/execute_subagent_plan.py \
+  --run-dir ../../../.career-pipeline-runs/<run_id> \
+  --manual-controller-execution \
+  --backfill-output job-scout=C:/path/to/job-scout.output.json \
+  --backfill-output hr-supervisor=C:/path/to/hr-supervisor.output.json
+
+python scripts/finalize_runtime_run.py \
+  --run-dir ../../../.career-pipeline-runs/<run_id> \
+  --real-subagent-execution \
+  --execution-mode manual-controller
+```
+
+Do not use `--manual-controller-execution` for mock outputs, single-pass unseparated prose, or outputs that did not follow the role prompt bundle and role-output contract.
 
 ## Adapter Options
 
