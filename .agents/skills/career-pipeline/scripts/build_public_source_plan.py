@@ -193,6 +193,54 @@ def build_tasks(invocations: list[dict[str, Any]], terms: list[str]) -> list[dic
     return tasks
 
 
+def is_target_job_fit_context(context: dict[str, Any]) -> bool:
+    target = context.get("target_context", {})
+    return bool(
+        context.get("task_type") == "target_job_fit"
+        or (isinstance(target, dict) and target.get("target_job_fit_requested") is True)
+    )
+
+
+def build_target_job_fit_tasks(
+    invocations: list[dict[str, Any]],
+    terms: list[str],
+) -> list[dict[str, Any]]:
+    query = " ".join(terms[:8])
+    agents = {invocation["target_agent"] for invocation in invocations}
+    jd_agent = "jd-analyzer" if "jd-analyzer" in agents else invocations[0]["target_agent"]
+    learning_agent = (
+        "learning-path-strategist"
+        if "learning-path-strategist" in agents
+        else jd_agent
+    )
+    return [
+        task(
+            "target-current-jd-verification",
+            jd_agent,
+            "current_target_jd_requirement",
+            "recruitment_platform_jd",
+            2,
+            f"{query} current JD target internship job requirements official public",
+            True,
+            True,
+            "medium",
+            "cache_metadata_and_short_excerpt",
+        ),
+        task(
+            "target-learning-gap-evidence",
+            learning_agent,
+            "target_skill_gap_and_project_evidence",
+            "verified_hr_public_post",
+            2,
+            f"{query} verified HR skill gap project expectation campus recruiting",
+            True,
+            False,
+            "medium",
+            "cache_metadata_and_short_excerpt",
+        ),
+    ]
+
+
 def detect_target_companies(context: dict[str, Any]) -> list[str]:
     text = json.dumps(context, ensure_ascii=False)
     candidates = ["ByteDance", "Tencent", "DJI", "Zhipu", "CATL", "Alibaba", "Baidu", "Huawei"]
@@ -204,6 +252,18 @@ def build_source_plan(run_dir: Path, output_ref: str) -> dict[str, Any]:
     invocations = load_invocations(run_dir)
     terms = target_terms(context)
     output_path = run_dir / output_ref
+    research_tasks = build_tasks(invocations, terms)
+    blocked_outputs_without_current_jd: list[str] = []
+    if is_target_job_fit_context(context):
+        research_tasks.extend(build_target_job_fit_tasks(invocations, terms))
+        blocked_outputs_without_current_jd = [
+            "current_fit_assessment",
+            "application_readiness_decision",
+            "learning_plan_before_application",
+            "targeted_resume_tailoring",
+            "fit_score",
+            "application_strategy",
+        ]
     plan = {
         "public_source_research_plan": {
             "run_id": invocations[0]["run_id"],
@@ -216,7 +276,9 @@ def build_source_plan(run_dir: Path, output_ref: str) -> dict[str, Any]:
             ],
             "target_terms": terms,
             "target_companies_detected": detect_target_companies(context),
-            "research_tasks": build_tasks(invocations, terms),
+            "target_job_fit_requested": is_target_job_fit_context(context),
+            "blocked_outputs_without_current_jd": blocked_outputs_without_current_jd,
+            "research_tasks": research_tasks,
             "blocked_source_types": [
                 {
                     "source_type": "private_resume",

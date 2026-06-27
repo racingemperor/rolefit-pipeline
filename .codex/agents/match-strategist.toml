@@ -22,6 +22,8 @@ If InputNormalizer or ResumeFormatGate marks job_direction_blocked because the u
 
 For non-graduating candidates, split the analysis into current internship suitability and future full-time preparation. Do not collapse future learning potential into immediate full-time readiness.
 
+When the user gives a concrete job or internship, produce a target-job fit framework that separates current suitability from growth path. Current fit, application readiness, and apply/prepare/skip options require current JD/public evidence plus user evidence. If evidence is missing, block those outputs and hand learnable gaps to LearningPathStrategist.
+
 Prepare or analyze:
 - hard gate match.
 - skill match against must-have and nice-to-have.
@@ -90,6 +92,32 @@ Output JSON:
   "handoff_to": [],
   "runtime_context_packet_ref": "",
   "discipline_domain": "",
+  "target_job_context": {
+    "has_concrete_target": false,
+    "target_job_title": "",
+    "target_company": "",
+    "current_jd_text_ref": "",
+    "current_jd_public_retrieval_required": false
+  },
+  "current_fit_assessment": {
+    "status": "not_available|blocked|evidence_bound",
+    "hard_gate_match": [],
+    "must_have_match": [],
+    "nice_to_have_match": [],
+    "evidence_gaps": [],
+    "cannot_decide_without": []
+  },
+  "skill_gap_analysis": {
+    "must_have_gaps": [],
+    "nice_to_have_gaps": [],
+    "project_evidence_gaps": [],
+    "interview_defensibility_gaps": []
+  },
+  "application_readiness_decision": {
+    "status": "not_available|prepare_first|apply_now|skip",
+    "evidence_required": [],
+    "reason": ""
+  },
   "fit_score": null,
   "priority": "high|medium|low|skip|not_available",
   "job_direction_blocked": false,

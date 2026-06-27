@@ -72,7 +72,17 @@ Do not dispatch user-side specialist subagents with only the static `.codex/agen
       "target_companies": [],
       "target_industries": [],
       "target_locations": [],
-      "internship_or_full_time": ""
+      "internship_or_full_time": "",
+      "has_concrete_target": false,
+      "target_job_fit_requested": false,
+      "target_job_title": "",
+      "target_company": "",
+      "current_jd_text_ref": "",
+      "current_jd_text_excerpt": "",
+      "current_jd_public_retrieval_required": false,
+      "current_fit_assessment_status": "",
+      "growth_path_assessment_status": "",
+      "fit_vs_growth_policy": ""
     },
     "provided_materials": [],
     "missing_user_owned_facts": [],
@@ -147,6 +157,7 @@ Each injected prompt must include:
 - the smallest static database subset needed by that role.
 - public/official network research tasks the role should run locally.
 - missing user-owned facts that must not be fabricated.
+- for concrete job or internship requests, target JD/company context, blocked current-fit fields, and the rule that current readiness must be separated from learnable growth path.
 - hard-data weight requirements and `weight_provenance` expectations.
 - handoff fields for downstream roles.
 - debate fields for challenging weak evidence.

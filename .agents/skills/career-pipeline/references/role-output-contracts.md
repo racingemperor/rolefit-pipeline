@@ -67,6 +67,15 @@ Each `evidence_basis` item should identify the supported claim:
 
 `repository_prior_usage` and `weight_provenance` must state whether a static database was used only as a prior. Repository priors must never be the sole basis for `fit_score`, `priority`, `asset_priority`, `skill_priority_weights`, `external_asset_weights`, `school_signal_weights`, or HR/company judgments.
 
+For concrete job or internship requests, roles should separate:
+
+- `current_fit_assessment`: evidence-bound current suitability for the exact target role.
+- `skill_gap_analysis`: must-have, nice-to-have, evidence, and narrative gaps against the current JD.
+- `learning_plan_before_application`: skills, projects, proof artifacts, and completion conditions needed before applying.
+- `application_readiness_decision`: apply now, prepare first, or skip only when current JD/public evidence and user evidence are sufficient.
+
+If current JD evidence is missing, these fields must be blocked or marked `not_available` rather than inferred from repository priors.
+
 Every proposed parameter weight, score, priority, ranking, threshold, or confidence adjustment must be supported by hard data. A role must not set weights by intuition, popularity assumptions, or model-only reasoning. If runtime public/official network evidence or user-provided materials are missing, set the weight status to `not_available` or `needs_more_sources`, add `runtime_research_tasks`, and block downstream decisions that depend on that weight.
 
 Each `weight_provenance` item should use:
@@ -316,7 +325,7 @@ Pipeline-level orchestration should expose:
   "run_state": {
     "run_id": "",
     "stage": "intake_received|input_normalized|context_packet_created|injection_ready|agents_running|merge_pending|debate_required|hr_review_required|factual_review_required|user_confirmation_required|blocked|final_package_ready",
-    "task_type": "resume_review|resume_generation|job_search|jd_analysis|company_research|tailored_resume|major_positioning|personal_branding|learning_plan",
+    "task_type": "resume_review|resume_generation|job_search|jd_analysis|company_research|tailored_resume|major_positioning|personal_branding|learning_plan|target_job_fit",
     "runtime_context_packet_ref": "",
     "secondary_prompt_injection_refs": [],
     "subagent_invocation_refs": [],

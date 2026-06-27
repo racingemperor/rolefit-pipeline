@@ -120,3 +120,4 @@ Roles may challenge other roles but should not take over their decisions:
 - `MatchStrategist` prepares conditional application options only when runtime evidence is sufficient.
 - `ResumeArchitect` drafts only from user facts and accepted format gates.
 - `LearningPathStrategist` may propose future learning evidence, but must not write unfinished learning as completed resume facts.
+- For `target_job_fit`, `MatchStrategist` owns current fit and application readiness only after current JD/public evidence exists; `LearningPathStrategist` owns evidence-backed skills, projects, proof artifacts, and resume-conversion conditions needed before applying. Both must return blockers instead of final judgments when current JD evidence is missing.

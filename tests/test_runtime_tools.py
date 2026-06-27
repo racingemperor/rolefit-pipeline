@@ -657,6 +657,44 @@ def test_validator_rejects_failed_role_output_with_final_decision_fields(tmp_pat
     assert "failed or malformed" in result.stderr
 
 
+def test_validator_rejects_failed_role_output_with_target_job_fit_decision_fields(tmp_path):
+    output = {
+        "invocation_ref": "invocations/match-strategist.invocation.json",
+        "role_output_packet": {
+            "invocation_id": "run-test-match-strategist",
+            "target_agent": "match-strategist",
+            "status": "failed",
+            "role_output_ref": "agents/match-strategist/output.json",
+            "evidence_packet_refs": [],
+            "runtime_weights_ref": "merge/runtime_weights.json",
+            "artifact_refs": [],
+            "blocked_outputs": ["current_fit_assessment"],
+            "runtime_research_tasks": [],
+            "needs_user_confirmation": [],
+            "handoff_to": [],
+            "errors": [{"category": "subagent_failed"}],
+            "confidence": "low",
+        },
+        "error_recovery_state": {
+            "status": "failed",
+            "errors": [],
+            "recovery_actions": ["return_blocked_package"],
+            "degraded_outputs": [],
+            "blocked_outputs": ["current_fit_assessment"],
+            "safe_outputs": [],
+            "next_action": "return_blocked_package",
+        },
+        "current_fit_assessment": {"status": "evidence_bound"},
+    }
+    output_path = tmp_path / "failed-target-fit-output.json"
+    output_path.write_text(json.dumps(output), encoding="utf-8")
+
+    result = run_python(VALIDATOR, "--role-output", str(output_path))
+
+    assert result.returncode == 1
+    assert "current_fit_assessment" in result.stderr
+
+
 def test_executor_rejects_malformed_backfill_output(tmp_path):
     run_root = tmp_path / ".career-pipeline-runs"
     simulate = run_python(
@@ -773,6 +811,96 @@ def test_simulator_supports_resume_generation_route(tmp_path):
     ]
 
 
+def test_simulator_supports_target_job_fit_route_with_target_context(tmp_path):
+    result = run_python(
+        SIMULATOR,
+        "--task-type",
+        "target_job_fit",
+        "--input-text",
+        (
+            "Computer science sophomore, Python and Java. "
+            "I want to apply for ByteDance LLM application engineer internship. "
+            "JD: build RAG applications, evaluate LLM outputs, use Python, SQL, APIs, "
+            "and deploy demos. I lack LLM project experience."
+        ),
+        "--run-root",
+        str(tmp_path / ".career-pipeline-runs"),
+        "--route",
+        "target_job_fit",
+    )
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)
+    run_dir = tmp_path / ".career-pipeline-runs" / response["runner_response"]["run_id"]
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    agents = [
+        Path(ref).name.replace(".invocation.json", "")
+        for ref in manifest["execution_manifest"]["subagent_invocation_refs"]
+    ]
+    assert agents == [
+        "major-cluster-classifier",
+        "profile-extractor",
+        "jd-analyzer",
+        "company-intelligence-analyst",
+        "job-scout",
+        "match-strategist",
+        "learning-path-strategist",
+        "hr-supervisor",
+        "factual-reviewer",
+    ]
+
+    context = json.loads(
+        (run_dir / "input" / "normalized" / "runtime_context_packet.json").read_text(encoding="utf-8")
+    )["runtime_context_packet"]
+    target = context["target_context"]
+    assert target["has_concrete_target"] is True
+    assert target["target_job_fit_requested"] is True
+    assert target["target_company"] == "ByteDance"
+    assert "LLM application engineer internship" in target["target_job_title"]
+    assert "RAG applications" in target["current_jd_text_excerpt"]
+    assert "current_fit_assessment" in context["blocked_outputs"]
+    assert "learning_plan_before_application" in context["blocked_outputs"]
+
+
+def test_target_job_fit_prompt_bundle_requires_fit_and_learning_gap_fields(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "target_job_fit",
+        "--input-text",
+        (
+            "Computer science sophomore, Python and Java. "
+            "Target: DJI robotics algorithm internship. "
+            "JD: C++, Python, perception, sensor fusion, deployment, robotics projects."
+        ),
+        "--run-root",
+        str(run_root),
+        "--route",
+        "target_job_fit",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+
+    for invocation_ref in [
+        "invocations/match-strategist.invocation.json",
+        "invocations/learning-path-strategist.invocation.json",
+    ]:
+        result = run_python(PROMPT_BUNDLE_BUILDER, "--run-dir", str(run_dir), "--invocation-ref", invocation_ref)
+        assert result.returncode == 0, result.stderr
+        bundle_ref = json.loads(result.stdout)["prompt_bundle_response"]["prompt_bundle_ref"]
+        bundle = json.loads((run_dir / bundle_ref).read_text(encoding="utf-8"))["subagent_prompt_bundle"]
+        required = set(bundle["required_output_fields"])
+        assert "current_fit_assessment" in required
+        assert "skill_gap_analysis" in required
+        assert "learning_plan_before_application" in required
+        assert "evidence_requirements" in required
+        role_context = bundle["prompt_sections"]["secondary_prompt_injection"]["content"]["role_specific_context"]
+        assert role_context["target_job_fit_assessment_requested"] is True
+        assert role_context["distinguish_current_fit_from_growth_path"] is True
+
+
 def test_prompt_bundle_builder_creates_subagent_ready_context(tmp_path):
     run_root = tmp_path / ".career-pipeline-runs"
     simulate = run_python(
@@ -878,6 +1006,42 @@ def test_public_source_plan_builder_creates_policy_bound_tasks(tmp_path):
     assert "social_media_weak" in source_types
     assert all(task["allowed"] is True for task in source_plan["research_tasks"])
     assert source_plan["blocked_source_types"]
+
+
+def test_public_source_plan_for_target_job_fit_requires_current_jd_and_gap_evidence(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "target_job_fit",
+        "--input-text",
+        (
+            "Computer science sophomore with Python and Java. "
+            "Assess fit for Tencent backend development internship. "
+            "JD: Java, Spring, MySQL, Redis, distributed systems, internship availability."
+        ),
+        "--run-root",
+        str(run_root),
+        "--route",
+        "target_job_fit",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+
+    result = run_python(SOURCE_PLAN_BUILDER, "--run-dir", str(run_dir))
+
+    assert result.returncode == 0, result.stderr
+    source_plan_ref = json.loads(result.stdout)["source_plan_response"]["source_plan_ref"]
+    source_plan = json.loads((run_dir / source_plan_ref).read_text(encoding="utf-8"))[
+        "public_source_research_plan"
+    ]
+    task_ids = {task["task_id"] for task in source_plan["research_tasks"]}
+    assert "target-current-jd-verification" in task_ids
+    assert "target-learning-gap-evidence" in task_ids
+    assert "current_fit_assessment" in source_plan["blocked_outputs_without_current_jd"]
+    assert "application_readiness_decision" in source_plan["blocked_outputs_without_current_jd"]
+    assert "learning_plan_before_application" in source_plan["blocked_outputs_without_current_jd"]
 
 
 def test_source_policy_validator_rejects_login_only_and_private_sources(tmp_path):

@@ -14,6 +14,8 @@ This role may make evidence-bound judgments only from the current JD text or cur
 
 If no current JD text or public JD evidence is available, return runtime_research_tasks and evidence_requirements instead of extracting requirements.
 
+For a concrete target job or internship, normalize the target job title, company, current JD text/reference, and public retrieval need. Do not decide whether the candidate fits; hand off explicit requirements, blockers, and evidence requirements to MatchStrategist and LearningPathStrategist.
+
 Extract or prepare:
 - hard gates: education, years, location, language, internship period, visa, must-have stack.
 - core responsibilities.
@@ -77,6 +79,13 @@ Output JSON:
   "shared_context_refs": [],
   "handoff_to": [],
   "runtime_context_packet_ref": "",
+  "target_job_context": {
+    "has_concrete_target": false,
+    "target_job_title": "",
+    "target_company": "",
+    "current_jd_text_ref": "",
+    "current_jd_public_retrieval_required": false
+  },
   "job_profile": {},
   "must_have": [],
   "nice_to_have": [],

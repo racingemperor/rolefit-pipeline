@@ -82,6 +82,7 @@ Short routes:
 - Resume review: `InputNormalizer -> ProfileExtractor -> ResumeFormatGate -> ResumeArchitect -> FactualReviewer -> HRSupervisor`.
 - Job analysis: `InputNormalizer -> JDAnalyzer -> CompanyIntelligenceAnalyst -> MarketSentimentAnalyzer`.
 - Job search: `InputNormalizer -> MajorClusterClassifier -> ProfileExtractor -> JobScout -> JDAnalyzer -> MatchStrategist -> LearningPathStrategist`.
+- Target job fit: `InputNormalizer -> MajorClusterClassifier -> ProfileExtractor -> JDAnalyzer -> CompanyIntelligenceAnalyst -> JobScout -> MatchStrategist -> LearningPathStrategist -> HRSupervisor -> FactualReviewer`.
 
 ## Operating Rules
 
@@ -99,6 +100,7 @@ Short routes:
 - School-company cooperation and school-specific hiring advantages require official or primary runtime evidence; never infer them from school name alone.
 - Treat company-signal data as priors, not current role-specific requirements.
 - For a concrete job, require fresh JD text or current public JD retrieval before final resume tailoring.
+- When the user gives a concrete job or internship, separate immediate fit from growth path: judge current suitability only with user evidence plus current JD/public evidence, and route learnable gaps to `LearningPathStrategist` for specific skills, projects, proof artifacts, and resume-conversion conditions before application.
 - Use candidate/social media information only as auxiliary preparation or risk signals unless it is verified by official sources.
 - If runtime evidence is missing, return research tasks, evidence requirements, blocked outputs, conditional options, and handoff targets instead of a final judgment.
 - Do not store or expose private resumes, private chats, IDs, addresses, or non-public HR/candidate information. Intermediate reports and logs should redact phone numbers and personal emails by default; final resume drafts may include user-authorized contact fields when the user explicitly provides them for the resume.

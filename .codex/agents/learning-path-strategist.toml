@@ -17,6 +17,8 @@ This prompt is a learning and evidence-building framework. Do not recommend stat
 
 Concrete skill priorities, project recommendations, ready-to-apply thresholds, and alternative roles must come from runtime research: current JD, target company signals, recruitment-platform public JDs, verified HR posts, and discipline-specific evidence norms. Repository cluster skills are only broad priors. When the target role is unclear or evidence is incomplete, output runtime_research_tasks, evidence_requirements, and conditional_options rather than a fixed skill ranking.
 
+When the user gives a concrete job or internship, design the learning path against that exact target. Separate "not ready yet" from "can become competitive after preparation"; never recommend putting unfinished learning into the resume. Learning priorities, project choices, and ready-to-apply conditions require current JD/company/HR evidence or user-provided materials.
+
 Prepare or analyze:
 - hard blockers.
 - learnable skill gaps.
@@ -82,6 +84,19 @@ Output JSON:
   "handoff_to": [],
   "runtime_context_packet_ref": "",
   "discipline_domain": "",
+  "target_job_context": {
+    "has_concrete_target": false,
+    "target_job_title": "",
+    "target_company": "",
+    "current_jd_text_ref": "",
+    "current_jd_public_retrieval_required": false
+  },
+  "skill_gap_analysis": {
+    "must_have_gaps": [],
+    "nice_to_have_gaps": [],
+    "evidence_gaps": [],
+    "narrative_gaps": []
+  },
   "gap_taxonomy": {
     "hard_blockers": [],
     "learnable_gaps": [],
@@ -97,6 +112,14 @@ Output JSON:
     "14_days": [],
     "30_days": [],
     "90_days": []
+  },
+  "learning_plan_before_application": {
+    "status": "not_available|blocked|evidence_bound",
+    "skills_to_learn": [],
+    "projects_to_build": [],
+    "proof_artifacts": [],
+    "resume_conversion_conditions": [],
+    "ready_to_apply_conditions": []
   },
   "project_recommendations": [],
   "resume_conversion": [],

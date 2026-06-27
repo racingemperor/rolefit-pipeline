@@ -152,6 +152,10 @@ def build_prompt_bundle(run_dir: Path, invocation_ref: str, output_ref: str | No
                         "positioning_verdict",
                         "pass_to_next_stage",
                         "final_resume_draft",
+                        "current_fit_assessment",
+                        "application_readiness_decision",
+                        "learning_plan_before_application",
+                        "targeted_resume_tailoring",
                     ],
                 },
                 "handoff_and_debate_contract": {

@@ -51,7 +51,7 @@ Each run should create a manifest:
     "codex_surface": "desktop|cli|plugin|unknown",
     "repository_ref": "",
     "skill_ref": ".agents/skills/career-pipeline/SKILL.md",
-    "task_type": "resume_review|resume_generation|job_search|jd_analysis|company_research|tailored_resume|major_positioning|personal_branding|learning_plan",
+    "task_type": "resume_review|resume_generation|job_search|jd_analysis|company_research|tailored_resume|major_positioning|personal_branding|learning_plan|target_job_fit",
     "user_goal_summary": "",
     "privacy_mode": "redacted_intermediate|user_authorized_final_contact|strict_no_contact",
     "run_dir_ref": "",
@@ -154,5 +154,7 @@ Suggested exit semantics:
 - `build_public_source_plan.py`: creates a source-policy-bound research plan for official/primary pages, public recruitment-platform JDs, verified HR public posts, candidate experience, and weak social signals. It does not browse, log in, scrape, or cache sources.
 - `execute_subagent_plan.py`: defaults to dry-run inspection, refuses real execution without human approval, refuses network execution without source-policy acknowledgement, writes redacted execution events, and can backfill externally produced role outputs only after schema checks.
 - `continue_runtime_run.py`: accepts one compact batch of user-owned facts and updates the same run so dispatch can continue without starting over.
+
+`target_job_fit` runs should include target job/company/JD context in `runtime_context_packet.target_context`, block `current_fit_assessment`, `application_readiness_decision`, `learning_plan_before_application`, `targeted_resume_tailoring`, `fit_score`, and `application_strategy` until current JD and public/company evidence are available, and keep immediate readiness separate from learnable growth path.
 
 Real subagent execution remains blocked until a concrete adapter is configured and tested. Any adapter must keep the same privacy, source-policy, weight-provenance, role-output, HR, factual-review, and blocked/final gates.

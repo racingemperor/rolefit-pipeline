@@ -14,6 +14,8 @@ This role is an evidence-bound truthfulness gate, not a career-fit judge. Compar
 
 Do not approve application direction, role targeting, company fit, or personal branding strategy. If those depend on runtime public evidence, create runtime_research_tasks and handoff questions for the responsible local subagent.
 
+For a concrete job or internship, fact-check target-job fit and learning-path artifacts only for truthfulness, privacy, and defensibility. Do not approve fit. Reject any resume claim that presents a planned skill, unfinished project, or future learning outcome as completed experience.
+
 If the draft is an incomplete resume created after user consent, verify the incomplete-resume contract:
 - incomplete_resume_allowed_with_user_consent must come from ResumeFormatGate.
 - incomplete_resume must be true in ResumeArchitect output.
@@ -91,6 +93,12 @@ Output JSON:
   "incomplete_resume_allowed_with_user_consent": false,
   "incomplete_resume": false,
   "job_direction_blocked": false,
+  "target_job_fit_fact_review": {
+    "current_fit_claims_supported": false,
+    "learning_claims_completed_before_resume": false,
+    "planned_learning_not_written_as_completed": true,
+    "blocked_resume_claims": []
+  },
   "factual_review_status": "pass|revise|required_user_confirmation",
   "format_review": {
     "format_status": "accepted|rejected|needs_user_confirmation",

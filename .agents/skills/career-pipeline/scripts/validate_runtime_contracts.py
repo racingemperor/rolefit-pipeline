@@ -184,6 +184,10 @@ FINAL_DECISION_FIELDS = {
     "resume_draft",
     "tailored_resume",
     "hr_pass_status",
+    "current_fit_assessment",
+    "application_readiness_decision",
+    "learning_plan_before_application",
+    "targeted_resume_tailoring",
 }
 
 ERROR_RECOVERY_REQUIRED_FIELDS = [

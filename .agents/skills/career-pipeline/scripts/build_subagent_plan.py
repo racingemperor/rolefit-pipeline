@@ -121,6 +121,18 @@ def build_prompt_bundle(run_dir: Path, invocation_ref: str, invocation: dict[str
                     "required_output_fields": required_output_fields,
                     "role_output_packet_required": True,
                     "error_recovery_state_required": True,
+                    "forbidden_when_failed_or_malformed": [
+                        "fit_score",
+                        "priority",
+                        "application_strategy",
+                        "positioning_verdict",
+                        "pass_to_next_stage",
+                        "final_resume_draft",
+                        "current_fit_assessment",
+                        "application_readiness_decision",
+                        "learning_plan_before_application",
+                        "targeted_resume_tailoring",
+                    ],
                 },
                 "handoff_and_debate_contract": {
                     "handoff_contract": invocation.get("handoff_contract", []),

@@ -21,6 +21,7 @@ TASK_TYPES = {
     "major_positioning",
     "personal_branding",
     "learning_plan",
+    "target_job_fit",
 }
 
 ROUTES = {
@@ -81,6 +82,28 @@ ROUTES = {
         "job-scout",
         "learning-path-strategist",
     ],
+    "target_job_fit": [
+        "major-cluster-classifier",
+        "profile-extractor",
+        "jd-analyzer",
+        "company-intelligence-analyst",
+        "job-scout",
+        "match-strategist",
+        "learning-path-strategist",
+        "hr-supervisor",
+        "factual-reviewer",
+    ],
+}
+
+COMPANY_ALIASES = {
+    "ByteDance": ["bytedance", "byte dance", "字节", "抖音"],
+    "Tencent": ["tencent", "腾讯"],
+    "DJI": ["dji", "大疆"],
+    "Zhipu": ["zhipu", "智谱"],
+    "CATL": ["catl", "宁德时代"],
+    "Alibaba": ["alibaba", "阿里"],
+    "Baidu": ["baidu", "百度"],
+    "Huawei": ["huawei", "华为"],
 }
 
 
@@ -133,6 +156,77 @@ def extract_skills(text: str) -> list[str]:
         if skill.lower() in lowered or skill in text:
             skills.append(skill)
     return skills
+
+
+def detect_target_companies_from_text(text: str) -> list[str]:
+    lowered = text.lower()
+    companies: list[str] = []
+    for canonical, aliases in COMPANY_ALIASES.items():
+        if canonical.lower() in lowered or any(alias.lower() in lowered for alias in aliases):
+            companies.append(canonical)
+    return companies
+
+
+def extract_jd_excerpt(text: str) -> str:
+    match = re.search(r"\b(?:JD|Job Description|Description|Requirements?)\s*[:：]\s*(.+)", text, re.I | re.S)
+    excerpt = match.group(1) if match else ""
+    if not excerpt and re.search(r"\b(apply|assess fit|target)\b|岗位|实习|internship", text, re.I):
+        excerpt = text
+    return excerpt.strip()[:500]
+
+
+def extract_target_job_title(text: str) -> str:
+    patterns = [
+        r"(?:apply for|target|assess fit for)\s+(.+?)(?:\.|。|,|，|\bJD\b|:|：)",
+        r"想投(?:递)?(.+?)(?:。|，|,|\bJD\b|:|：)",
+        r"目标岗位[:：]\s*(.+?)(?:。|，|,|\bJD\b|:|：)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text, re.I | re.S)
+        if match:
+            title = match.group(1).strip()
+            for company in detect_target_companies_from_text(text):
+                title = re.sub(re.escape(company), "", title, flags=re.I).strip()
+            title = re.sub(r"\s+", " ", title)
+            if title:
+                return title[:160]
+    if "internship" in text.lower():
+        return "target internship"
+    if "岗位" in text:
+        return "target role"
+    return ""
+
+
+def build_target_context(input_text: str, base_target: dict[str, Any], task_type: str) -> dict[str, Any]:
+    target = dict(base_target)
+    companies = detect_target_companies_from_text(input_text)
+    jd_excerpt = extract_jd_excerpt(input_text)
+    title = extract_target_job_title(input_text)
+    concrete_requested = task_type == "target_job_fit" or bool(jd_excerpt and (companies or title))
+    target_roles = list(target.get("target_roles") or [])
+    if title and title not in target_roles:
+        target_roles.append(title)
+    target_companies = list(target.get("target_companies") or [])
+    for company in companies:
+        if company not in target_companies:
+            target_companies.append(company)
+    target.update(
+        {
+            "target_roles": target_roles,
+            "target_companies": target_companies,
+            "has_concrete_target": concrete_requested,
+            "target_job_fit_requested": task_type == "target_job_fit",
+            "target_job_title": title,
+            "target_company": target_companies[0] if target_companies else "",
+            "current_jd_text_excerpt": jd_excerpt,
+            "current_jd_text_ref": "user_provided_chat_excerpt" if jd_excerpt else "",
+            "current_jd_public_retrieval_required": not bool(jd_excerpt),
+            "current_fit_assessment_status": "blocked_until_current_jd_and_evidence",
+            "growth_path_assessment_status": "blocked_until_current_jd_and_gap_evidence",
+            "fit_vs_growth_policy": "separate_current_fit_from_learning_path_before_application",
+        }
+    )
+    return target
 
 
 def redact_contact_like_text(text: str) -> str:
@@ -190,7 +284,7 @@ def artifact_ref(
     }
 
 
-def build_profile(input_text: str) -> dict[str, Any]:
+def build_profile(input_text: str, task_type: str = "") -> dict[str, Any]:
     major_name = detect_major(input_text)
     candidate_stage = detect_candidate_stage(input_text)
     skills = extract_skills(input_text)
@@ -268,6 +362,59 @@ def build_context_packet(
             "needed_for_outputs": ["application_direction", "runtime_weights", "resume_tailoring"],
         }
     ]
+    blocked_outputs = ["application_direction", "final_resume_draft"]
+    next_possible_actions = [
+        "Ask user once for missing user-owned facts.",
+        "Run public research subagents for current JD/company/school evidence.",
+        "Keep final recommendations blocked until required evidence exists.",
+    ]
+    target_context = profile["target_direction"]
+    if task_type == "target_job_fit":
+        public_research_needed.extend(
+            [
+                {
+                    "research_question": "Verify the concrete target JD from user-provided text or current public JD sources before fit assessment.",
+                    "target_sources": [
+                        "official company career page",
+                        "public recruitment platform JD",
+                        "user-provided JD text or link",
+                    ],
+                    "needed_for_outputs": [
+                        "current_fit_assessment",
+                        "application_readiness_decision",
+                        "resume_tailoring",
+                    ],
+                },
+                {
+                    "research_question": "Collect target-role skill and evidence expectations before recommending learning gaps or projects.",
+                    "target_sources": [
+                        "current JD requirements",
+                        "verified HR public posts",
+                        "official company campus pages",
+                        "public role-family reports",
+                    ],
+                    "needed_for_outputs": [
+                        "skill_gap_analysis",
+                        "learning_plan_before_application",
+                        "project_evidence_requirements",
+                    ],
+                },
+            ]
+        )
+        blocked_outputs = [
+            "current_fit_assessment",
+            "application_readiness_decision",
+            "application_direction",
+            "learning_plan_before_application",
+            "targeted_resume_tailoring",
+            "final_resume_draft",
+        ]
+        next_possible_actions = [
+            "Summarize the candidate facts and concrete target job currently known.",
+            "Verify or retrieve the current JD and target-company evidence.",
+            "Separate immediate fit from learnable gaps and preparation before application.",
+            "Keep application readiness and targeted resume advice blocked until JD evidence exists.",
+        ]
     return {
         "packet_id": f"{run_id}-context",
         "artifact_ref": context_ref,
@@ -285,7 +432,7 @@ def build_context_packet(
             "grade_or_year": education["grade_or_year"],
             "school_signal_research_needed": ["official school-company cooperation evidence"],
         },
-        "target_context": profile["target_direction"],
+        "target_context": target_context,
         "provided_materials": profile["materials_provided"],
         "missing_user_owned_facts": missing_user_owned_facts,
         "public_research_needed": public_research_needed,
@@ -298,12 +445,8 @@ def build_context_packet(
         ],
         "privacy_constraints": ["redact_contact_fields", "do_not_copy_private_resume_to_shared_context"],
         "consent_flags": {"incomplete_resume_consent": False},
-        "blocked_outputs": ["application_direction", "final_resume_draft"],
-        "next_possible_actions": [
-            "Ask user once for missing user-owned facts.",
-            "Run public research subagents for current JD/company/school evidence.",
-            "Keep final recommendations blocked until required evidence exists.",
-        ],
+        "blocked_outputs": blocked_outputs,
+        "next_possible_actions": next_possible_actions,
     }
 
 
@@ -315,40 +458,140 @@ def build_injection(
     input_packet_ref: str,
     allowed_user_facts_ref: str,
     output_ref: str,
+    context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     base_prompt_ref = f".codex/agents/{target_agent}.toml"
+    target_context = (context or {}).get("target_context", {})
+    target_job_fit_requested = bool(target_context.get("target_job_fit_requested"))
+    role_specific_context = {
+        "simulation_scope": "contract_only_no_network_no_real_subagent",
+        "must_return_blockers_instead_of_final_judgment": True,
+        "target_job_fit_assessment_requested": target_job_fit_requested,
+        "distinguish_current_fit_from_growth_path": target_job_fit_requested,
+        "final_fit_requires_current_jd_public_evidence": target_job_fit_requested,
+    }
+    research_tasks = [
+        {
+            "research_question": "Gather current public JD/company/school evidence before setting fit or priority.",
+            "target_sources": [
+                "official company career pages",
+                "public recruitment platform JDs",
+                "official school notices",
+            ],
+            "required_freshness": "0_6_months preferred; otherwise mark weak or stale",
+            "needed_for_outputs": ["runtime_weights", "application_strategy"],
+        }
+    ]
+    hard_data_weight_tasks = [
+        {
+            "parameter": "skill_weight",
+            "rule": "verified only with current JD or public official evidence; otherwise not_available",
+        }
+    ]
+    required_output_fields = [
+        "role_output_packet",
+        "error_recovery_state",
+        "blocked_outputs",
+        "runtime_research_tasks",
+    ]
+    blocked_outputs = ["fit_score", "application_strategy", "final_resume_draft"]
+    handoff_contract = ["return blockers to CareerOrchestrator"]
+    debate_contract = ["challenge unsupported weights instead of creating scores"]
+
+    if target_job_fit_requested:
+        research_tasks.extend(
+            [
+                {
+                    "research_question": "Verify the concrete target JD from user text, user link, or current public JD sources before judging current fit.",
+                    "target_sources": [
+                        "user-provided JD text or link",
+                        "official company career page",
+                        "public recruitment platform JD",
+                    ],
+                    "required_freshness": "current JD or mark stale/weak",
+                    "needed_for_outputs": [
+                        "current_fit_assessment",
+                        "application_readiness_decision",
+                        "targeted_resume_tailoring",
+                    ],
+                },
+                {
+                    "research_question": "Find evidence-backed skill, project, and portfolio gaps needed to improve success for this exact target role.",
+                    "target_sources": [
+                        "current JD requirements",
+                        "verified HR public posts",
+                        "official company campus pages",
+                        "public role-family reports",
+                    ],
+                    "required_freshness": "0_6_months preferred; otherwise mark weak or stale",
+                    "needed_for_outputs": [
+                        "skill_gap_analysis",
+                        "learning_plan_before_application",
+                        "project_evidence_requirements",
+                    ],
+                },
+            ]
+        )
+        hard_data_weight_tasks.extend(
+            [
+                {
+                    "parameter": "current_fit_assessment_weight",
+                    "rule": "fit/readiness must be supported by current JD plus user evidence; otherwise not_available",
+                },
+                {
+                    "parameter": "learning_gap_priority",
+                    "rule": "gap priorities must be grounded in JD/company/HR evidence, not model intuition",
+                },
+                {
+                    "parameter": "application_readiness_decision",
+                    "rule": "apply-now, prepare-first, or skip decisions require current JD and public evidence",
+                },
+            ]
+        )
+        required_output_fields.extend(
+            [
+                "current_fit_assessment",
+                "skill_gap_analysis",
+                "learning_plan_before_application",
+                "evidence_requirements",
+            ]
+        )
+        blocked_outputs = [
+            "current_fit_assessment",
+            "application_readiness_decision",
+            "fit_score",
+            "application_strategy",
+            "learning_plan_before_application",
+            "targeted_resume_tailoring",
+            "final_resume_draft",
+        ]
+        handoff_contract.extend(
+            [
+                "handoff current-fit gaps to LearningPathStrategist",
+                "handoff unsupported fit claims to HRSupervisor and FactualReviewer",
+            ]
+        )
+        debate_contract.extend(
+            [
+                "separate current readiness from future growth potential",
+                "challenge any apply-now recommendation without current JD evidence",
+            ]
+        )
+
+    database_files_to_read = [
+        "data/runtime_parameters/parameter_ownership.zh-CN.json",
+        "data/major_taxonomy/summary.json",
+        "data/company_signals/summary.json",
+    ]
     return {
         "target_agent": target_agent,
         "base_prompt_ref": base_prompt_ref,
         "runtime_context_packet_ref": context_ref,
-        "role_specific_context": {
-            "simulation_scope": "contract_only_no_network_no_real_subagent",
-            "must_return_blockers_instead_of_final_judgment": True,
-        },
+        "role_specific_context": role_specific_context,
         "allowed_user_facts": ["major_name", "grade_or_year", "skills_and_tools", "target_direction"],
-        "research_tasks": [
-            {
-                "research_question": "Gather current public JD/company/school evidence before setting fit or priority.",
-                "target_sources": [
-                    "official company career pages",
-                    "public recruitment platform JDs",
-                    "official school notices",
-                ],
-                "required_freshness": "0_6_months preferred; otherwise mark weak or stale",
-                "needed_for_outputs": ["runtime_weights", "application_strategy"],
-            }
-        ],
-        "hard_data_weight_tasks": [
-            {
-                "parameter": "skill_weight",
-                "rule": "verified only with current JD or public official evidence; otherwise not_available",
-            }
-        ],
-        "database_files_to_read": [
-            "data/runtime_parameters/parameter_ownership.zh-CN.json",
-            "data/major_taxonomy/summary.json",
-            "data/company_signals/summary.json",
-        ],
+        "research_tasks": research_tasks,
+        "hard_data_weight_tasks": hard_data_weight_tasks,
+        "database_files_to_read": database_files_to_read,
         "source_policy_refs": [".agents/skills/career-pipeline/references/source-policy.md"],
         "invocation_contract": {
             "invocation_id": f"{run_id}-{target_agent}",
@@ -359,40 +602,15 @@ def build_injection(
             "runtime_context_packet_ref": context_ref,
             "input_packet_ref": input_packet_ref,
             "allowed_user_facts_ref": allowed_user_facts_ref,
-            "database_files_to_read": [
-                "data/runtime_parameters/parameter_ownership.zh-CN.json",
-                "data/major_taxonomy/summary.json",
-                "data/company_signals/summary.json",
-            ],
+            "database_files_to_read": database_files_to_read,
             "source_policy_refs": [".agents/skills/career-pipeline/references/source-policy.md"],
-            "research_tasks": [
-                {
-                    "research_question": "Gather current public JD/company/school evidence before setting fit or priority.",
-                    "target_sources": [
-                        "official company career pages",
-                        "public recruitment platform JDs",
-                        "official school notices",
-                    ],
-                    "required_freshness": "0_6_months preferred; otherwise mark weak or stale",
-                    "needed_for_outputs": ["runtime_weights", "application_strategy"],
-                }
-            ],
-            "hard_data_weight_tasks": [
-                {
-                    "parameter": "skill_weight",
-                    "rule": "verified only with current JD or public official evidence; otherwise not_available",
-                }
-            ],
-            "required_output_fields": [
-                "role_output_packet",
-                "error_recovery_state",
-                "blocked_outputs",
-                "runtime_research_tasks",
-            ],
+            "research_tasks": research_tasks,
+            "hard_data_weight_tasks": hard_data_weight_tasks,
+            "required_output_fields": required_output_fields,
             "output_artifact_target": output_ref,
             "privacy_constraints": ["redact_contact_fields", "share_only_allowed_user_facts"],
-            "handoff_contract": ["return blockers to CareerOrchestrator"],
-            "debate_contract": ["challenge unsupported weights instead of creating scores"],
+            "handoff_contract": handoff_contract,
+            "debate_contract": debate_contract,
             "expected_artifact_types": ["subagent_output", "evidence_packet", "redacted_log"],
             "required_log_events": ["dispatch", "receive_output", "validate_output"],
             "timeout_or_budget_hint": "simulation-no-dispatch",
@@ -400,15 +618,10 @@ def build_injection(
             "on_failure": "return_blocked",
             "status": "not_started",
         },
-        "blocked_outputs": ["fit_score", "application_strategy", "final_resume_draft"],
-        "required_output_fields": [
-            "role_output_packet",
-            "error_recovery_state",
-            "blocked_outputs",
-            "runtime_research_tasks",
-        ],
-        "handoff_contract": ["return blockers to CareerOrchestrator"],
-        "debate_contract": ["challenge unsupported weights instead of creating scores"],
+        "blocked_outputs": blocked_outputs,
+        "required_output_fields": required_output_fields,
+        "handoff_contract": handoff_contract,
+        "debate_contract": debate_contract,
     }
 
 
@@ -452,7 +665,12 @@ def simulate(args: argparse.Namespace) -> dict[str, Any]:
     run_dir = run_root / run_id
     created_at = utc_now()
 
-    profile = build_profile(args.input_text)
+    profile = build_profile(args.input_text, args.task_type)
+    profile["target_direction"] = build_target_context(
+        args.input_text,
+        profile.get("target_direction", {}),
+        args.task_type,
+    )
 
     raw_ref_path = run_dir / "input" / "raw_refs.json"
     profile_path = run_dir / "input" / "normalized" / "first_round_user_profile.json"
@@ -498,6 +716,7 @@ def simulate(args: argparse.Namespace) -> dict[str, Any]:
             rel(input_packet_path, run_dir),
             rel(allowed_facts_path, run_dir),
             rel(role_output_path, run_dir),
+            context,
         )
         write_json(injection_path, {"secondary_prompt_injection": injection})
         write_json(input_packet_path, build_input_packet(run_id, target_agent, context_ref, rel(injection_path, run_dir)))
@@ -524,7 +743,7 @@ def simulate(args: argparse.Namespace) -> dict[str, Any]:
                 "evidence_packet_refs": [],
                 "runtime_weights_ref": "merge/runtime_weights.json",
                 "artifact_refs": [],
-                "blocked_outputs": ["fit_score", "application_strategy", "final_resume_draft"],
+                "blocked_outputs": context["blocked_outputs"],
                 "runtime_research_tasks": context["public_research_needed"],
                 "needs_user_confirmation": context["missing_user_owned_facts"],
                 "handoff_to": ["career-orchestrator"],
@@ -548,7 +767,7 @@ def simulate(args: argparse.Namespace) -> dict[str, Any]:
                 ],
                 "recovery_actions": ["ask_user_once", "run_public_research"],
                 "degraded_outputs": ["known_information_summary"],
-                "blocked_outputs": ["fit_score", "application_strategy", "final_resume_draft"],
+                "blocked_outputs": context["blocked_outputs"],
                 "safe_outputs": ["runtime_research_tasks", "needs_user_confirmation"],
                 "next_action": "return_blocked_package",
             },
@@ -595,7 +814,11 @@ def simulate(args: argparse.Namespace) -> dict[str, Any]:
                         "agent": "career-orchestrator",
                         "category": "missing_user_fact",
                         "severity": "blocking",
-                        "affected_outputs": ["final_resume_draft", "application_direction"],
+                        "affected_outputs": [
+                            output
+                            for output in context["blocked_outputs"]
+                            if output in {"final_resume_draft", "application_direction", "targeted_resume_tailoring"}
+                        ],
                         "evidence_or_artifact_refs": [context_ref],
                         "message": "Required user-owned facts are missing.",
                         "recovery_action": "ask_user_once",
@@ -612,7 +835,18 @@ def simulate(args: argparse.Namespace) -> dict[str, Any]:
                         "agent": "job-scout",
                         "category": "unsupported_weight",
                         "severity": "blocking",
-                        "affected_outputs": ["fit_score", "application_strategy"],
+                        "affected_outputs": [
+                            output
+                            for output in context["blocked_outputs"]
+                            if output
+                            in {
+                                "fit_score",
+                                "application_strategy",
+                                "current_fit_assessment",
+                                "application_readiness_decision",
+                                "learning_plan_before_application",
+                            }
+                        ],
                         "evidence_or_artifact_refs": [],
                         "message": "Runtime weights cannot be set without current public or user-provided evidence.",
                         "recovery_action": "research_public_source",
@@ -624,7 +858,7 @@ def simulate(args: argparse.Namespace) -> dict[str, Any]:
             ],
             "recovery_actions": ["ask_user_once", "run_public_research"],
             "degraded_outputs": ["known_information_summary"],
-            "blocked_outputs": ["missing_user_facts", "public_research_required", "final_resume_draft"],
+            "blocked_outputs": ["missing_user_facts", "public_research_required"] + context["blocked_outputs"],
             "safe_outputs": ["first_round_user_profile", "runtime_context_packet", "subagent_invocation_plan"],
             "next_action": "return_blocked_package",
         }
@@ -635,7 +869,7 @@ def simulate(args: argparse.Namespace) -> dict[str, Any]:
     blocked_package = {
         "blocked_package": {
             "run_id": run_id,
-            "blocked_outputs": ["missing_user_facts", "public_research_required", "final_resume_draft"],
+            "blocked_outputs": ["missing_user_facts", "public_research_required"] + context["blocked_outputs"],
             "safe_outputs": [
                 "known user facts can be summarized",
                 "public research tasks can be handed to runtime subagents",

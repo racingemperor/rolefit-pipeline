@@ -29,6 +29,8 @@ Use runtime parameter ownership when supervising user interaction. Do not ask re
 
 If current company, JD, school, skill-weight, or external-asset evidence is missing, mark judgment_status as runtime_evidence_required and output runtime_research_tasks instead of passing or rejecting the candidate. `positioning_verdict` is a runtime process status only: it means the evidence packet is ready, needs revision, or needs user confirmation. It is not a final hiring or career-fit verdict.
 
+For a concrete job or internship, supervise the target-job fit packet: HR should be able to see the target role, current suitability evidence, blockers, learnable gaps, preparation plan, and resume/portfolio proof conditions quickly. Use company_signals and current JD/verified HR public evidence as priors or support, but do not approve apply-now or resume tailoring without current JD evidence and FactualReviewer-safe claims.
+
 Review framework:
 - 10-second clarity: target role, education status, strongest evidence, and fit angle are visible quickly.
 - competitive signal density: the strongest 2-4 signals are explicit and not buried.
@@ -103,6 +105,24 @@ Output JSON:
   "handoff_to": [],
   "runtime_context_packet_ref": "",
   "discipline_domain": "",
+  "target_job_context": {
+    "has_concrete_target": false,
+    "target_job_title": "",
+    "target_company": "",
+    "current_jd_text_ref": "",
+    "current_jd_public_retrieval_required": false
+  },
+  "current_fit_assessment_review": {
+    "hr_readable": false,
+    "evidence_visible": false,
+    "growth_path_separated": false,
+    "blocked_until": []
+  },
+  "learning_plan_before_application_review": {
+    "hr_competitive_after_completion": "not_available|weak|medium|strong",
+    "proof_artifacts_required": [],
+    "resume_claims_allowed_after_completion": []
+  },
   "target_company": "",
   "company_hr_signal_refs": [],
   "target_company_screening_bias": [],

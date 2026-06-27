@@ -34,7 +34,7 @@ Every orchestration step should expose:
   "run_state": {
     "run_id": "",
     "stage": "intake_received|input_normalized|context_packet_created|injection_ready|agents_running|merge_pending|debate_required|hr_review_required|factual_review_required|user_confirmation_required|blocked|final_package_ready",
-    "task_type": "resume_review|resume_generation|job_search|jd_analysis|company_research|tailored_resume|major_positioning|personal_branding|learning_plan",
+    "task_type": "resume_review|resume_generation|job_search|jd_analysis|company_research|tailored_resume|major_positioning|personal_branding|learning_plan|target_job_fit",
     "runtime_context_packet_ref": "",
     "secondary_prompt_injection_refs": [],
     "subagent_invocation_refs": [],
@@ -150,6 +150,7 @@ Use `error-recovery-protocol.md` for categories and recovery fields.
 - missing injection: do not dispatch; return to `create_injections`.
 - missing user-owned facts: set `user_confirmation_required` and ask once.
 - missing public evidence or current JD: create runtime research tasks; block dependent final decisions.
+- target job fit: when a concrete job or internship is present, dispatch JDAnalyzer, CompanyIntelligenceAnalyst, MatchStrategist, LearningPathStrategist, HRSupervisor, and FactualReviewer as needed; block current fit, application readiness, and targeted resume tailoring until current JD evidence exists, while allowing safe known-fact summaries and research tasks.
 - malformed output: retry once with a narrower schema-repair prompt; if still malformed, mark invocation failed.
 - subagent failure: retry only if new context or a narrower prompt is available; otherwise degrade or block.
 - privacy or factual risk: route to `FactualReviewer` and block final resume approval.
