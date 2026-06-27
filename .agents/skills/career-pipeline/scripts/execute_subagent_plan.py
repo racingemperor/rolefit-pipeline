@@ -43,6 +43,27 @@ ALLOWED_ROLE_OUTPUT_STATUSES = {
     "malformed",
 }
 
+ALLOWED_SOURCE_TYPES = {
+    "user_provided",
+    "official_or_primary",
+    "official_school_notice",
+    "recruitment_platform_jd",
+    "verified_hr_public_post",
+    "candidate_experience_secondary",
+    "social_media_weak",
+    "repository_prior",
+    "public_report",
+}
+
+FORBIDDEN_SOURCE_TYPES = {
+    "private_resume",
+    "private_chat",
+    "private_hr_message",
+    "recruiter_backend",
+    "login_only_page",
+    "non_public_candidate_profile",
+}
+
 FINAL_DECISION_FIELDS = {
     "fit_score",
     "priority",
@@ -129,6 +150,42 @@ def load_plan(run_dir: Path, plan_ref: str) -> dict[str, Any]:
     return plan
 
 
+def load_source_plan(run_dir: Path, source_plan_ref: str) -> dict[str, Any]:
+    path = run_dir / source_plan_ref
+    if not path.is_file():
+        raise ExecutionError(f"source plan is required before network execution: {source_plan_ref}")
+    payload = load_json(path)
+    plan = payload.get("public_source_research_plan")
+    if not isinstance(plan, dict):
+        raise ExecutionError(f"{source_plan_ref}: missing public_source_research_plan")
+    if plan.get("network_execution_default") != "disabled_until_human_and_source_policy_ack":
+        raise ExecutionError(f"{source_plan_ref}: invalid network execution default")
+    errors = []
+    tasks = plan.get("research_tasks")
+    if not isinstance(tasks, list) or not tasks:
+        raise ExecutionError(f"{source_plan_ref}: research_tasks must be non-empty")
+    for index, task in enumerate(tasks):
+        where = f"{source_plan_ref}.research_tasks[{index}]"
+        if not isinstance(task, dict):
+            raise ExecutionError(f"{where}: task must be an object")
+        source_type = task.get("source_type")
+        if source_type in FORBIDDEN_SOURCE_TYPES:
+            errors.append(f"{where}: forbidden source_type `{source_type}`")
+        elif source_type not in ALLOWED_SOURCE_TYPES:
+            errors.append(f"{where}: unsupported source_type `{source_type}`")
+        if task.get("requires_login") is True:
+            errors.append(f"{where}: requires_login sources are not allowed")
+        if source_type == "social_media_weak" and task.get("may_set_final_decision") is True:
+            errors.append(f"{where}: social_media_weak cannot be a final decision basis")
+        if source_type == "social_media_weak" and task.get("may_set_weight") is True:
+            errors.append(f"{where}: social_media_weak cannot set weights alone")
+        if source_type == "candidate_experience_secondary" and task.get("may_set_final_decision") is True:
+            errors.append(f"{where}: candidate_experience_secondary cannot be a final decision basis")
+    if errors:
+        raise ExecutionError("; ".join(errors))
+    return plan
+
+
 def validate_plan_only(plan: dict[str, Any]) -> None:
     for index, item in enumerate(plan["dispatch_queue"]):
         where = f"dispatch_queue[{index}]"
@@ -145,6 +202,8 @@ def enforce_execution_gates(args: argparse.Namespace) -> None:
         raise ExecutionError("human approval is required before --execute can run")
     if args.allow_network and not args.source_policy_ack:
         raise ExecutionError("source policy acknowledgement is required before network execution")
+    if args.allow_network:
+        load_source_plan(args.run_dir, args.source_plan_ref)
     if args.execute and not args.dry_run and not args.adapter:
         raise ExecutionError("a real subagent adapter is not configured; omit --execute or provide --adapter")
 
@@ -263,6 +322,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--human-approved", action="store_true")
     parser.add_argument("--allow-network", action="store_true")
     parser.add_argument("--source-policy-ack", action="store_true")
+    parser.add_argument("--source-plan-ref", default="evidence/public_source_research_plan.json")
     parser.add_argument("--adapter", default="", help="Reserved name/path for a future real subagent adapter")
     parser.add_argument(
         "--backfill-output",

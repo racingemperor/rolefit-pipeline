@@ -91,6 +91,51 @@ PLAN_QUEUE_REQUIRED_FIELDS = [
     "blocked_until",
 ]
 
+SOURCE_PLAN_REQUIRED_FIELDS = [
+    "run_id",
+    "policy_ref",
+    "network_execution_default",
+    "research_tasks",
+    "blocked_source_types",
+]
+
+SOURCE_TASK_REQUIRED_FIELDS = [
+    "task_id",
+    "agent",
+    "claim_field",
+    "source_type",
+    "source_priority",
+    "allowed",
+    "requires_login",
+    "may_set_weight",
+    "may_set_final_decision",
+    "evidence_strength_floor",
+    "privacy_action",
+    "query_template",
+    "output_fields",
+]
+
+ALLOWED_SOURCE_TYPES = {
+    "user_provided",
+    "official_or_primary",
+    "official_school_notice",
+    "recruitment_platform_jd",
+    "verified_hr_public_post",
+    "candidate_experience_secondary",
+    "social_media_weak",
+    "repository_prior",
+    "public_report",
+}
+
+FORBIDDEN_SOURCE_TYPES = {
+    "private_resume",
+    "private_chat",
+    "private_hr_message",
+    "recruiter_backend",
+    "login_only_page",
+    "non_public_candidate_profile",
+}
+
 ROLE_OUTPUT_PACKET_REQUIRED_FIELDS = [
     "invocation_id",
     "target_agent",
@@ -354,6 +399,9 @@ def validate_subagent_plan(payload: dict[str, Any]) -> None:
             if field not in item:
                 raise ValidationError(f"{where}: missing required field `{field}`")
             require_non_empty(item[field], field, where)
+        if "prompt_bundle_ref" in item and item["prompt_bundle_ref"]:
+            if item["prompt_bundle_ref"].replace("\\", "/").startswith("input/raw_refs"):
+                raise ValidationError(f"{where}: prompt_bundle_ref must not expose raw input")
         if item["queue_index"] != index:
             raise ValidationError(f"{where}: `queue_index` must match list order")
         if item["dispatch_mode"] != "plan_only":
@@ -368,6 +416,52 @@ def validate_subagent_plan(payload: dict[str, Any]) -> None:
         require_list(item["blocked_until"], "blocked_until", where)
         if any(ref.replace("\\", "/").startswith("input/raw_refs") for ref in item["input_refs"]):
             raise ValidationError(f"{where}: raw input refs must not be exposed to subagent plans")
+
+
+def validate_source_plan(payload: dict[str, Any]) -> None:
+    plan = payload.get("public_source_research_plan")
+    if not isinstance(plan, dict):
+        raise ValidationError("root: missing `public_source_research_plan` object")
+    for field in SOURCE_PLAN_REQUIRED_FIELDS:
+        if field not in plan:
+            raise ValidationError(f"public_source_research_plan: missing required field `{field}`")
+        if field != "blocked_source_types":
+            require_non_empty(plan[field], field, "public_source_research_plan")
+    if plan["policy_ref"] != ".agents/skills/career-pipeline/references/source-policy.md":
+        raise ValidationError("public_source_research_plan: policy_ref must point to source-policy.md")
+    if plan["network_execution_default"] != "disabled_until_human_and_source_policy_ack":
+        raise ValidationError(
+            "public_source_research_plan: network execution must be disabled until human and source-policy acknowledgement"
+        )
+    require_list(plan["research_tasks"], "research_tasks", "public_source_research_plan")
+    require_list(plan["blocked_source_types"], "blocked_source_types", "public_source_research_plan")
+    errors = []
+    for index, task in enumerate(plan["research_tasks"]):
+        where = f"public_source_research_plan.research_tasks[{index}]"
+        if not isinstance(task, dict):
+            raise ValidationError(f"{where}: task must be an object")
+        for field in SOURCE_TASK_REQUIRED_FIELDS:
+            if field not in task:
+                raise ValidationError(f"{where}: missing required field `{field}`")
+            require_non_empty(task[field], field, where)
+        require_list(task["output_fields"], "output_fields", where)
+        source_type = task["source_type"]
+        if source_type in FORBIDDEN_SOURCE_TYPES:
+            errors.append(f"{where}: forbidden source_type `{source_type}`")
+        elif source_type not in ALLOWED_SOURCE_TYPES:
+            errors.append(f"{where}: unsupported source_type `{source_type}`")
+        if task["requires_login"] is True:
+            errors.append(f"{where}: requires_login sources are not allowed")
+        if task["allowed"] is not True:
+            errors.append(f"{where}: active research tasks must be explicitly allowed")
+        if source_type == "social_media_weak" and task["may_set_final_decision"] is True:
+            errors.append(f"{where}: social_media_weak cannot be a final decision basis")
+        if source_type == "social_media_weak" and task["may_set_weight"] is True:
+            errors.append(f"{where}: social_media_weak cannot set weights alone")
+        if source_type == "candidate_experience_secondary" and task["may_set_final_decision"] is True:
+            errors.append(f"{where}: candidate_experience_secondary cannot be a final decision basis")
+    if errors:
+        raise ValidationError("; ".join(errors))
 
 
 def validate_role_output(payload: dict[str, Any]) -> None:
@@ -454,6 +548,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--manifest", type=Path, help="JSON file containing execution_manifest and run_state")
     parser.add_argument("--subagent-plan", type=Path, help="JSON file containing subagent_invocation_plan")
     parser.add_argument("--role-output", type=Path, help="JSON file containing a role_output_packet")
+    parser.add_argument("--source-plan", type=Path, help="JSON file containing public_source_research_plan")
     parser.add_argument("--repo-root", type=Path, default=Path.cwd(), help="Repository root to validate")
     parser.add_argument("--emit-invocations", action="store_true", help="Emit canonical subagent_invocations")
     args = parser.parse_args(argv)
@@ -471,7 +566,15 @@ def main(argv: list[str] | None = None) -> int:
             validate_subagent_plan(load_json(args.subagent_plan))
         if args.role_output:
             validate_role_output(load_json(args.role_output))
-        if not args.injections and not args.manifest and not args.subagent_plan and not args.role_output:
+        if args.source_plan:
+            validate_source_plan(load_json(args.source_plan))
+        if (
+            not args.injections
+            and not args.manifest
+            and not args.subagent_plan
+            and not args.role_output
+            and not args.source_plan
+        ):
             validate_repository(args.repo_root)
         if args.emit_invocations:
             print(json.dumps(output, ensure_ascii=False, indent=2))

@@ -10,6 +10,8 @@ SIMULATOR = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "simul
 PLAN_BUILDER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "build_subagent_plan.py"
 PLAN_EXECUTOR = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "execute_subagent_plan.py"
 RUN_CONTINUER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "continue_runtime_run.py"
+PROMPT_BUNDLE_BUILDER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "build_subagent_prompt_bundle.py"
+SOURCE_PLAN_BUILDER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "build_public_source_plan.py"
 
 
 def run_python(script: Path, *args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
@@ -493,6 +495,102 @@ def test_executor_network_execution_requires_source_policy_ack(tmp_path):
     assert "source policy" in result.stderr.lower()
 
 
+def test_executor_network_execution_requires_source_plan(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "computer science sophomore, Python, looking for AI internship",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+
+    result = run_python(
+        PLAN_EXECUTOR,
+        "--run-dir",
+        str(run_dir),
+        "--execute",
+        "--human-approved",
+        "--allow-network",
+        "--source-policy-ack",
+    )
+
+    assert result.returncode == 1
+    assert "source plan" in result.stderr.lower()
+
+
+def test_executor_network_execution_rejects_invalid_source_plan(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "computer science sophomore, Python, looking for AI internship",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+    source_plan_path = run_dir / "evidence" / "public_source_research_plan.json"
+    source_plan_path.parent.mkdir(parents=True, exist_ok=True)
+    source_plan_path.write_text(
+        json.dumps(
+            {
+                "public_source_research_plan": {
+                    "run_id": run_id,
+                    "policy_ref": ".agents/skills/career-pipeline/references/source-policy.md",
+                    "network_execution_default": "disabled_until_human_and_source_policy_ack",
+                    "research_tasks": [
+                        {
+                            "task_id": "login-only-jd",
+                            "agent": "job-scout",
+                            "claim_field": "jd_requirement",
+                            "source_type": "recruitment_platform_jd",
+                            "source_priority": 3,
+                            "allowed": True,
+                            "requires_login": True,
+                            "may_set_weight": True,
+                            "may_set_final_decision": True,
+                            "evidence_strength_floor": "medium",
+                            "privacy_action": "cache_metadata_only",
+                            "query_template": "login-only JD",
+                            "output_fields": ["evidence_basis"],
+                        }
+                    ],
+                    "blocked_source_types": [],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = run_python(
+        PLAN_EXECUTOR,
+        "--run-dir",
+        str(run_dir),
+        "--execute",
+        "--human-approved",
+        "--allow-network",
+        "--source-policy-ack",
+    )
+
+    assert result.returncode == 1
+    assert "requires_login" in result.stderr
+
+
 def test_validator_rejects_role_output_without_traceability(tmp_path):
     output = {
         "role_output_packet": {
@@ -673,3 +771,197 @@ def test_simulator_supports_resume_generation_route(tmp_path):
         "factual-reviewer",
         "hr-supervisor",
     ]
+
+
+def test_prompt_bundle_builder_creates_subagent_ready_context(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "computer science sophomore, Python, looking for AI internship",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    invocation_ref = "invocations/job-scout.invocation.json"
+
+    result = run_python(PROMPT_BUNDLE_BUILDER, "--run-dir", str(run_dir), "--invocation-ref", invocation_ref)
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)
+    bundle_ref = response["prompt_bundle_response"]["prompt_bundle_ref"]
+    bundle_path = run_dir / bundle_ref
+    assert bundle_path.is_file()
+    bundle = json.loads(bundle_path.read_text(encoding="utf-8"))["subagent_prompt_bundle"]
+    assert bundle["target_agent"] == "job-scout"
+    assert bundle["invocation_ref"] == invocation_ref
+    assert bundle["base_prompt_ref"] == ".codex/agents/job-scout.toml"
+    assert bundle["runtime_context_packet_ref"] == "input/normalized/runtime_context_packet.json"
+    assert bundle["secondary_prompt_injection_ref"] == "injections/job-scout.secondary_prompt_injection.json"
+    assert "static_role_prompt" in bundle["prompt_sections"]
+    assert "runtime_context_packet" in bundle["prompt_sections"]
+    assert "secondary_prompt_injection" in bundle["prompt_sections"]
+    assert "source_policy" in bundle["prompt_sections"]
+    assert "required_output_contract" in bundle["prompt_sections"]
+    assert "role_output_packet" in bundle["required_output_fields"]
+    assert "error_recovery_state" in bundle["required_output_fields"]
+    assert "input/raw_refs.json" not in json.dumps(bundle, ensure_ascii=False)
+
+
+def test_plan_builder_attaches_prompt_bundle_refs(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "computer science sophomore, Python, looking for AI internship",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+
+    result = run_python(PLAN_BUILDER, "--run-dir", str(run_dir), "--build-prompt-bundles")
+
+    assert result.returncode == 0, result.stderr
+    plan_ref = json.loads(result.stdout)["planner_response"]["subagent_plan_ref"]
+    plan = json.loads((run_dir / plan_ref).read_text(encoding="utf-8"))["subagent_invocation_plan"]
+    first = plan["dispatch_queue"][0]
+    assert first["prompt_bundle_ref"].startswith("prompts/")
+    assert (run_dir / first["prompt_bundle_ref"]).is_file()
+    validation = run_python(VALIDATOR, "--subagent-plan", str(run_dir / plan_ref))
+    assert validation.returncode == 0, validation.stderr
+
+
+def test_public_source_plan_builder_creates_policy_bound_tasks(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "computer science sophomore, Python, looking for AI internship at ByteDance or DJI",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+
+    result = run_python(SOURCE_PLAN_BUILDER, "--run-dir", str(run_dir))
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)
+    source_plan_ref = response["source_plan_response"]["source_plan_ref"]
+    source_plan = json.loads((run_dir / source_plan_ref).read_text(encoding="utf-8"))[
+        "public_source_research_plan"
+    ]
+    assert source_plan["run_id"] == run_id
+    assert source_plan["policy_ref"] == ".agents/skills/career-pipeline/references/source-policy.md"
+    assert source_plan["network_execution_default"] == "disabled_until_human_and_source_policy_ack"
+    source_types = {task["source_type"] for task in source_plan["research_tasks"]}
+    assert "official_or_primary" in source_types
+    assert "recruitment_platform_jd" in source_types
+    assert "verified_hr_public_post" in source_types
+    assert "social_media_weak" in source_types
+    assert all(task["allowed"] is True for task in source_plan["research_tasks"])
+    assert source_plan["blocked_source_types"]
+
+
+def test_source_policy_validator_rejects_login_only_and_private_sources(tmp_path):
+    source_plan = {
+        "public_source_research_plan": {
+            "run_id": "run-test",
+            "policy_ref": ".agents/skills/career-pipeline/references/source-policy.md",
+            "network_execution_default": "disabled_until_human_and_source_policy_ack",
+            "research_tasks": [
+                {
+                    "task_id": "bad-private-resume",
+                    "agent": "job-scout",
+                    "claim_field": "candidate_condition",
+                    "source_type": "private_resume",
+                    "source_priority": 0,
+                    "allowed": True,
+                    "requires_login": False,
+                    "may_set_weight": True,
+                    "may_set_final_decision": True,
+                    "evidence_strength_floor": "strong",
+                    "privacy_action": "none",
+                    "query_template": "collect private resumes",
+                    "output_fields": ["weight_provenance"],
+                },
+                {
+                    "task_id": "bad-login",
+                    "agent": "job-scout",
+                    "claim_field": "jd_requirement",
+                    "source_type": "recruitment_platform_jd",
+                    "source_priority": 3,
+                    "allowed": True,
+                    "requires_login": True,
+                    "may_set_weight": True,
+                    "may_set_final_decision": True,
+                    "evidence_strength_floor": "medium",
+                    "privacy_action": "cache_metadata_only",
+                    "query_template": "crawl login-only JD",
+                    "output_fields": ["evidence_basis"],
+                },
+            ],
+            "blocked_source_types": [],
+        }
+    }
+    plan_path = tmp_path / "bad-source-plan.json"
+    plan_path.write_text(json.dumps(source_plan), encoding="utf-8")
+
+    result = run_python(VALIDATOR, "--source-plan", str(plan_path))
+
+    assert result.returncode == 1
+    assert "private_resume" in result.stderr
+    assert "requires_login" in result.stderr
+
+
+def test_source_policy_validator_rejects_weak_social_media_as_final_basis(tmp_path):
+    source_plan = {
+        "public_source_research_plan": {
+            "run_id": "run-test",
+            "policy_ref": ".agents/skills/career-pipeline/references/source-policy.md",
+            "network_execution_default": "disabled_until_human_and_source_policy_ack",
+            "research_tasks": [
+                {
+                    "task_id": "weak-social",
+                    "agent": "market-sentiment-analyzer",
+                    "claim_field": "company_reputation",
+                    "source_type": "social_media_weak",
+                    "source_priority": 5,
+                    "allowed": True,
+                    "requires_login": False,
+                    "may_set_weight": True,
+                    "may_set_final_decision": True,
+                    "evidence_strength_floor": "weak",
+                    "privacy_action": "aggregate_deidentified_only",
+                    "query_template": "single anonymous post",
+                    "output_fields": ["weight_provenance"],
+                }
+            ],
+            "blocked_source_types": [],
+        }
+    }
+    plan_path = tmp_path / "weak-source-plan.json"
+    plan_path.write_text(json.dumps(source_plan), encoding="utf-8")
+
+    result = run_python(VALIDATOR, "--source-plan", str(plan_path))
+
+    assert result.returncode == 1
+    assert "social_media_weak" in result.stderr
+    assert "final" in result.stderr.lower()

@@ -25,6 +25,8 @@ create run_id and run directory
   -> persist first_round_user_profile and runtime_context_packet
   -> invoke CareerOrchestrator to create secondary_prompt_injections
   -> convert each secondary_prompt_injection into a subagent invocation packet
+  -> build subagent prompt bundles from static role prompts, runtime context, allowed facts, source policy, and output contracts
+  -> build a public-source research plan before any network-enabled research
   -> dispatch required role subagents
   -> validate role outputs against role-output-contracts
   -> merge evidence, blocked outputs, runtime weights, and debate fields
@@ -148,6 +150,8 @@ Suggested exit semantics:
 
 - `simulate_runtime_run.py`: creates a private no-network blocked run with normalized input, runtime context, secondary injections, invocation packets, blocked package, and simulated blocked role outputs.
 - `build_subagent_plan.py`: turns invocation packets into a plan-only dispatch queue. Plan-only queues are not proof that subagents ran.
+- `build_subagent_prompt_bundle.py`: creates one role-specific derived prompt bundle with the static role prompt, runtime context packet, secondary prompt injection, allowed user facts, source policy, research tasks, hard-data weight tasks, and required output contract. Raw input refs must not appear in the bundle.
+- `build_public_source_plan.py`: creates a source-policy-bound research plan for official/primary pages, public recruitment-platform JDs, verified HR public posts, candidate experience, and weak social signals. It does not browse, log in, scrape, or cache sources.
 - `execute_subagent_plan.py`: defaults to dry-run inspection, refuses real execution without human approval, refuses network execution without source-policy acknowledgement, writes redacted execution events, and can backfill externally produced role outputs only after schema checks.
 - `continue_runtime_run.py`: accepts one compact batch of user-owned facts and updates the same run so dispatch can continue without starting over.
 
