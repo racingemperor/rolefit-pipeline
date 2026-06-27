@@ -10,6 +10,8 @@ from typing import Any
 
 USER_FACT_FIELDS = [
     "school_name",
+    "major_name",
+    "grade_or_year",
     "degree_level",
     "graduation_window",
     "project_competition_research_experience",
@@ -74,7 +76,7 @@ def require_context(run_dir: Path) -> tuple[Path, dict[str, Any]]:
 
 def update_profile(profile: dict[str, Any], facts: dict[str, Any]) -> None:
     education = profile.setdefault("education_status", {})
-    for field in ["school_name", "degree_level", "graduation_window"]:
+    for field in ["school_name", "major_name", "grade_or_year", "degree_level", "graduation_window"]:
         if facts.get(field):
             education[field] = facts[field]
 
@@ -101,9 +103,11 @@ def update_context(context: dict[str, Any], profile: dict[str, Any], facts: dict
     for field in ["school_name", "major_name", "grade_or_year"]:
         if education.get(field):
             school_context[field] = education[field]
-    for field in ["school_name", "degree_level", "graduation_window"]:
+    for field in ["school_name", "major_name", "grade_or_year", "degree_level", "graduation_window"]:
         if facts.get(field):
             upsert_known_fact(context, field, facts[field])
+    if facts.get("major_name"):
+        context.setdefault("major_and_discipline", {})["normalized_major"] = facts["major_name"]
 
     if facts.get("project_competition_research_experience"):
         upsert_known_fact(
@@ -203,7 +207,12 @@ def continue_run(args: argparse.Namespace) -> dict[str, Any]:
     run_dir = args.run_dir
     if not run_dir.is_dir():
         raise ContinuationError(f"run directory not found: {run_dir}")
-    facts = json.loads(args.user_facts_json)
+    facts_source = args.user_facts_json
+    if args.user_facts_json_file:
+        facts_source = args.user_facts_json_file.read_text(encoding="utf-8")
+    if not facts_source:
+        raise ContinuationError("--user-facts-json or --user-facts-json-file is required")
+    facts = json.loads(facts_source)
     if not isinstance(facts, dict):
         raise ContinuationError("--user-facts-json must decode to an object")
 
@@ -254,7 +263,8 @@ def continue_run(args: argparse.Namespace) -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Continue an existing career-pipeline run with user-owned facts.")
     parser.add_argument("--run-dir", required=True, type=Path)
-    parser.add_argument("--user-facts-json", required=True)
+    parser.add_argument("--user-facts-json")
+    parser.add_argument("--user-facts-json-file", type=Path)
     args = parser.parse_args(argv)
     try:
         response = continue_run(args)

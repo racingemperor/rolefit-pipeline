@@ -2290,6 +2290,8 @@ def test_continue_runtime_run_accepts_user_facts_and_updates_same_run(tmp_path):
     run_dir = run_root / run_id
     facts = {
         "school_name": "Example University",
+        "major_name": "Software Engineering",
+        "grade_or_year": "junior",
         "degree_level": "bachelor",
         "graduation_window": "2028",
         "project_competition_research_experience": [
@@ -2322,9 +2324,63 @@ def test_continue_runtime_run_accepts_user_facts_and_updates_same_run(tmp_path):
         (run_dir / "input" / "normalized" / "runtime_context_packet.json").read_text(encoding="utf-8")
     )["runtime_context_packet"]
     assert context["school_context"]["school_name"] == "Example University"
+    assert context["school_context"]["major_name"] == "Software Engineering"
+    assert context["school_context"]["grade_or_year"] == "junior"
+    assert {"field": "major_name", "value": "Software Engineering"} in context["known_user_facts"]
+    assert {"field": "grade_or_year", "value": "junior"} in context["known_user_facts"]
     assert context["missing_user_owned_facts"] == []
     known_fields = {fact["field"] for fact in context["known_user_facts"]}
-    assert {"school_name", "degree_level", "graduation_window"}.issubset(known_fields)
+    assert {
+        "school_name",
+        "major_name",
+        "grade_or_year",
+        "degree_level",
+        "graduation_window",
+    }.issubset(known_fields)
+
+
+def test_continue_runtime_run_accepts_user_facts_json_file(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "engineering undergraduate, Python and C++, looking for software internship",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    facts_path = tmp_path / "user-facts.json"
+    facts_path.write_text(
+        json.dumps(
+            {
+                "major_name": "Software Engineering",
+                "grade_or_year": "junior",
+                "school_name": "Example University",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = run_python(
+        RUN_CONTINUER,
+        "--run-dir",
+        str(run_dir),
+        "--user-facts-json-file",
+        str(facts_path),
+    )
+
+    assert result.returncode == 0, result.stderr
+    context = json.loads(
+        (run_dir / "input" / "normalized" / "runtime_context_packet.json").read_text(encoding="utf-8")
+    )["runtime_context_packet"]
+    assert context["school_context"]["major_name"] == "Software Engineering"
+    assert context["school_context"]["grade_or_year"] == "junior"
 
 
 def test_simulator_supports_resume_generation_route(tmp_path):
