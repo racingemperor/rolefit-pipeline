@@ -75,24 +75,14 @@ For real subagent execution in Codex Desktop, prefer the Codex Desktop built-in 
 
 For target-role checks, missing details such as city, deadline, headcount, or internship duration should go to `ask_hr_about`. The system can return a prepare-first / `prepare_first` plan while stronger evidence is still being collected.
 
-## Current Status
+## News
 
-Implemented:
-
-- Repo-scoped Codex Skill entry.
-- Engineering major taxonomy and role-cluster support.
-- Public-source policy for official pages, recruitment platforms, school notices, local employers, and social/HR signals.
-- Batched role prompt framework for Codex subagents.
-- General resume generation when the user has no concrete target.
-- Concrete learning/project recommendation contracts.
-- Current resume plus after-learning/project preview.
-- Local DOCX/PDF/PNG resume renderer.
-
-Not packaged yet:
-
-- This is not a `.codex-plugin` package yet.
-- Live recruitment search still depends on the user's Codex environment and available browsing/search tools.
-- Non-engineering disciplines are planned but not fully implemented.
+- 2026-06-28: Added MIT license and made the repository public.
+- 2026-06-28: Simplified the README for public presentation; archived the detailed version in `docs/archive/`.
+- 2026-06-28: Added two resume versions: current factual resume and after-learning/project preview.
+- 2026-06-28: Added DOCX, PDF, PNG, `resume_draft.md`, and `growth_resume_preview.md` export support.
+- 2026-06-28: Current usable scope is engineering majors and engineering-adjacent backgrounds. Non-engineering disciplines remain planned.
+- Packaging note: this is still a repo-scoped Codex Skill, not a `.codex-plugin` package yet.
 
 ## Key Files
 
