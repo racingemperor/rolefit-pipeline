@@ -165,7 +165,8 @@ def test_real_user_flow_prefers_codex_desktop_adapter_when_available():
     assert "subagent_work_orders.json" in flow_text
     assert "execute_subagent_plan.py --manual-controller-execution" in flow_text
     assert "finalize_runtime_run.py --execution-mode manual-controller" in flow_text
-    assert "Codex Desktop 内置 subagent adapter" in readme_text
+    assert "暂未封装为 MCP 服务" in readme_text
+    assert "不是可以在任意 Agent 中自动调用的通用插件" in readme_text
     assert "mock-blocked" in readme_text
 
 
@@ -186,6 +187,7 @@ def test_readme_documents_product_flow_and_public_source_collection_helpers():
     assert "scripts/run_product_flow.py" in readme_text
     assert "scripts/collect_public_source_results.py" in readme_text
     assert "不需要手写 JSON" in readme_text
+    assert "当前 Agent 已经通过浏览器搜索或可见网页结果收集到公开 URL" in readme_text
     assert "main Codex controller has already gathered public URLs" in network_text
     assert "browser search or visible web results" in network_text
     assert "title=" in network_text
