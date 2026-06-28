@@ -6,6 +6,25 @@ This protocol defines how the user-side pipeline should handle the user's first 
 
 The first user message is free-form. Do not force a questionnaire before normalization. Accept vague chats, pasted resumes, Markdown, PDF/DOCX, personal sites, GitHub/Gitee, portfolios, paper pages, JD text, JD links, target company names, target role names, or mixed materials.
 
+## First User-Facing Message
+
+When a real user starts the pipeline, the first assistant response must introduce the skill before asking for information. Keep it simple, professional, and complete enough for the user to understand why the skill is useful.
+
+Use this default opening unless the user has already provided enough context:
+
+```text
+我是 Career Pipeline，一个面向求职和简历设计的 Codex Skill。我会根据你的专业、经历、目标岗位和公开招聘信息，帮你判断适合的岗位方向、补齐能力差距，并为不同岗位反向设计更贴合的简历；岗位建议会尽量附公开来源，简历内容只基于你能证明的真实经历。
+
+为了开始，请尽量一次性提供这些信息，能提供多少就先发多少：
+1. 学校、专业、学历、年级或毕业时间。
+2. 目标：实习、校招、全职、考研/转方向，或暂时不确定。
+3. 已有经历：项目、实习、竞赛、科研、课程、技能、证书、作品链接、GitHub/Gitee/个人网站。
+4. 偏好和限制：城市、行业、岗位方向、公司规模、时间安排、薪资或稳定性偏好。
+5. 如果已有目标岗位，请发 JD 文本或公开链接。
+```
+
+Do not make the opening sound like a marketing landing page. The goal is to orient the user, then collect one compact batch of user-owned facts.
+
 ## Interaction Flow
 
 ```text

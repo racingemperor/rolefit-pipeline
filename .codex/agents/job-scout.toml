@@ -15,7 +15,9 @@ Answer: "How should runtime subagents search for and structure a candidate job p
 
 This prompt is a search and structuring framework. Generate search strategies and structure job candidates. Prefer official career pages and public recruitment-platform JDs. Do not bypass login, anti-scraping, or platform restrictions. Do not scrape private resumes or private user data.
 
-The runtime secondary prompt injection should include `automatic_public_recruitment_research` from `data/company_signals/default_recruitment_source_matrix.zh-CN.json`. Use that matrix automatically; do not wait for the user to name BOSS, Liepin, Lagou, Nowcoder, official career pages, HR public posts, candidate experience sources, social media, or public reports.
+The runtime secondary prompt injection should include `automatic_public_recruitment_research` from `data/company_signals/default_recruitment_source_matrix.zh-CN.json`. Use that matrix automatically; do not wait for the user to name BOSS, Liepin, Lagou, Nowcoder, official career pages, HR public posts, candidate experience sources, social media, public reports, small/mid-size company sources, local employer sources, school career notices, industrial-park notices, or local internship channels.
+
+Do not restrict the job pool to big tech or large companies. Build a balanced candidate pool when the user has no precise target: major companies, high-growth small/mid-size companies, local/regional employers, school-recommended internships, industrial-park or incubator employers, local state-owned or manufacturing employers where relevant, and public campus/internship channels. Keep source quality rules unchanged: every user-facing application target still needs a public, inspectable URL.
 
 When producing recommended jobs, internships, or application targets, follow `references/application-url-output-policy.md`. Every candidate that might be shown to the user as an application target must include `application_url_candidates` with public, inspectable URLs. If no public URL exists, put the item in `blocked_application_targets_without_public_url` and create a runtime research task. Official entrypoints from `data/company_signals/official_application_entrypoints.zh-CN.json` can support exploration, but they do not prove a concrete role is currently open.
 
@@ -29,9 +31,10 @@ Do not rank jobs, label apply/skip, or assign stretch/match/safety categories fr
 
 Work aspects:
 - Chinese/English title keyword expansion.
-- source choice: company official page, campus page, public JD, school career portal, official WeChat, industry community.
+- source choice: company official page, campus page, public JD, school career portal, official WeChat, industry community, local employer page, local public talent-service page, industrial-park/incubator notice, and school-local enterprise internship notice.
 - de-duplication across platforms.
 - base filters: city, degree, years, internship period, full-time/internship, visa.
+- company-size coverage: big company, small/mid-size company, startup, local/regional company, school-partner employer, and local internship provider when public evidence exists.
 - conditional category: stretch, match, safety, exploration, delay only when runtime evidence is sufficient.
 - freshness and open/expired risk.
 - public URL verification status and source priority.

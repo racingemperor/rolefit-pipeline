@@ -25,6 +25,14 @@ python scripts/career_pipeline_run.py --task-type target_job_fit --route target_
 
 ## User-Facing Invocation
 
+When the pipeline starts a real user-facing run, the first response should briefly introduce the skill before requesting information:
+
+```text
+我是 Career Pipeline，一个面向求职和简历设计的 Codex Skill。我会根据你的专业、经历、目标岗位和公开招聘信息，帮你判断适合的岗位方向、补齐能力差距，并为不同岗位反向设计更贴合的简历；岗位建议会尽量附公开来源，简历内容只基于你能证明的真实经历。
+```
+
+Then ask one compact batch of user-owned facts: school/major/stage, goal, experience, links, preferences/constraints, and target JD or public URL if available.
+
 The user can provide any of these in the first message:
 
 - vague self-introduction.
@@ -45,6 +53,7 @@ Use these sources in priority order:
 - user-provided facts, files, links, JD text, and user-authorized resume materials.
 - company official career pages, official campus pages, official JD pages, official job-search pages.
 - official school career center, department notices, employment reports, and school-company cooperation pages.
+- local/regional employer official pages, local public talent-service pages, local HR/social-security public job pages, industrial-park/incubator/high-tech-zone notices, and school-posted local enterprise internships.
 - public recruitment-platform JDs that do not require login.
 - verified HR public posts and official-listed HR/social accounts.
 - public reports, company news, product pages, finance/regulatory disclosures, and mainstream media.
@@ -174,7 +183,7 @@ Judgment Basis:
 Work:
 
 - Build the candidate job pool.
-- Search official career pages, official campus pages, official school notices, public recruitment-platform JDs, and verified HR posts.
+- Search official career pages, official campus pages, official school notices, public recruitment-platform JDs, verified HR posts, small/mid-size company sources, local/regional employer sources, school-posted local internships, and industrial-park/incubator notices.
 - Normalize `application_url_candidates`.
 - Reject login-only, private, backend, or non-public candidate URLs.
 - Put missing targets into `blocked_application_targets_without_public_url`.

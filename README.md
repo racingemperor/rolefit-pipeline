@@ -27,7 +27,7 @@ The skill can help with:
 - **Learning-first planning**: when the user is not ready, propose skills, projects, proof artifacts, and resume-conversion conditions before applying.
 - **Role-specific resume strategy**: design a resume around one company or one role family instead of producing a broad, generic resume.
 - **Personal branding**: decide whether GitHub, Gitee, personal website, portfolio, paper page, project demo, blog, or other assets matter for the target direction.
-- **Public-source job research**: use official career pages, school notices, public JDs, verified HR public posts, reports, and weak social signals with explicit confidence levels.
+- **Public-source job research**: use official career pages, school notices, public JDs, verified HR public posts, reports, local employer sources, small/mid-size company sources, school-local internship notices, and weak social signals with explicit confidence levels.
 - **HR-supervised output**: keep the final advice concise, credible, and easy for a recruiter to scan.
 
 ## Core Idea
@@ -48,6 +48,8 @@ The result should be a compact decision package:
 - proof artifacts to build before applying;
 - one-role resume outline or draft;
 - HR confirmation items such as city, deadline, headcount, or internship duration when the public page is silent.
+
+The job pool should not be limited to big tech. When the user has no precise target, the skill should consider major companies, small/mid-size companies, startups, local/regional employers, school-recommended internships, industrial-park or incubator employers, and local public internship channels when public evidence exists.
 
 ## Pipeline
 
@@ -249,7 +251,7 @@ Implemented:
 - Codex Skill entry and role prompt frameworks.
 - Engineering major taxonomy and employment clusters.
 - Company, school, runtime-parameter, and resume-format seed databases.
-- Public-source policy, URL policy, access-wall recovery, and accuracy tiers.
+- Public-source policy, URL policy, local/small-company source coverage, access-wall recovery, and accuracy tiers.
 - Deterministic local simulation and contract validation scripts.
 - Batched subagent work-order protocol.
 - Manual Controller MVP and Codex Desktop adapter documentation.

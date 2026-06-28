@@ -51,6 +51,56 @@
       "requires_login": false
     },
     {
+      "group_id": "local_regional_employer",
+      "priority": 2,
+      "source_type": "official_or_primary",
+      "display_sources": [
+        "地方企业官网招聘页",
+        "地方企业官方公众号招聘公告",
+        "地方人才服务网公开岗位",
+        "地方人社局/公共就业服务平台公开岗位",
+        "产业园区/孵化器/高新区公开招聘或实习公告",
+        "学校就业网发布的地方企业实习或校招通知"
+      ],
+      "use_for": [
+        "local_or_regional_job_pool",
+        "internship_opportunity",
+        "school_local_enterprise_channel",
+        "role_family",
+        "location_degree_stage",
+        "application_url_candidate"
+      ],
+      "may_set_weight": true,
+      "may_set_final_decision": true,
+      "requires_login": false,
+      "degrade_rule": "Use only public, inspectable pages. If a local platform requires login or shows only a contact poster without job details, treat it as an exploration source or ask_hr_about item, not a role-specific JD."
+    },
+    {
+      "group_id": "small_mid_size_company_public",
+      "priority": 2,
+      "source_type": "recruitment_platform_jd",
+      "display_sources": [
+        "中小企业官网公开招聘页",
+        "创业公司官网公开招聘页",
+        "BOSS直聘/猎聘/拉勾等公开可访问的中小企业 JD",
+        "实习僧等公开可访问的中小企业实习 JD",
+        "牛客企业招聘页中的中小企业公开岗位",
+        "地方招聘会或双选会公开岗位页"
+      ],
+      "use_for": [
+        "small_mid_size_company_job_pool",
+        "startup_or_growth_company_job_pool",
+        "current_jd_requirement",
+        "skill_frequency",
+        "application_url_candidate",
+        "prepare_first_or_explore_target"
+      ],
+      "may_set_weight": true,
+      "may_set_final_decision": true,
+      "requires_login": false,
+      "degrade_rule": "Do not lower source confidence merely because the employer is small. Judge by public URL quality, JD specificity, recency, and whether the source is official or a public recruitment-platform JD."
+    },
+    {
       "group_id": "public_recruitment_platform",
       "priority": 2,
       "source_type": "recruitment_platform_jd",
@@ -175,6 +225,10 @@
     "{company} {role} 校园招聘 官方",
     "{company} {role} 实习 招聘 JD",
     "{company} {role} BOSS直聘 猎聘 拉勾 牛客",
+    "{city} {role} 实习 地方企业 招聘",
+    "{city} {major} 实习 产业园 高新区 孵化器 招聘",
+    "{school} {major} 地方企业 实习 就业 通知",
+    "{role} 中小企业 实习 校招 公开 JD",
     "{company} {role} HR 校招 公开",
     "{company} {role} 面经 offer 复盘",
     "{company} 发展 状况 财报 融资 行业 报告"
