@@ -110,6 +110,9 @@ Concrete project recommendations should use:
       "proof_artifacts": [],
       "resume_conversion_conditions": [],
       "interview_defensibility_questions": [],
+      "candidate_discovery_ref": "",
+      "source_audit_ref": "",
+      "project_interview_pack_ref": "",
       "source_basis": [],
       "risk_notes": []
     }
@@ -117,7 +120,7 @@ Concrete project recommendations should use:
 }
 ```
 
-Project recommendations are preparation guidance, not proof that the user has completed work. Planned work `must not be written as completed resume claims`. ResumeArchitect and FactualReviewer may only convert a project into resume content after proof artifacts exist and the user can explain personal contribution, input/output, core modules, and failure boundaries.
+Project recommendations are preparation guidance, not proof that the user has completed work. Planned work `must not be written as completed resume claims`. When the recommendation depends on an open-source or public project, use `discover_project_candidates.py` or an equivalent candidate-discovery artifact to avoid shallow wrappers and star-count traps, then use `audit_project_repository.py` or equivalent local source audit before treating project claims as source-verified. `build_project_interview_pack.py` can produce the project positioning, existing capability, suggested modifications, resume-ready claims, STAR bullets, interviewer follow-ups, and core-code explanation paths. ResumeArchitect and FactualReviewer may only convert a project into resume content after proof artifacts exist and the user can explain personal contribution, input/output, core modules, and failure boundaries.
 
 HR real questions should use:
 

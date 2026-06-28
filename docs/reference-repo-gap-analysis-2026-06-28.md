@@ -42,18 +42,23 @@ The goal is not to copy their workflows. The useful pattern is: turn target role
 - HR wording must come from the target company or recommended company public sources. If not found, it must be marked unavailable.
 - Candidate experience and social media are limited to preparation notes.
 - The final user-facing report now includes `HR/面试可能追问` and renders concrete project suggestions.
+- Added MVP project scripts:
+  - `discover_project_candidates.py` for candidate scoring and shallow-project filtering.
+  - `audit_project_repository.py` for local source evidence audit.
+  - `build_project_interview_pack.py` for project positioning, existing capability, suggested modifications, resume-ready claims, STAR bullets, interviewer follow-ups, and code explanation paths.
 
 ## Still Not Fully Productized
 
-- The project recommendation system does not yet clone or audit public repositories by default.
-- There is no built-in project source-code verifier like a local repo audit tool.
+- The project recommendation system does not yet run live GitHub/Gitee search by default; candidates must come from a search adapter, JSON candidate pool, or user-side subagent.
+- The project recommendation system does not yet clone public repositories by default.
 - There is no generated project resume pack PDF.
-- GitHub project discovery is still delegated to user-side public source search or subagents.
+- GitHub project discovery is still delegated to user-side public source search or subagents, then passed into `discover_project_candidates.py`.
 - Non-engineering project recommendation rubrics are still reserved for later discipline expansion.
 
 ## Future Enhancements
 
 - Add an optional project-discovery role that searches GitHub/Gitee and public tutorials by target role family.
-- Add a project audit script that checks README, dependencies, entrypoints, tests, and runnable paths.
+- Add a clone/fetch script that writes a source manifest and gates final project recommendations on clone success.
+- Expand the project audit script to check entrypoints, runnable commands, and smoke-test logs.
 - Add a source-code evidence rule before writing project responsibility bullets.
 - Add a resume project pack template for one project, including project intro, personal contribution, technical difficulty, proof artifacts, and interview Q&A.

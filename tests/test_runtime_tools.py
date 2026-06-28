@@ -43,6 +43,15 @@ PUBLIC_SOURCE_SEARCHER = ROOT / ".agents" / "skills" / "career-pipeline" / "scri
 SUBAGENT_ADAPTER_RUNNER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "run_subagent_adapter.py"
 CAREER_PIPELINE_RUNNER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "career_pipeline_run.py"
 FINALIZER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "finalize_runtime_run.py"
+PROJECT_CANDIDATE_DISCOVERER = (
+    ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "discover_project_candidates.py"
+)
+PROJECT_REPO_AUDITOR = (
+    ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "audit_project_repository.py"
+)
+PROJECT_INTERVIEW_PACK_BUILDER = (
+    ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "build_project_interview_pack.py"
+)
 REAL_USER_DEPLOYMENT_FLOW = (
     ROOT
     / ".agents"
@@ -282,6 +291,203 @@ def test_target_job_fit_injections_require_project_and_hr_question_outputs(tmp_p
     assert "candidate experience" in hr_payload
     assert "social media weak signals" in hr_payload
     assert "preparation only" in hr_payload
+
+
+def test_project_candidate_discovery_filters_shallow_projects_and_keeps_mid_star_business_candidates(tmp_path):
+    candidates_path = tmp_path / "project_candidates.json"
+    candidates_path.write_text(
+        json.dumps(
+            {
+                "candidates": [
+                    {
+                        "name": "ticket-flow-service",
+                        "repo_url": "https://github.com/example/ticket-flow-service",
+                        "bucket": "工单客服",
+                        "stars": 1800,
+                        "last_pushed_at": "2026-05-01",
+                        "language": "Java",
+                        "topics": ["spring-boot", "helpdesk", "mysql", "redis"],
+                        "description": "Helpdesk ticket workflow with Spring Boot, MySQL, Redis, Docker.",
+                        "readme_probe": "Ticket status flow, REST API, database migration, Docker compose, tests.",
+                    },
+                    {
+                        "name": "thin-llm-wrapper",
+                        "repo_url": "https://github.com/example/thin-llm-wrapper",
+                        "bucket": "业务型 Agent",
+                        "stars": 42000,
+                        "last_pushed_at": "2026-04-10",
+                        "language": "TypeScript",
+                        "topics": ["llm", "wrapper", "browser-extension"],
+                        "description": "Simple browser extension wrapper around a single LLM call.",
+                        "readme_probe": "Prompt template and browser extension side panel.",
+                    },
+                    {
+                        "name": "agent-research-workflow",
+                        "repo_url": "https://github.com/example/agent-research-workflow",
+                        "bucket": "业务型 Agent",
+                        "stars": 2600,
+                        "last_pushed_at": "2026-03-20",
+                        "language": "Python",
+                        "topics": ["ai-agent", "workflow", "evaluation", "postgres"],
+                        "description": "Research workflow agent with task state, tools, persistence, and evaluation.",
+                        "readme_probe": "Planner, tool calling, task queue, Postgres persistence, eval traces.",
+                    },
+                ]
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    out_dir = tmp_path / "discovery"
+
+    result = run_python(
+        PROJECT_CANDIDATE_DISCOVERER,
+        "--candidates-json",
+        str(candidates_path),
+        "--target-role",
+        "backend or AI application internship",
+        "--jd-text",
+        "Java Spring Boot MySQL Redis ticket workflow LLM agent evaluation",
+        "--mode",
+        "mixed",
+        "--out-dir",
+        str(out_dir),
+    )
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)["project_candidate_discovery_response"]
+    payload = json.loads((out_dir / response["discovery_json"]).read_text(encoding="utf-8"))[
+        "project_candidate_discovery"
+    ]
+    shortlist_names = [item["name"] for item in payload["shortlist"]]
+    excluded_names = [item["name"] for item in payload["excluded"]]
+    assert "ticket-flow-service" in shortlist_names
+    assert "agent-research-workflow" in shortlist_names
+    assert "thin-llm-wrapper" in excluded_names
+    assert payload["shortlist"][0]["score_breakdown"]["star_score"] <= 10
+    assert "shallow_or_wrapper" in json.dumps(payload["excluded"], ensure_ascii=False)
+    assert (out_dir / response["shortlist_md"]).is_file()
+
+
+def make_tiny_project_repo(root: Path) -> Path:
+    repo = root / "tiny_ticket_project"
+    (repo / "routes").mkdir(parents=True)
+    (repo / "tests").mkdir()
+    (repo / "migrations").mkdir()
+    (repo / "README.md").write_text(
+        "# Tiny Ticket Project\n\nREST API for ticket creation, status updates, MySQL persistence, and Redis cache.\n",
+        encoding="utf-8",
+    )
+    (repo / "requirements.txt").write_text("fastapi\nredis\npymysql\npytest\n", encoding="utf-8")
+    (repo / "Dockerfile").write_text("FROM python:3.12-slim\n", encoding="utf-8")
+    (repo / "docker-compose.yml").write_text("services:\n  db:\n    image: mysql:8\n", encoding="utf-8")
+    (repo / "app.py").write_text(
+        "from routes.tickets import router\n\napp = router\n",
+        encoding="utf-8",
+    )
+    (repo / "routes" / "tickets.py").write_text(
+        "def create_ticket(payload):\n    return {'status': 'created', 'payload': payload}\n",
+        encoding="utf-8",
+    )
+    (repo / "migrations" / "001_init.sql").write_text(
+        "create table tickets(id int primary key, status varchar(32));\n",
+        encoding="utf-8",
+    )
+    (repo / "tests" / "test_smoke.py").write_text(
+        "def test_smoke():\n    assert True\n",
+        encoding="utf-8",
+    )
+    return repo
+
+
+def test_project_repo_auditor_extracts_source_evidence_points(tmp_path):
+    repo = make_tiny_project_repo(tmp_path)
+    out_dir = tmp_path / "audit"
+
+    result = run_python(
+        PROJECT_REPO_AUDITOR,
+        "--repo",
+        str(repo),
+        "--name",
+        "tiny-ticket-project",
+        "--out-dir",
+        str(out_dir),
+    )
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)["project_repo_audit_response"]
+    audit = json.loads((out_dir / response["audit_json"]).read_text(encoding="utf-8"))["project_repo_audit"]
+    assert audit["name"] == "tiny-ticket-project"
+    assert "requirements.txt" in audit["dependency_files"]
+    assert "docker-compose.yml" in audit["docker_files"]
+    assert "tests/test_smoke.py" in audit["test_files"]
+    assert "api_backend" in audit["signals"]
+    assert "database_state" in audit["signals"]
+    assert len(audit["source_evidence_points"]) >= 5
+    assert audit["resume_claim_gate"]["source_verified"] is True
+
+
+def test_project_interview_pack_separates_existing_capability_modification_and_resume_ready_claims(tmp_path):
+    repo = make_tiny_project_repo(tmp_path)
+    audit_dir = tmp_path / "audit"
+    audit_result = run_python(
+        PROJECT_REPO_AUDITOR,
+        "--repo",
+        str(repo),
+        "--name",
+        "tiny-ticket-project",
+        "--out-dir",
+        str(audit_dir),
+    )
+    assert audit_result.returncode == 0, audit_result.stderr
+    audit_ref = audit_dir / json.loads(audit_result.stdout)["project_repo_audit_response"]["audit_json"]
+    recommendation_path = tmp_path / "recommendation.json"
+    recommendation_path.write_text(
+        json.dumps(
+            {
+                "project_name": "tiny-ticket-project",
+                "target_role_family": "backend internship",
+                "target_jd_summary": "Java/Python backend internship requiring API, database, cache, Docker, and tests.",
+                "planned_modifications": [
+                    "add ticket search API",
+                    "add Redis cache invalidation notes",
+                    "add API smoke test",
+                ],
+                "completed_modifications": ["read source structure and verified existing smoke test"],
+                "proof_artifacts": ["local source audit", "README", "tests/test_smoke.py"],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    out_dir = tmp_path / "pack"
+
+    result = run_python(
+        PROJECT_INTERVIEW_PACK_BUILDER,
+        "--audit-json",
+        str(audit_ref),
+        "--recommendation-json",
+        str(recommendation_path),
+        "--out-dir",
+        str(out_dir),
+    )
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)["project_interview_pack_response"]
+    pack_text = (out_dir / response["pack_md"]).read_text(encoding="utf-8")
+    for heading in [
+        "## 项目定位",
+        "## 现有能力",
+        "## 建议改造",
+        "## 可写入简历",
+        "## STAR 简历项目",
+        "## 面试官追问",
+        "## 核心代码讲解",
+    ]:
+        assert heading in pack_text
+    assert "add ticket search API" in pack_text
+    assert "未完成内容不能写成已完成项目" in pack_text
+    assert "tests/test_smoke.py" in pack_text
 
 
 def test_engineering_smoke_test_writes_results_for_ten_profiles(tmp_path):
@@ -3560,6 +3766,9 @@ def test_role_prompts_cover_hr_questions_and_concrete_project_recommendations():
         "implementation_steps",
         "proof_artifacts",
         "resume_conversion_conditions",
+        "discover_project_candidates.py",
+        "audit_project_repository.py",
+        "build_project_interview_pack.py",
         "must not be written as completed resume claims",
     ]:
         assert term in learning_prompt
@@ -3583,6 +3792,19 @@ def test_role_prompts_cover_hr_questions_and_concrete_project_recommendations():
 
     assert "HR/面试可能追问" in user_flow
     assert "具体项目建议" in user_flow
+
+
+def test_project_toolchain_is_documented_in_skill_entrypoint():
+    skill_text = SKILL_MD.read_text(encoding="utf-8")
+
+    for term in [
+        "discover_project_candidates.py",
+        "audit_project_repository.py",
+        "build_project_interview_pack.py",
+        "local source audit",
+        "project interview pack",
+    ]:
+        assert term in skill_text
 
 
 def test_user_facing_package_rules_are_documented_across_runtime_layers():

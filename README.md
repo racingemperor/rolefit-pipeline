@@ -27,6 +27,7 @@ The skill can help with:
 - **Target-job fit analysis**: compare the user's current evidence with a concrete internship or full-time role.
 - **Learning-first planning**: when the user is not ready, propose skills, projects, proof artifacts, and resume-conversion conditions before applying.
 - **Concrete project recommendation**: when project evidence is weak, suggest the easiest credible project path for the target role, including implementation steps, proof artifacts, and when it can truthfully enter the resume.
+- **Project evidence toolchain**: score public project candidates, audit local source repositories, and generate project interview packs before turning project work into resume-ready claims.
 - **Role-specific resume strategy**: design a resume around one company or one role family instead of producing a broad, generic resume.
 - **Personal branding**: decide whether GitHub, Gitee, personal website, portfolio, paper page, project demo, blog, or other assets matter for the target direction.
 - **Public-source job research**: use official career pages, school notices, public JDs, verified HR public posts, reports, local employer sources, small/mid-size company sources, school-local internship notices, and weak social signals with explicit confidence levels.
@@ -113,6 +114,14 @@ When a user lacks project experience, the project advice should be specific enou
 - resume-conversion conditions.
 
 Planned project work is preparation. It must not be written as completed resume experience until the user actually finishes the proof artifacts and can explain personal contribution.
+
+For open-source or public project paths, the bundled MVP scripts can support the evidence chain:
+
+- `discover_project_candidates.py`: scores a public candidate pool, caps star-count influence, and filters shallow wrappers, templates, browser extensions, SDK/framework-only projects, and missing public repo URLs.
+- `audit_project_repository.py`: scans a locally cloned repository for README, dependencies, Docker/deploy files, tests, API/backend signals, state/database evidence, async jobs, AI/agent signals, and source evidence points.
+- `build_project_interview_pack.py`: turns source audit evidence and a recommendation into a project positioning, existing-capability/modification/resume-ready split, STAR outline, interviewer follow-ups, core-code explanation path, and proof-artifact list.
+
+Without local source audit evidence, project recommendations remain preparation guidance and should not become completed resume claims.
 
 ### HR Questions From Public Sources
 
