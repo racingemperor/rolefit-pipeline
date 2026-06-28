@@ -42,6 +42,8 @@ Source accuracy supervision: Tier A/B sources may support HR-readable recommenda
 
 When preparing the final answer for the user, produce a professional, concise, resume-like user-facing summary. Prefer this structure: positioning conclusion, recommended targets with public URLs, why they match, gaps to fix before applying, ask_hr_about confirmation items, and next 3 actions. Hide internal runtime terms unless the user is debugging the pipeline.
 
+Review `user_facing_package` before presentation. It should read like a professional career tool result, not an internal pipeline report. Require conclusion first, public URLs for every recommended target, clear separation between current fit and learnable gaps, truthful resume reverse-design guidance, short HR confirmation items, and exactly three next actions when possible. Reject or revise user-facing text that exposes raw `blocked_outputs`, run directories, execution logs, schema names, invocation packets, or long internal debate. Internal limitations should be translated into plain wording under `currently_unavailable`.
+
 Review framework:
 - 10-second clarity: target role, education status, strongest evidence, and fit angle are visible quickly.
 - competitive signal density: the strongest 2-4 signals are explicit and not buried.
@@ -186,12 +188,14 @@ Output JSON:
   "recommended_reframe": [],
   "user_facing_summary_guidance": {
     "style": "professional_concise_resume_like",
+    "required_package_field": "user_facing_package",
     "sections": [
       "positioning_conclusion",
       "recommended_targets_with_public_urls",
       "match_basis",
       "gaps_to_fix_before_application",
       "ask_hr_about",
+      "currently_unavailable",
       "next_three_actions"
     ],
     "avoid": [
@@ -201,6 +205,15 @@ Output JSON:
       "schema jargon",
       "long internal debate"
     ]
+  },
+  "user_facing_package_review": {
+    "package_present": false,
+    "professional_concise": false,
+    "conclusion_first": false,
+    "all_targets_have_public_urls": false,
+    "internal_fields_hidden": false,
+    "next_three_actions_present": false,
+    "revision_required": []
   },
   "one_round_followup_ok": false,
   "job_direction_blocked": false,

@@ -19,6 +19,8 @@ Concrete skill priorities, project recommendations, ready-to-apply thresholds, a
 
 When the user gives a concrete job or internship, design the learning path against that exact target. Separate "not ready yet" from "can become competitive after preparation"; never recommend putting unfinished learning into the resume. A useful prepare-first learning path may be returned from available JD text, public URL, role-family evidence, repository priors marked as priors, and user materials. Exact learning priority weights, final ready-to-apply conditions, company-specific project choices, and resume-conversion claims require current JD/company/HR evidence or user-provided materials. If the public page is silent on opening status, freshness, city, work location, onsite days, arrival time, deadline, headcount, or internship duration, add those details to `ask_hr_about` instead of blocking the learning path.
 
+Make every learning recommendation convertible into evidence. For each key gap, specify the skill to learn, the proof artifact to build, the minimum completion condition, and when it may be written into a resume. This lets the orchestrator show `gaps_to_fix_before_application` and a resume reverse-design plan without falsely claiming unfinished learning as current ability.
+
 Prepare or analyze:
 - hard blockers.
 - learnable skill gaps.

@@ -141,6 +141,190 @@ def validate_source_discovery(run_dir: Path, search_results_ref: str, allowed_so
     return True, [allowed_sources_ref]
 
 
+def source_accuracy_tier(source_type: str) -> str:
+    if source_type in {"official_or_primary", "official_school_notice", "user_provided"}:
+        return "A"
+    if source_type in {"recruitment_platform_jd", "verified_hr_public_post", "public_report"}:
+        return "B"
+    if source_type in {"candidate_experience_secondary", "social_media_weak"}:
+        return "C"
+    return "D"
+
+
+def public_source_index(allowed_sources_payload: dict[str, Any]) -> list[dict[str, Any]]:
+    sources = allowed_sources_payload.get("sources")
+    if not isinstance(sources, list):
+        return []
+    index: list[dict[str, Any]] = []
+    seen_urls: set[str] = set()
+    for source in sources:
+        if not isinstance(source, dict):
+            continue
+        url = str(source.get("source_ref") or "").strip()
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        source_type = str(source.get("source_type") or "user_provided")
+        index.append(
+            {
+                "title": str(source.get("title") or "公开来源"),
+                "url": url,
+                "source_type": source_type,
+                "source_accuracy_tier": source_accuracy_tier(source_type),
+                "may_support_application_claims": bool(source.get("may_set_final_decision")),
+                "note": str(source.get("snippet") or "")[:180],
+            }
+        )
+    return index
+
+
+def urls_from_target(target: dict[str, Any]) -> list[str]:
+    urls: list[str] = []
+    for url in target.get("public_urls") or []:
+        if isinstance(url, str) and url.startswith(("http://", "https://")):
+            urls.append(url)
+    for candidate in target.get("application_url_candidates") or []:
+        if not isinstance(candidate, dict):
+            continue
+        url = str(candidate.get("url") or "").strip()
+        requires_login = candidate.get("requires_login") is True
+        tier = str(candidate.get("source_accuracy_tier") or "")
+        if url.startswith(("http://", "https://")) and not requires_login and tier != "D":
+            urls.append(url)
+    return list(dict.fromkeys(urls))
+
+
+def collect_recommended_targets(role_outputs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    targets: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, tuple[str, ...]]] = set()
+    for payload in role_outputs:
+        for target in payload.get("recommended_application_targets") or []:
+            if not isinstance(target, dict):
+                continue
+            urls = urls_from_target(target)
+            if not urls:
+                continue
+            company = str(target.get("company") or "").strip()
+            role = str(target.get("title_or_role_family") or target.get("role_family") or "").strip()
+            key = (company, role, tuple(urls))
+            if key in seen:
+                continue
+            seen.add(key)
+            targets.append(
+                {
+                    "company": company or "待确认公司",
+                    "title_or_role_family": role or "待确认岗位方向",
+                    "scenario": str(target.get("scenario") or "explore"),
+                    "public_urls": urls,
+                    "why_this_target": str(target.get("why_this_target") or "公开来源可检查，适合作为下一步探索对象。"),
+                    "ask_hr_about": [
+                        str(item)
+                        for item in target.get("ask_hr_about") or []
+                        if str(item).strip()
+                    ],
+                }
+            )
+    return targets
+
+
+def collect_learning_gaps(role_outputs: list[dict[str, Any]]) -> list[str]:
+    gaps: list[str] = []
+    for payload in role_outputs:
+        gap_analysis = payload.get("skill_gap_analysis")
+        if isinstance(gap_analysis, dict):
+            for field in [
+                "must_have_gaps",
+                "nice_to_have_gaps",
+                "project_evidence_gaps",
+                "interview_defensibility_gaps",
+                "evidence_gaps",
+                "narrative_gaps",
+            ]:
+                for item in gap_analysis.get(field) or []:
+                    text = str(item).strip()
+                    if text:
+                        gaps.append(text)
+        learning = payload.get("learning_plan_before_application")
+        if isinstance(learning, dict):
+            for field in ["skills_to_learn", "projects_to_build", "proof_artifacts"]:
+                for item in learning.get(field) or []:
+                    text = str(item).strip()
+                    if text:
+                        gaps.append(text)
+    return list(dict.fromkeys(gaps))[:6]
+
+
+def collect_ask_hr_about(role_outputs: list[dict[str, Any]]) -> list[str]:
+    items: list[str] = []
+    for payload in role_outputs:
+        for target in payload.get("recommended_application_targets") or []:
+            if isinstance(target, dict):
+                items.extend(str(item) for item in target.get("ask_hr_about") or [])
+        review = payload.get("application_url_review")
+        if isinstance(review, dict):
+            items.extend(str(item) for item in review.get("ask_hr_about") or [])
+        learning = payload.get("learning_plan_before_application")
+        if isinstance(learning, dict):
+            items.extend(str(item) for item in learning.get("ask_hr_about") or [])
+    cleaned = [item for item in (text.strip() for text in items) if item]
+    return list(dict.fromkeys(cleaned))
+
+
+def build_user_facing_package(
+    plan: dict[str, Any],
+    manifest_payload: dict[str, Any],
+    allowed_sources_payload: dict[str, Any],
+    role_outputs: list[dict[str, Any]],
+    limited_blocked_outputs: list[str],
+) -> dict[str, Any]:
+    task_type = str(manifest_payload["execution_manifest"].get("task_type") or plan.get("task_type") or "")
+    source_index = public_source_index(allowed_sources_payload)
+    recommended_targets = collect_recommended_targets(role_outputs)
+    gaps = collect_learning_gaps(role_outputs)
+    ask_hr = collect_ask_hr_about(role_outputs)
+    if not ask_hr:
+        ask_hr = [
+            "如果公开页面没有写明岗位状态、城市、到岗时间、截止日期或实习周期，投递前向 HR 或招聘联系人确认。"
+        ]
+    unavailable_items = []
+    if limited_blocked_outputs:
+        unavailable_items.append(
+            "精确适配分、最终投递优先级或公司定制权重需要更强的当前 JD、公开来源和个人经历证据。"
+        )
+    if recommended_targets:
+        conclusion = (
+            "已完成公开来源和角色输出校验，可以基于下列公开入口继续做岗位探索、准备优先级和一岗一简历设计。"
+        )
+    else:
+        conclusion = (
+            "已完成公开来源和角色输出校验；当前更适合先做岗位方向探索、能力补齐和简历素材整理，"
+            "具体投递目标需要继续绑定公开 JD 或官方入口。"
+        )
+    return {
+        "positioning_conclusion": conclusion,
+        "task_type": task_type,
+        "evidence_status": "公开来源已通过策略校验；角色输出已完成运行检查。",
+        "recommended_targets": recommended_targets,
+        "public_source_index": source_index,
+        "gaps_to_fix_before_application": gaps
+        or [
+            "围绕目标岗位补齐可验证的项目、技能和成果证据。",
+            "未完成的学习内容只能写入学习计划，不能写成已掌握技能或已完成项目。",
+        ],
+        "resume_reverse_design": (
+            "有明确目标岗位时，按该岗位 JD、公开来源和可证明经历生成一岗一简历；"
+            "没有明确目标时，先生成覆盖面更广的校招/实习版简历。"
+        ),
+        "ask_hr_about": ask_hr,
+        "currently_unavailable": unavailable_items,
+        "next_three_actions": [
+            "先打开公开来源，确认岗位方向、投递入口和你愿意接受的城市/到岗方式。",
+            "补充学校、专业、项目职责、代码/作品链接、实习时间等用户自有信息，以便提高匹配和简历质量。",
+            "选定一个目标岗位或 JD 后，进入一岗一简历流程：岗位要求分析、能力补齐、简历反向设计和事实审核。",
+        ],
+    }
+
+
 def update_manifest_for_final(
     run_dir: Path,
     manifest_payload: dict[str, Any],
@@ -192,8 +376,10 @@ def finalize(args: argparse.Namespace) -> dict[str, Any]:
         args.search_results_ref,
         args.allowed_sources_ref,
     )
+    allowed_sources_payload = load_json(run_dir / args.allowed_sources_ref)
     role_output_refs = []
     role_packets = []
+    role_outputs = []
     limited_blocked_outputs: list[str] = []
     for item in plan["dispatch_queue"]:
         output_ref = item["output_artifact_target"]
@@ -206,8 +392,16 @@ def finalize(args: argparse.Namespace) -> dict[str, Any]:
         )
         limited_blocked_outputs.extend(role_blocked_outputs)
         role_output_refs.append(output_ref)
+        role_outputs.append(payload)
         role_packets.append(payload["role_output_packet"])
     limited_blocked_outputs = sorted(set(limited_blocked_outputs))
+    user_facing_package = build_user_facing_package(
+        plan,
+        manifest_payload,
+        allowed_sources_payload,
+        role_outputs,
+        limited_blocked_outputs,
+    )
     final_ref = args.output
     final_path = run_dir / final_ref
     decision_package = {
@@ -234,6 +428,7 @@ def finalize(args: argparse.Namespace) -> dict[str, Any]:
                 "merge/runtime_weights.json",
             ),
             "gate_evidence_refs": role_output_refs + source_gate_refs,
+            "user_facing_package": user_facing_package,
             "blocked_outputs": limited_blocked_outputs,
             "degraded_outputs": limited_blocked_outputs,
             "decision_summary": (

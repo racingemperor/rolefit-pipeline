@@ -112,3 +112,15 @@ Treat these as product-flow bugs:
 ## Current Feedback
 
 The prompt framework is strong enough to guide this flow, but the next real test should check natural-language quality. The main remaining risk is not contract shape; it is whether the final user-facing answer feels like a professional career tool instead of an internal pipeline report.
+
+## Resolved Coverage
+
+The current prompt and runtime contract now require a dedicated `user_facing_package` before final presentation. This package must:
+
+- keep the conclusion first and the language professional.
+- include public-source URLs when targets are shown.
+- translate internal blockers into plain-language limitations.
+- hide raw `blocked_outputs`, run directories, execution logs, schemas, and role packets.
+- include gaps to fix, resume reverse-design guidance, HR confirmation items, and `next_three_actions`.
+
+The finalizer now writes `user_facing_package` into `final/decision_package.json`, and tests check that the user-facing layer exists, includes public source URLs, has three next actions, and does not expose internal runtime fields.

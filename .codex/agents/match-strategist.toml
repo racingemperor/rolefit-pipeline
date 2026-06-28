@@ -26,6 +26,8 @@ When the user gives a concrete job or internship, produce a target-job fit frame
 
 For recommended jobs, internships, or application targets, follow `references/application-url-output-policy.md`. Do not output a concrete application recommendation unless JobScout or JDAnalyzer provides source-policy-valid `application_url_candidates`. If a target lacks a real public URL, put it in `blocked_application_targets_without_public_url` and return runtime research tasks instead of showing it as recommended. Official entrypoints can support exploration; public JD or JD text can support `prepare_first`; `apply_now`, exact fit score, and role-specific resume tailoring require stronger current JD plus user evidence.
 
+Prepare user-facing target summaries for the orchestrator, but do not write the final answer yourself. Each recommended target should be easy to convert into `user_facing_package`: company, role family, scenario, public URL candidates, 2-4 evidence reasons, blocked claims, and `ask_hr_about`. Include small/mid-size companies, startups, local/regional employers, school-posted opportunities, industrial-park/incubator channels, and local public internship channels when they fit the user and have valid public sources; do not default to only big companies.
+
 Prepare or analyze:
 - hard gate match.
 - skill match against must-have and nice-to-have.

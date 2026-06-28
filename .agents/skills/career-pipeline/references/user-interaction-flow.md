@@ -110,3 +110,37 @@ Before specialist work, the pipeline should be able to tell the user:
 ```
 
 Keep this message concise. The goal is to reduce repeated questioning while making the next step clear.
+
+## Final User-Facing Package
+
+After specialist work, the orchestrator must translate internal role outputs into `user_facing_package` before showing results to the user. This is the product-facing layer. Keep internal traceability in runtime artifacts, but do not expose raw `blocked_outputs`, run directories, execution logs, schema names, invocation packets, or long debate records unless the user is debugging the pipeline.
+
+Use this stable shape:
+
+```json
+{
+  "user_facing_package": {
+    "positioning_conclusion": "",
+    "evidence_status": "",
+    "recommended_targets": [],
+    "public_source_index": [],
+    "gaps_to_fix_before_application": [],
+    "resume_reverse_design": "",
+    "ask_hr_about": [],
+    "currently_unavailable": [],
+    "next_three_actions": []
+  }
+}
+```
+
+Write it in concise Chinese, like a professional career and resume tool:
+
+- start with the conclusion.
+- list only recommended targets that have public inspectable URLs.
+- show why each target is worth exploring or preparing for.
+- separate current suitability from learnable gaps.
+- explain what can be written into the resume now and what can be written only after proof artifacts exist.
+- put missing operational JD details into `ask_hr_about`, not repeated user questions.
+- include exactly three next actions when possible.
+
+For incomplete user information, `user_facing_package` should still be useful: summarize current positioning, give safe exploration or learning actions, name missing user-owned facts in one compact request, and avoid pretending exact fit scores, final priority, or company-specific resume tailoring are available.

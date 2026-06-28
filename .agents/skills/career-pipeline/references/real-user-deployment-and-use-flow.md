@@ -423,23 +423,19 @@ User Input
 
 ## Final User Output
 
-The final package should include:
+The final package should keep internal traceability in `decision_package`, but the text shown to the user should come from `user_facing_package`. This layer exists so the real user sees a professional career-planning result, not a runtime report. Do not expose raw `blocked_outputs`, run directories, execution logs, schema names, invocation packets, or long internal debate unless the user is debugging the pipeline.
 
-- known candidate summary.
-- major/discipline cluster and cross-tags.
-- current target or no-target exploration state.
-- public evidence index and source confidence.
-- target role/JD analysis when available.
-- recommended_application_targets with real public URLs.
-- blocked_application_targets_without_public_url.
-- ask_hr_about for missing HR-operational details.
+`user_facing_package` should include:
+
+- positioning conclusion.
+- evidence status and source confidence.
+- recommended targets with real public URLs, when source-policy-valid URLs exist.
+- public source index so the user can inspect information sources.
 - current fit and learnable gaps.
-- learning plan and proof artifacts.
-- personal branding plan.
-- HR readability review.
-- resume format gate result.
-- resume draft only when allowed.
-- factual review and risk notes.
-- next actions.
+- learning plan, proof artifacts, and resume-conversion conditions.
+- resume reverse-design note: one role, one resume; broad campus version when no target exists.
+- `ask_hr_about` for missing HR-operational details.
+- what is currently unavailable because stronger evidence is missing.
+- `next_three_actions`.
 
-Keep the final user output concise and professional: conclusion first, then evidence, recommended public URLs, gaps to fix, HR confirmation items, and next 3 actions. If a required source, URL, subagent, or user fact is missing, return a degraded package for the affected fields instead of guessing or exposing internal runtime details.
+Keep the final user output concise and professional: conclusion first, then evidence, recommended public URLs, gaps to fix, HR confirmation items, and next 3 actions. If a required source, URL, subagent, or user fact is missing, return a degraded `user_facing_package` for the affected fields instead of guessing or exposing internal runtime details. Internal `blocked_outputs` may remain inside the runtime package, but user-facing wording should translate them into plain-language limitations such as "精确适配分需要当前 JD 和更多个人经历证据".

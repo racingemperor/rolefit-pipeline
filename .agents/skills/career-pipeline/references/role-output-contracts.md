@@ -216,6 +216,56 @@ Roles that prepare or challenge fit, learning, branding, resume structure, HR re
 
 Use these fields when one role challenges another role's claim or when a conclusion depends on missing runtime evidence. Do not silently erase disagreements. If a conflict depends on missing user evidence, return a user-confirmation point instead of forcing a final recommendation. If a conflict depends on public or official evidence, create `runtime_research_tasks` and hand off to the responsible local subagent.
 
+## User-Facing Package Fields
+
+The final user-visible result should be exposed through `user_facing_package`. Internal packages may keep `blocked_outputs`, `degraded_outputs`, run directories, invocation references, execution logs, role packets, and schema details for traceability; `user_facing_package` must translate those internals into concise professional Chinese.
+
+Use this shape:
+
+```json
+{
+  "user_facing_package": {
+    "positioning_conclusion": "",
+    "task_type": "",
+    "evidence_status": "",
+    "recommended_targets": [
+      {
+        "company": "",
+        "title_or_role_family": "",
+        "scenario": "apply_now|prepare_first|explore|skip",
+        "public_urls": [],
+        "why_this_target": "",
+        "ask_hr_about": []
+      }
+    ],
+    "public_source_index": [
+      {
+        "title": "",
+        "url": "",
+        "source_type": "",
+        "source_accuracy_tier": "A|B|C|D",
+        "may_support_application_claims": false,
+        "note": ""
+      }
+    ],
+    "gaps_to_fix_before_application": [],
+    "resume_reverse_design": "",
+    "ask_hr_about": [],
+    "currently_unavailable": [],
+    "next_three_actions": []
+  }
+}
+```
+
+Rules:
+
+- `recommended_targets` must not include a target with empty `public_urls`.
+- translate raw `blocked_outputs` into `currently_unavailable` using user-friendly wording.
+- do not include run directories, execution logs, raw role packets, or schema names.
+- keep `next_three_actions` to exactly three items when possible.
+- planned learning can appear as a gap or proof-artifact task, but not as a completed resume claim.
+- if no target job exists, use exploration targets, role families, learning gaps, and broad campus resume guidance instead of fake precision.
+
 ## Input Normalization Fields
 
 The first stage should expose:

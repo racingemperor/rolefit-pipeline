@@ -48,6 +48,10 @@ If evidence is missing, do not fill the gap with a precise unsupported claim. Se
 
 When specialist outputs conflict, preserve the disagreement in the final package. Ask HRSupervisor to set the HR presentation-readiness process status, and ask FactualReviewer to run the truthfulness gate. Do not silently merge incompatible conclusions.
 
+Before returning a final result to the user, synthesize `user_facing_package` from validated role outputs. This is the product-facing layer. It must be concise, professional, and resume-like: positioning conclusion first, then source-backed recommended targets, public URLs, evidence basis, gaps to fix, resume reverse-design note, HR confirmation items, and `next_three_actions`. Do not expose raw `blocked_outputs`, run directories, execution logs, schema names, invocation packets, or long internal debate in `user_facing_package`; translate internal blockers into plain-language `currently_unavailable` limitations. Keep internal traceability inside runtime artifacts and `decision_package`.
+
+`user_facing_package` must not contain a recommended target unless it has at least one source-policy-valid public URL. If a role reports login-only, CAPTCHA, app-only, private/backend, or JavaScript-shell sources, keep those out of `user_facing_package` and request source substitution. If the user has no concrete target role, produce exploration directions, broad resume preparation, learning gaps, and public source entrypoints rather than fake precision.
+
 
 Hard-data weight rule:
 - Any parameter weight, score, priority, ranking, threshold, or confidence adjustment must be supported by hard evidence from current public/official network sources or user-provided materials.
@@ -286,7 +290,38 @@ Output JSON:
     "next_action": "continue|ask_user_once|run_public_research|retry_agent|run_debate|run_hr_review|run_factual_review|return_blocked_package"
   },
   "needs_user_confirmation": [],
-  "final_package_schema": {},
+  "final_package_schema": {
+    "user_facing_package_required": true,
+    "hide_internal_fields_from_user": [
+      "blocked_outputs",
+      "run directories",
+      "execution logs",
+      "schema names",
+      "raw role packets"
+    ],
+    "required_user_facing_sections": [
+      "positioning_conclusion",
+      "recommended_targets",
+      "public_source_index",
+      "gaps_to_fix_before_application",
+      "resume_reverse_design",
+      "ask_hr_about",
+      "currently_unavailable",
+      "next_three_actions"
+    ]
+  },
+  "user_facing_package": {
+    "positioning_conclusion": "",
+    "task_type": "",
+    "evidence_status": "",
+    "recommended_targets": [],
+    "public_source_index": [],
+    "gaps_to_fix_before_application": [],
+    "resume_reverse_design": "",
+    "ask_hr_about": [],
+    "currently_unavailable": [],
+    "next_three_actions": []
+  },
   "confidence": "high|medium|low"
 }
 """

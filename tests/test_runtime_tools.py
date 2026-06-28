@@ -1162,6 +1162,14 @@ def test_finalizer_writes_final_package_when_role_outputs_are_done(tmp_path):
     assert final_package["decision_package"]["real_subagent_execution"] is True
     assert final_package["decision_package"]["source_discovery_ready"] is True
     assert final_package["decision_package"]["role_output_refs"]
+    user_package = final_package["decision_package"]["user_facing_package"]
+    assert user_package["positioning_conclusion"]
+    assert user_package["public_source_index"][0]["url"].startswith("https://")
+    assert len(user_package["next_three_actions"]) == 3
+    user_package_text = json.dumps(user_package, ensure_ascii=False)
+    assert "blocked_outputs" not in user_package_text
+    assert "run_dir" not in user_package_text
+    assert "execution_log" not in user_package_text
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["execution_manifest"]["current_stage"] == "final_package_ready"
     assert manifest["run_state"]["stage"] == "final_package_ready"
@@ -3278,6 +3286,38 @@ def test_role_prompts_gate_application_recommendations_on_public_urls():
     assert "professional, concise, resume-like user-facing summary" in hr_supervisor
     assert "application_url_fact_review" in factual_reviewer
     assert "missing HR-operational fields" in factual_reviewer
+
+
+def test_user_facing_package_rules_are_documented_across_runtime_layers():
+    user_flow = (
+        ROOT
+        / ".agents"
+        / "skills"
+        / "career-pipeline"
+        / "references"
+        / "user-interaction-flow.md"
+    ).read_text(encoding="utf-8")
+    deployment_flow = REAL_USER_DEPLOYMENT_FLOW.read_text(encoding="utf-8")
+    role_contracts = (
+        ROOT
+        / ".agents"
+        / "skills"
+        / "career-pipeline"
+        / "references"
+        / "role-output-contracts.md"
+    ).read_text(encoding="utf-8")
+    orchestrator = (ROOT / ".codex" / "agents" / "career-orchestrator.toml").read_text(
+        encoding="utf-8"
+    )
+    hr_supervisor = (ROOT / ".codex" / "agents" / "hr-supervisor.toml").read_text(
+        encoding="utf-8"
+    )
+
+    for text in [user_flow, deployment_flow, role_contracts, orchestrator, hr_supervisor]:
+        assert "user_facing_package" in text
+        assert "blocked_outputs" in text
+        assert "run directories" in text or "run_dir" in text
+        assert "next_three_actions" in text
 
 
 def test_target_job_fit_policy_does_not_overblock_when_current_jd_details_are_missing():
