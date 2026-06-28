@@ -205,6 +205,10 @@ python .agents/skills/career-pipeline/scripts/validate_runtime_contracts.py --re
 pytest -q
 ```
 
+For product-flow review without running the full test suite, use the manual user-flow checklist:
+
+- [Incomplete undergraduate user flow](docs/manual-tests/incomplete-undergrad-user-flow-2026-06-28.md)
+
 ## Real User-Side Execution
 
 For real output in Codex Desktop, prefer the **Codex Desktop built-in subagent adapter** when current-session `multi_agent_v1.spawn_agent` is available.
