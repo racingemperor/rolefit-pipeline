@@ -122,6 +122,8 @@ InputNormalizer
   -> MatchStrategist
   -> LearningPathStrategist
   -> PersonalBrandingStrategist
+  -> ResumePolisher
+  -> PortfolioAssetBuilder
   -> HRSupervisor
   -> ResumeFormatGate
   -> ResumeArchitect
@@ -132,10 +134,12 @@ InputNormalizer
 Short routes:
 
 - Major positioning: `InputNormalizer -> MajorClusterClassifier`.
-- Resume review: `InputNormalizer -> ProfileExtractor -> ResumeFormatGate -> ResumeArchitect -> FactualReviewer -> HRSupervisor`.
+- Resume review: `InputNormalizer -> ProfileExtractor -> ResumeFormatGate -> ResumePolisher -> ResumeArchitect -> FactualReviewer -> HRSupervisor`.
 - Job analysis: `InputNormalizer -> JDAnalyzer -> CompanyIntelligenceAnalyst -> MarketSentimentAnalyzer`.
 - Job search: `InputNormalizer -> MajorClusterClassifier -> ProfileExtractor -> JobScout -> JDAnalyzer -> MatchStrategist -> LearningPathStrategist`.
 - Target job fit: `InputNormalizer -> MajorClusterClassifier -> ProfileExtractor -> JDAnalyzer -> CompanyIntelligenceAnalyst -> JobScout -> MatchStrategist -> LearningPathStrategist -> HRSupervisor -> FactualReviewer`.
+- Existing resume polish: `InputNormalizer -> ProfileExtractor -> ResumeFormatGate -> ResumePolisher -> ResumeArchitect -> FactualReviewer -> HRSupervisor`.
+- Authorized portfolio asset improvement: `InputNormalizer -> ProfileExtractor -> PersonalBrandingStrategist -> PortfolioAssetBuilder -> FactualReviewer -> HRSupervisor`.
 
 ## Operating Rules
 
@@ -165,6 +169,8 @@ Short routes:
 - When the user gives a concrete job or internship, separate immediate fit from growth path: judge suitability from user evidence plus available JD/public evidence, mark unsupported exact scores or tailored claims as unavailable, and route learnable gaps to `LearningPathStrategist` for specific skills, projects, proof artifacts, and resume-conversion conditions before application.
 - When the user lacks project evidence or the target role expects stronger hands-on proof, require `LearningPathStrategist` to produce concrete project recommendations: role-fit rationale, easiest credible completion path, implementation steps, proof artifacts, resume-conversion conditions, and interview-defensibility questions. Planned project work must not be written as completed resume claims.
 - For project-backed resume or interview claims, prefer the local project toolchain: discover public candidates, audit a locally cloned repository, then build a project interview pack. Without local source audit evidence, project recommendations remain preparation guidance and cannot become resume-ready project claims.
+- When the user provides an existing resume, route through `ResumePolisher` before final resume drafting. Preserve the user's original resume format by default. Use repository resume templates only to strengthen missing section logic or evidence placement; if the template is more specific and persuasive, add supported content into the original resume instead of replacing the user's format.
+- When the user wants help with a personal website, GitHub/Gitee account, project README, demo, portfolio, blog, paper page, or other public proof link, route through `PersonalBrandingStrategist` and `PortfolioAssetBuilder`. Planning is allowed without write access, but generating, editing, publishing, pushing, or modifying user-owned assets requires explicit user authorization and a bounded path or asset scope.
 - When the output includes HR questions or HR screening wording, require `HRSupervisor` to bind each item to the target company or recommended company and a public source URL from official recruiting pages, enterprise-certified recruiting accounts, verified HR public posts, or public recruitment-platform process notes. Do not generate HR wording yourself; if company-bound public HR wording is unavailable, return a limitation and runtime research tasks. Candidate experience and social media weak signals are preparation only.
 - If a public JD or application URL does not state opening status, freshness, city, work location, onsite days, arrival time, deadline, headcount, or internship duration, do not ask the user to fill those details and do not block the recommendation only for that reason. Add them to `ask_hr_about` and tell the user to confirm with HR or the recruiter.
 - Use candidate/social media information only as auxiliary preparation or risk signals unless it is verified by official sources.
@@ -181,6 +187,8 @@ Short routes:
 ## Role Prompt Files
 
 Role prompt frameworks live in `.codex/agents/*.toml`.
+
+Current role prompt files include `resume-polisher` for existing-resume polishing and `portfolio-asset-builder` for authorized personal website, GitHub/Gitee, README, demo, and portfolio asset improvement.
 
 Each file contains:
 

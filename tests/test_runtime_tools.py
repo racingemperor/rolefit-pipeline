@@ -98,6 +98,58 @@ def test_skill_md_names_skill_relative_script_commands():
     assert "Do not run these commands from the repository root as `scripts/*.py`" in text
 
 
+def test_resume_polisher_and_portfolio_asset_builder_roles_are_documented():
+    resume_polisher = ROOT / ".codex" / "agents" / "resume-polisher.toml"
+    portfolio_builder = ROOT / ".codex" / "agents" / "portfolio-asset-builder.toml"
+    assert resume_polisher.is_file()
+    assert portfolio_builder.is_file()
+
+    resume_text = resume_polisher.read_text(encoding="utf-8")
+    portfolio_text = portfolio_builder.read_text(encoding="utf-8")
+    skill_text = SKILL_MD.read_text(encoding="utf-8")
+    readme_text = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    for phrase in [
+        "preserve_user_resume_format",
+        "user_provided_resume_as_layout_source",
+        "add_content_into_original_resume",
+        "handoff_to_resume_architect",
+        "handoff_to_factual_reviewer",
+        "handoff_to_hr_supervisor",
+    ]:
+        assert phrase in resume_text
+
+    for phrase in [
+        "requires_explicit_user_authorization",
+        "website_or_github_modification_plan",
+        "personal_website",
+        "GitHub/Gitee",
+        "handoff_to_personal_branding_strategist",
+        "handoff_to_factual_reviewer",
+        "handoff_to_hr_supervisor",
+    ]:
+        assert phrase in portfolio_text
+
+    assert "resume-polisher" in skill_text
+    assert "portfolio-asset-builder" in skill_text
+    assert "用户给出自己的简历之后" in readme_text
+    assert "用户授权后" in readme_text
+
+
+def test_resume_and_branding_routes_include_new_polishing_roles():
+    simulator_text = SIMULATOR.read_text(encoding="utf-8")
+    plan_builder_text = PLAN_BUILDER.read_text(encoding="utf-8")
+    readme_text = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert '"resume-polisher"' in simulator_text
+    assert '"portfolio-asset-builder"' in simulator_text
+    assert '"resume-polisher": "branding_and_resume"' in plan_builder_text
+    assert '"portfolio-asset-builder": "branding_and_resume"' in plan_builder_text
+    assert '"resume-polisher": ["resume-format-gate"]' in plan_builder_text
+    assert '"portfolio-asset-builder": [' in plan_builder_text
+    assert "协调 17 个角色 prompts/subagents" in readme_text
+
+
 def test_skill_md_links_runtime_network_and_adapter_setup():
     text = SKILL_MD.read_text(encoding="utf-8")
 
@@ -2540,7 +2592,10 @@ def test_product_flow_runner_prepares_real_user_run_instead_of_contract_simulati
         "jd-analyzer",
         "match-strategist",
         "learning-path-strategist",
+        "personal-branding-strategist",
         "resume-format-gate",
+        "resume-polisher",
+        "portfolio-asset-builder",
         "resume-architect",
         "hr-supervisor",
         "factual-reviewer",
@@ -2599,7 +2654,10 @@ def test_product_flow_without_target_includes_general_resume_generation_gate(tmp
         "jd-analyzer",
         "match-strategist",
         "learning-path-strategist",
+        "personal-branding-strategist",
         "resume-format-gate",
+        "resume-polisher",
+        "portfolio-asset-builder",
         "resume-architect",
         "hr-supervisor",
         "factual-reviewer",
@@ -4038,6 +4096,7 @@ def test_simulator_supports_resume_generation_route(tmp_path):
         "major-cluster-classifier",
         "profile-extractor",
         "resume-format-gate",
+        "resume-polisher",
         "resume-architect",
         "factual-reviewer",
         "hr-supervisor",

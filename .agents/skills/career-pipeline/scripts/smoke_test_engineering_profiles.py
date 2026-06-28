@@ -233,6 +233,7 @@ PROFILES = [
         expected_agents=[
             "profile-extractor",
             "personal-branding-strategist",
+            "portfolio-asset-builder",
             "hr-supervisor",
             "factual-reviewer",
         ],
@@ -263,6 +264,7 @@ PROFILES = [
             "major-cluster-classifier",
             "profile-extractor",
             "resume-format-gate",
+            "resume-polisher",
             "resume-architect",
             "factual-reviewer",
             "hr-supervisor",
