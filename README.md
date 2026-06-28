@@ -30,6 +30,56 @@ Current usable scope is **engineering majors and engineering-adjacent background
 - Resume artifacts in Word DOCX, PDF, and first-page PNG.
 - Next 3 actions for the user.
 
+## Deploy
+
+Clone the repository and open Codex in the repo root:
+
+```bash
+git clone https://github.com/racingemperor/codex-career-agent-design.git
+cd codex-career-agent-design
+```
+
+The repo-scoped Skill entry is:
+
+```text
+.agents/skills/career-pipeline/SKILL.md
+```
+
+Useful local checks:
+
+```bash
+python .agents/skills/career-pipeline/scripts/validate_runtime_contracts.py --repo-root .
+python -m pytest tests/test_runtime_tools.py -q
+```
+
+## Run In Codex
+
+In Codex, open a new chat from this repository directory and start with:
+
+```text
+Use the career-pipeline skill.
+Computer-related junior, basic Python, looking for an internship but unsure what to apply for.
+Please help me choose directions, plan skills/projects, and design the resume.
+```
+
+For a target role:
+
+```text
+Use the career-pipeline skill.
+Automation graduate student, C++, ROS, Python, robotics competition experience.
+Target: DJI robotics/control algorithm internship.
+Please judge whether I should apply now. If not, give a prepare-first plan and a better role-specific resume direction.
+```
+
+For a deterministic contract smoke run:
+
+```bash
+cd .agents/skills/career-pipeline
+python scripts/career_pipeline_run.py --task-type target_job_fit --route target_job_fit --input-text "computer science senior, assess fit for Tencent backend role. JD: Java and MySQL" --run-root ../../../.career-pipeline-runs --source-adapter seed --subagent-adapter mock-blocked
+```
+
+`seed` and `mock-blocked` are local smoke-test modes. They do not browse live recruitment sites and do not prove real subagent execution.
+
 ## Typical Use
 
 In Codex, open this repository and ask:
