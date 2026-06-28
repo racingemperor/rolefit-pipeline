@@ -611,6 +611,92 @@ def artifact_ref(
     }
 
 
+def build_authorized_resume_editing_context(context: dict[str, Any] | None) -> dict[str, Any]:
+    consent_flags = (context or {}).get("consent_flags", {})
+    if not isinstance(consent_flags, dict):
+        consent_flags = {}
+    allowed_input_refs = list(consent_flags.get("resume_edit_allowed_input_refs") or [])
+    allowed_output_refs = list(consent_flags.get("resume_edit_allowed_output_refs") or [])
+    authorized = bool(consent_flags.get("resume_edit_authorized") and allowed_input_refs and allowed_output_refs)
+    return {
+        "requires_explicit_user_authorization": True,
+        "operation_mode": "apply_authorized_local_changes" if authorized else "plan_only_until_user_authorizes_paths",
+        "authorization_status": "granted_for_local_edits" if authorized else "missing_or_planning_only",
+        "allowed_input_refs": allowed_input_refs,
+        "allowed_output_refs": allowed_output_refs,
+        "allowed_actions": ["read_user_resume", "write_polished_resume_draft"] if authorized else ["plan_resume_polish"],
+        "apply_tool_ref": "scripts/apply_resume_polish.py",
+        "operation_packet_schema": {
+            "authorization": {
+                "granted": authorized,
+                "allowed_input_refs": allowed_input_refs,
+                "allowed_output_refs": allowed_output_refs,
+            },
+            "source_resume_ref": "",
+            "output_resume_ref": "",
+            "preserve_user_resume_format": True,
+            "polished_resume_draft": "",
+        },
+        "resume_edit_operation_steps": [
+            "Read only the user-authorized source resume ref.",
+            "Preserve the user's section order, headings, language, and density unless the user asks for a rebuild.",
+            "Create a diff-style resume_edit_operation_plan before writing.",
+            "If operation_mode is plan_only_until_user_authorizes_paths, return the plan and ask for explicit path authorization; do not write files.",
+            "If operation_mode is apply_authorized_local_changes, call apply_tool_ref with the operation packet and write only to allowed_output_refs.",
+            "Return applied_resume_artifacts, file_modification_summary, and handoff refs for factual and HR review.",
+        ],
+        "prohibited_operations": [
+            "do not overwrite the source resume unless it is explicitly listed in allowed_output_refs",
+            "do not write outside allowed_output_refs",
+            "do not add unsupported facts, metrics, awards, education, or skills",
+        ],
+    }
+
+
+def build_authorized_asset_editing_context(context: dict[str, Any] | None) -> dict[str, Any]:
+    consent_flags = (context or {}).get("consent_flags", {})
+    if not isinstance(consent_flags, dict):
+        consent_flags = {}
+    allowed_root = str(consent_flags.get("portfolio_asset_allowed_root") or "")
+    allowed_actions = list(consent_flags.get("portfolio_asset_allowed_actions") or [])
+    authorized = bool(consent_flags.get("portfolio_asset_edit_authorized") and allowed_root and allowed_actions)
+    return {
+        "requires_explicit_user_authorization": True,
+        "operation_mode": "apply_authorized_local_changes" if authorized else "plan_only_until_user_authorizes_root",
+        "authorization_status": "granted_for_local_edits" if authorized else "missing_or_planning_only",
+        "allowed_root": allowed_root,
+        "allowed_actions": allowed_actions if authorized else ["plan_asset_changes"],
+        "apply_tool_ref": "scripts/apply_portfolio_asset_changes.py",
+        "operation_packet_schema": {
+            "authorization": {
+                "granted": authorized,
+                "allowed_root": allowed_root,
+                "allowed_actions": allowed_actions,
+            },
+            "changes": [
+                {
+                    "path": "relative/path/inside/allowed/root",
+                    "content": "complete file content to write",
+                }
+            ],
+        },
+        "asset_edit_operation_steps": [
+            "Select the asset type with PersonalBrandingStrategist evidence first.",
+            "Create website_or_github_modification_plan with files, sections, proof links, privacy checks, and approval status.",
+            "If operation_mode is plan_only_until_user_authorizes_root, return the plan and ask for explicit root/action authorization; do not write files.",
+            "If operation_mode is apply_authorized_local_changes, call apply_tool_ref with relative paths only and write only inside allowed_root.",
+            "Preserve existing content unless the user authorized a rebuild.",
+            "Return applied_asset_changes, file_modification_summary, and handoff refs for resume, factual, and HR review.",
+        ],
+        "prohibited_operations": [
+            "do not write absolute paths",
+            "do not traverse outside allowed_root",
+            "do not publish, push, deploy, or change remote metadata without separate explicit authorization",
+            "do not expose private contact, IDs, NDA content, private code, credentials, tokens, or cookies",
+        ],
+    }
+
+
 def build_profile(input_text: str, task_type: str = "") -> dict[str, Any]:
     major_name = detect_major(input_text)
     discipline = detect_discipline_and_major(input_text, major_name)
@@ -1132,6 +1218,55 @@ def build_injection(
             [
                 "challenge projects that are too hard, too shallow, unverifiable, or weakly tied to the target role",
                 "do not allow planned project work to become completed resume claims",
+            ]
+        )
+
+    if target_agent == "resume-polisher":
+        role_specific_context["authorized_resume_editing"] = build_authorized_resume_editing_context(context)
+        required_output_fields.extend(
+            [
+                "preserve_user_resume_format",
+                "user_provided_resume_as_layout_source",
+                "add_content_into_original_resume",
+                "resume_edit_operation_plan",
+                "applied_resume_artifacts",
+                "file_modification_summary",
+            ]
+        )
+        handoff_contract.extend(
+            [
+                "handoff resume_edit_operation_plan to ResumeArchitect when a fuller rewrite is needed",
+                "handoff applied resume artifact refs to FactualReviewer and HRSupervisor",
+            ]
+        )
+        debate_contract.extend(
+            [
+                "challenge any resume edit that changes the user's original format without explicit rebuild authorization",
+                "challenge any local write request that lacks authorized_resume_editing operation_mode, allowed refs, or apply result",
+            ]
+        )
+
+    if target_agent == "portfolio-asset-builder":
+        role_specific_context["authorized_asset_editing"] = build_authorized_asset_editing_context(context)
+        required_output_fields.extend(
+            [
+                "authorization_status",
+                "authorized_scope",
+                "website_or_github_modification_plan",
+                "applied_asset_changes",
+                "file_modification_summary",
+            ]
+        )
+        handoff_contract.extend(
+            [
+                "handoff selected asset strategy to PersonalBrandingStrategist",
+                "handoff applied asset refs to ResumePolisher, FactualReviewer, and HRSupervisor",
+            ]
+        )
+        debate_contract.extend(
+            [
+                "challenge any asset edit that writes outside the authorized root or lacks explicit user authorization",
+                "challenge any resume-facing link text for an asset that is not built, verified, or explicitly conditional",
             ]
         )
 

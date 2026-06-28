@@ -48,6 +48,10 @@ CAREER_PIPELINE_RUNNER = ROOT / ".agents" / "skills" / "career-pipeline" / "scri
 PRODUCT_FLOW_RUNNER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "run_product_flow.py"
 FINALIZER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "finalize_runtime_run.py"
 RESUME_RENDERER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "render_resume_artifacts.py"
+APPLY_RESUME_POLISH = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "apply_resume_polish.py"
+APPLY_PORTFOLIO_ASSET_CHANGES = (
+    ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "apply_portfolio_asset_changes.py"
+)
 INCOMPLETE_USER_MANUAL_OUTPUTS = (
     ROOT
     / ".agents"
@@ -148,6 +152,250 @@ def test_resume_and_branding_routes_include_new_polishing_roles():
     assert '"resume-polisher": ["resume-format-gate"]' in plan_builder_text
     assert '"portfolio-asset-builder": [' in plan_builder_text
     assert "协调 17 个角色 prompts/subagents" in readme_text
+
+
+def test_resume_polisher_can_apply_authorized_file_changes(tmp_path):
+    original = tmp_path / "resume.md"
+    output = tmp_path / "resume.polished.md"
+    plan = tmp_path / "resume-polish-plan.json"
+    original.write_text("# 简历\n\n## 项目\n\n- 做过 RAG 项目。\n", encoding="utf-8")
+    plan.write_text(
+        json.dumps(
+            {
+                "authorization": {
+                    "granted": True,
+                    "allowed_input_refs": [str(original)],
+                    "allowed_output_refs": [str(output)],
+                },
+                "source_resume_ref": str(original),
+                "output_resume_ref": str(output),
+                "preserve_user_resume_format": True,
+                "polished_resume_draft": (
+                    "# 简历\n\n## 项目\n\n"
+                    "- RAG 校园问答项目：完成文档切分、向量检索与问答链路，保留 README 和运行截图。\n"
+                ),
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    result = run_python(APPLY_RESUME_POLISH, "--plan-json", str(plan))
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)["resume_polish_apply_response"]
+    assert response["status"] == "applied"
+    assert response["preserve_user_resume_format"] is True
+    assert output.read_text(encoding="utf-8").startswith("# 简历")
+    assert "向量检索" in output.read_text(encoding="utf-8")
+
+
+def test_resume_polisher_blocks_unauthorized_output_path(tmp_path):
+    original = tmp_path / "resume.md"
+    outside = tmp_path.parent / "outside-resume.md"
+    plan = tmp_path / "resume-polish-plan.json"
+    original.write_text("# 简历\n", encoding="utf-8")
+    plan.write_text(
+        json.dumps(
+            {
+                "authorization": {
+                    "granted": True,
+                    "allowed_input_refs": [str(original)],
+                    "allowed_output_refs": [str(tmp_path / "allowed.md")],
+                },
+                "source_resume_ref": str(original),
+                "output_resume_ref": str(outside),
+                "preserve_user_resume_format": True,
+                "polished_resume_draft": "# 简历\n\n越权写入\n",
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    result = run_python(APPLY_RESUME_POLISH, "--plan-json", str(plan))
+
+    assert result.returncode != 0
+    assert "not authorized" in result.stderr
+    assert not outside.exists()
+
+
+def test_portfolio_asset_builder_can_apply_authorized_site_changes(tmp_path):
+    site_root = tmp_path / "site"
+    site_root.mkdir()
+    index = site_root / "index.md"
+    plan = tmp_path / "portfolio-plan.json"
+    index.write_text("# Me\n", encoding="utf-8")
+    plan.write_text(
+        json.dumps(
+            {
+                "authorization": {
+                    "granted": True,
+                    "allowed_root": str(site_root),
+                    "allowed_actions": ["write_file"],
+                },
+                "changes": [
+                    {
+                        "path": "index.md",
+                        "content": "# Me\n\n## Projects\n\n- RAG demo with README and screenshot.\n",
+                    },
+                    {
+                        "path": "README.md",
+                        "content": "# Portfolio\n\nRole-fit proof assets.\n",
+                    },
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    result = run_python(APPLY_PORTFOLIO_ASSET_CHANGES, "--plan-json", str(plan))
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)["portfolio_asset_apply_response"]
+    assert response["status"] == "applied"
+    assert len(response["applied_changes"]) == 2
+    assert "Projects" in index.read_text(encoding="utf-8")
+    assert (site_root / "README.md").is_file()
+
+
+def test_portfolio_asset_builder_blocks_path_traversal(tmp_path):
+    site_root = tmp_path / "site"
+    site_root.mkdir()
+    outside = tmp_path / "outside.md"
+    plan = tmp_path / "portfolio-plan.json"
+    plan.write_text(
+        json.dumps(
+            {
+                "authorization": {
+                    "granted": True,
+                    "allowed_root": str(site_root),
+                    "allowed_actions": ["write_file"],
+                },
+                "changes": [{"path": "../outside.md", "content": "bad"}],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    result = run_python(APPLY_PORTFOLIO_ASSET_CHANGES, "--plan-json", str(plan))
+
+    assert result.returncode != 0
+    assert "outside authorized root" in result.stderr
+    assert not outside.exists()
+
+
+def test_resume_and_portfolio_injections_carry_authorized_operation_guidance(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "Computer science junior, Python, has a resume and a GitHub portfolio, wants internship advice.",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "product_job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+
+    resume_injection = json.loads(
+        (run_dir / "injections" / "resume-polisher.secondary_prompt_injection.json").read_text(
+            encoding="utf-8"
+        )
+    )["secondary_prompt_injection"]
+    portfolio_injection = json.loads(
+        (run_dir / "injections" / "portfolio-asset-builder.secondary_prompt_injection.json").read_text(
+            encoding="utf-8"
+        )
+    )["secondary_prompt_injection"]
+
+    resume_editing = resume_injection["role_specific_context"]["authorized_resume_editing"]
+    assert resume_editing["requires_explicit_user_authorization"] is True
+    assert resume_editing["operation_mode"] == "plan_only_until_user_authorizes_paths"
+    assert resume_editing["apply_tool_ref"] == "scripts/apply_resume_polish.py"
+    assert "allowed_input_refs" in resume_editing
+    assert "allowed_output_refs" in resume_editing
+    assert "resume_edit_operation_steps" in resume_editing
+    assert "resume_edit_operation_plan" in resume_injection["required_output_fields"]
+    assert "applied_resume_artifacts" in resume_injection["required_output_fields"]
+    assert "file_modification_summary" in resume_injection["required_output_fields"]
+    assert "handoff applied resume artifact refs to FactualReviewer and HRSupervisor" in resume_injection[
+        "handoff_contract"
+    ]
+
+    asset_editing = portfolio_injection["role_specific_context"]["authorized_asset_editing"]
+    assert asset_editing["requires_explicit_user_authorization"] is True
+    assert asset_editing["operation_mode"] == "plan_only_until_user_authorizes_root"
+    assert asset_editing["apply_tool_ref"] == "scripts/apply_portfolio_asset_changes.py"
+    assert "allowed_root" in asset_editing
+    assert "allowed_actions" in asset_editing
+    assert "asset_edit_operation_steps" in asset_editing
+    assert "website_or_github_modification_plan" in portfolio_injection["required_output_fields"]
+    assert "applied_asset_changes" in portfolio_injection["required_output_fields"]
+    assert "file_modification_summary" in portfolio_injection["required_output_fields"]
+    assert "handoff applied asset refs to ResumePolisher, FactualReviewer, and HRSupervisor" in portfolio_injection[
+        "handoff_contract"
+    ]
+
+
+def test_role_prompts_and_protocols_document_secondary_injected_file_operations():
+    resume_prompt = (ROOT / ".codex" / "agents" / "resume-polisher.toml").read_text(encoding="utf-8")
+    portfolio_prompt = (ROOT / ".codex" / "agents" / "portfolio-asset-builder.toml").read_text(
+        encoding="utf-8"
+    )
+    injection_protocol = (
+        ROOT
+        / ".agents"
+        / "skills"
+        / "career-pipeline"
+        / "references"
+        / "runtime-subagent-injection-protocol.md"
+    ).read_text(encoding="utf-8")
+    invocation_contract = (
+        ROOT
+        / ".agents"
+        / "skills"
+        / "career-pipeline"
+        / "references"
+        / "subagent-invocation-contract.md"
+    ).read_text(encoding="utf-8")
+    skill_text = SKILL_MD.read_text(encoding="utf-8")
+
+    for term in [
+        "authorized_resume_editing",
+        "operation_mode",
+        "apply_tool_ref",
+        "apply_resume_polish.py",
+        "resume_edit_operation_plan",
+        "applied_resume_artifacts",
+        "file_modification_summary",
+        "secondary prompt injection",
+    ]:
+        assert term in resume_prompt
+        assert term in injection_protocol
+        assert term in invocation_contract
+
+    for term in [
+        "authorized_asset_editing",
+        "operation_mode",
+        "apply_tool_ref",
+        "apply_portfolio_asset_changes.py",
+        "applied_asset_changes",
+        "file_modification_summary",
+        "secondary prompt injection",
+    ]:
+        assert term in portfolio_prompt
+        assert term in injection_protocol
+        assert term in invocation_contract
+
+    assert "apply_resume_polish.py" in skill_text
+    assert "apply_portfolio_asset_changes.py" in skill_text
 
 
 def test_skill_md_links_runtime_network_and_adapter_setup():

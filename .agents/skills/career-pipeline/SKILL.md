@@ -63,6 +63,8 @@ python scripts/finalize_runtime_run.py --run-dir ../../../.career-pipeline-runs/
 python scripts/render_resume_artifacts.py --decision-package ../../../.career-pipeline-runs/<run_id>/final/decision_package.json --out-dir ../../../.career-pipeline-runs/<run_id>/final/resume_artifacts --basename general_resume
 python scripts/render_resume_artifacts.py --decision-package ../../../.career-pipeline-runs/<run_id>/final/decision_package.json --out-dir ../../../.career-pipeline-runs/<run_id>/final/resume_artifacts --basename general_resume --all-resume-versions
 python scripts/render_resume_artifacts.py --draft-md ../../../.career-pipeline-runs/<run_id>/final/resume_draft.md --out-dir ../../../.career-pipeline-runs/<run_id>/final/resume_artifacts --basename general_resume
+python scripts/apply_resume_polish.py --plan-json <authorized_resume_polish_operation.json>
+python scripts/apply_portfolio_asset_changes.py --plan-json <authorized_portfolio_asset_operation.json>
 python scripts/execute_subagent_plan.py --run-dir ../../../.career-pipeline-runs/<run_id> --dry-run
 ```
 
@@ -88,6 +90,8 @@ Do not run these commands from the repository root as `scripts/*.py`; the `scrip
 - `scripts/run_subagent_adapter.py` is the adapter runner entrypoint. `--mock-blocked` writes schema-valid blocked role outputs and always sets `real_subagent_execution = false`; `--adapter-command` runs an external command adapter per work order and sets `real_subagent_execution = true` only when every role output validates and finishes as `done` or `done_with_warnings`.
 - `scripts/finalize_runtime_run.py` assembles `final/decision_package.json` only after required role outputs are present, non-blocked, validated, and produced by a real adapter or an explicitly marked Manual Controller MVP run.
 - `scripts/render_resume_artifacts.py` exports a validated resume Markdown draft or `final/decision_package.json` resume draft into Word DOCX, PDF, and first-page PNG artifacts. It also writes `final/resume_artifacts/resume_draft.md` when rendering from a decision package so users do not need to hand-edit JSON. With `--all-resume-versions`, it also exports `growth_resume_preview.md` plus DOCX/PDF/PNG when the final package includes a conditional after-learning/project resume preview.
+- `scripts/apply_resume_polish.py` applies a ResumePolisher operation packet only after secondary prompt injection supplies explicit user authorization, allowed input refs, and allowed output refs.
+- `scripts/apply_portfolio_asset_changes.py` applies PortfolioAssetBuilder file changes only after secondary prompt injection supplies explicit user authorization, an allowed root, and allowed actions; it refuses path traversal outside the authorized root.
 - `scripts/execute_subagent_plan.py` inspects a plan-only queue, enforces human/source-policy gates before real execution, writes redacted execution events, and can backfill externally produced role outputs after schema checks. Use `--manual-controller-execution` only when the main Codex controller actually dispatched separated role subagents or separated role passes; it stamps backfilled outputs with manual-controller real-execution metadata for finalizer review.
 - `scripts/continue_runtime_run.py` updates the same run with one compact batch of user-owned facts, refreshes the runtime context packet, and returns the run to `injection_ready`.
 

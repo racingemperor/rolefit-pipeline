@@ -117,6 +117,78 @@ def product_blocked_outputs(context: dict[str, Any]) -> list[str]:
     return blocked
 
 
+def ensure_authorized_operation_context(injection: dict[str, Any], role_context: dict[str, Any]) -> None:
+    target_agent = injection.get("target_agent")
+    required_fields = list_value(injection.get("required_output_fields"))
+    handoff_contract = list_value(injection.get("handoff_contract"))
+
+    if target_agent == "resume-polisher":
+        role_context.setdefault(
+            "authorized_resume_editing",
+            {
+                "requires_explicit_user_authorization": True,
+                "operation_mode": "plan_only_until_user_authorizes_paths",
+                "authorization_status": "missing_or_planning_only",
+                "allowed_input_refs": [],
+                "allowed_output_refs": [],
+                "allowed_actions": ["plan_resume_polish"],
+                "apply_tool_ref": "scripts/apply_resume_polish.py",
+                "resume_edit_operation_steps": [
+                    "Preserve the user's original resume format.",
+                    "Return resume_edit_operation_plan before any write.",
+                    "Write files only after explicit user path authorization.",
+                    "Return applied_resume_artifacts and file_modification_summary after authorized local changes.",
+                ],
+            },
+        )
+        for field in [
+            "resume_edit_operation_plan",
+            "applied_resume_artifacts",
+            "file_modification_summary",
+        ]:
+            if field not in required_fields:
+                required_fields.append(field)
+        for handoff in [
+            "handoff applied resume artifact refs to FactualReviewer and HRSupervisor",
+        ]:
+            if handoff not in handoff_contract:
+                handoff_contract.append(handoff)
+
+    if target_agent == "portfolio-asset-builder":
+        role_context.setdefault(
+            "authorized_asset_editing",
+            {
+                "requires_explicit_user_authorization": True,
+                "operation_mode": "plan_only_until_user_authorizes_root",
+                "authorization_status": "missing_or_planning_only",
+                "allowed_root": "",
+                "allowed_actions": ["plan_asset_changes"],
+                "apply_tool_ref": "scripts/apply_portfolio_asset_changes.py",
+                "asset_edit_operation_steps": [
+                    "Return website_or_github_modification_plan before any write.",
+                    "Write only relative paths inside the user-authorized root.",
+                    "Preserve existing content unless the user authorized a rebuild.",
+                    "Return applied_asset_changes and file_modification_summary after authorized local changes.",
+                ],
+            },
+        )
+        for field in [
+            "website_or_github_modification_plan",
+            "applied_asset_changes",
+            "file_modification_summary",
+        ]:
+            if field not in required_fields:
+                required_fields.append(field)
+        for handoff in [
+            "handoff applied asset refs to ResumePolisher, FactualReviewer, and HRSupervisor",
+        ]:
+            if handoff not in handoff_contract:
+                handoff_contract.append(handoff)
+
+    injection["required_output_fields"] = required_fields
+    injection["handoff_contract"] = handoff_contract
+
+
 def write_wrapped_json(path: Path, wrapper_key: str, payload: dict[str, Any]) -> None:
     write_json(path, {wrapper_key: payload})
 
@@ -185,6 +257,7 @@ def rewrite_injections_for_product_run(run_dir: Path, context: dict[str, Any]) -
             role_context["exact_score_priority_and_tailoring_require_current_jd_public_evidence"] = True
             role_context["hr_supervision_required"] = True
             role_context["factual_review_required_before_final"] = True
+            ensure_authorized_operation_context(injection, role_context)
         injection["blocked_outputs"] = [
             item
             for item in list_value(injection.get("blocked_outputs"))

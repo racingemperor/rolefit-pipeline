@@ -31,6 +31,13 @@ Compose each runtime subagent prompt in this order:
 
 Do not include irrelevant private user facts. Contact fields should appear only when the role needs them and the user authorized final resume contact fields.
 
+For file-modifying roles, the secondary prompt injection must carry the exact operation authority:
+
+- `ResumePolisher` may modify local resume artifacts only when the injection includes `authorized_resume_editing.operation_mode = apply_authorized_local_changes`, non-empty `allowed_input_refs`, non-empty `allowed_output_refs`, and `apply_tool_ref = scripts/apply_resume_polish.py`. Otherwise it must return `resume_edit_operation_plan` only. Required outputs include `applied_resume_artifacts` and `file_modification_summary`.
+- `PortfolioAssetBuilder` may modify a website, GitHub/Gitee profile repository, README, demo, or portfolio file only when the injection includes `authorized_asset_editing.operation_mode = apply_authorized_local_changes`, `allowed_root`, allowed write action, and `apply_tool_ref = scripts/apply_portfolio_asset_changes.py`. Otherwise it must return `website_or_github_modification_plan` only. Required outputs include `applied_asset_changes` and `file_modification_summary`.
+
+These operation fields belong in the secondary prompt injection and invocation contract; they should not be guessed from the static role prompt or from hidden conversation memory.
+
 ## Invocation Packet
 
 Each subagent invocation should be addressable:

@@ -162,6 +162,51 @@ Each injected prompt must include:
 - handoff fields for downstream roles.
 - debate fields for challenging weak evidence.
 
+## Secondary-Injected File Operations
+
+Static role prompts may describe file-editing capability, but real local modification must be authorized through the secondary prompt injection. The orchestrator must not ask `ResumePolisher` or `PortfolioAssetBuilder` to infer write permissions from chat tone alone.
+
+For `resume-polisher`, include `role_specific_context.authorized_resume_editing`:
+
+```json
+{
+  "authorized_resume_editing": {
+    "requires_explicit_user_authorization": true,
+    "operation_mode": "plan_only_until_user_authorizes_paths|apply_authorized_local_changes",
+    "authorization_status": "missing_or_planning_only|granted_for_local_edits",
+    "allowed_input_refs": [],
+    "allowed_output_refs": [],
+    "allowed_actions": [],
+    "apply_tool_ref": "scripts/apply_resume_polish.py",
+    "resume_edit_operation_steps": [],
+    "prohibited_operations": []
+  }
+}
+```
+
+Required output fields for this mode: `resume_edit_operation_plan`, `applied_resume_artifacts`, and `file_modification_summary`. If `operation_mode` is `plan_only_until_user_authorizes_paths`, the role returns a plan and asks for path authorization. If `operation_mode` is `apply_authorized_local_changes`, it may call `apply_tool_ref` with an operation packet and must write only to `allowed_output_refs`.
+
+For `portfolio-asset-builder`, include `role_specific_context.authorized_asset_editing`:
+
+```json
+{
+  "authorized_asset_editing": {
+    "requires_explicit_user_authorization": true,
+    "operation_mode": "plan_only_until_user_authorizes_root|apply_authorized_local_changes",
+    "authorization_status": "missing_or_planning_only|granted_for_local_edits",
+    "allowed_root": "",
+    "allowed_actions": [],
+    "apply_tool_ref": "scripts/apply_portfolio_asset_changes.py",
+    "asset_edit_operation_steps": [],
+    "prohibited_operations": []
+  }
+}
+```
+
+Required output fields for this mode: `website_or_github_modification_plan`, `applied_asset_changes`, and `file_modification_summary`. If `operation_mode` is `plan_only_until_user_authorizes_root`, the role returns a plan and asks for root/action authorization. If `operation_mode` is `apply_authorized_local_changes`, it may call `apply_tool_ref` with relative-path changes and must write only inside `allowed_root`.
+
+Both roles must hand off applied artifact refs to `FactualReviewer` and `HRSupervisor`; `portfolio-asset-builder` should also hand off resume-facing link changes to `ResumePolisher`.
+
 ## Completeness Requirements
 
 Before a specialist subagent runs, the orchestrator should verify:
