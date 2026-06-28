@@ -15,6 +15,7 @@ Current usable scope is **engineering majors and engineering-adjacent background
 - **Learn before applying**: when the user is not ready, gives specific skills, projects, proof artifacts, and resume-conversion conditions.
 - **One role, one resume**: avoids a generic resume when a concrete role or company is selected.
 - **Two resume versions**: generates a current factual resume, plus a clearly labeled preview of how the resume could look after recommended skills/projects are completed.
+- **Multi-agent workflow**: coordinates 15 role prompts/subagents and a seed company-signal database covering 85 engineering-heavy employers.
 - **Source-aware job research**: uses public job URLs, official pages, school notices, recruitment platforms, local opportunities, and verified HR public sources when available.
 - **Truthfulness gate**: planned learning or projects cannot be written as completed experience until proof artifacts exist.
 
