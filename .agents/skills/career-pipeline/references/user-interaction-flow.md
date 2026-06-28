@@ -37,6 +37,21 @@ first user materials
   -> proceed with provided facts or request incomplete-resume consent
 ```
 
+## Standard Real User Flow
+
+This is the standard product flow from the first user sentence to the final user-facing report. 用户不需要了解 subagent、JSON、runner；the controller handles internal routing, source checks, role coordination, and final rendering.
+
+1. `first user sentence`: accept the user's natural message, even if it is vague, such as "我是计算机相关专业大三，会一点 Python，想找实习但不知道投什么".
+2. `skill opening`: introduce Career Pipeline in one short professional paragraph before asking for information.
+3. `one compact information request`: summarize known facts, say what can be done now, say what is missing, and ask one compact batch of user-owned facts only.
+4. `job-source search`: automatically search allowed public sources: official company pages, public JD pages, recruitment platforms visible without login, school career notices, local public employment channels, industrial-park/incubator notices, verified HR public posts, and weak social/candidate signals only as auxiliary context.
+5. `match judgment`: judge current direction or target-role fit from user facts plus source-policy-valid evidence; do not invent exact scores or final priority when evidence is missing.
+6. `learning advice`: convert gaps into learnable skills, projects, proof artifacts, and resume-conversion conditions.
+7. `resume direction`: give broad campus/internship resume guidance when no target exists; use one-role-one-resume reverse design only after a target JD or role family is available.
+8. `final user-facing report`: render a concise Chinese report with current positioning, recommended directions or job pool, reasons, gaps, learning/project plan, resume writing direction, public URLs, HR questions, and next three actions.
+
+For incomplete first-round users, do not stall the flow. Give safe direction clusters, learning path, and resume packaging advice from available facts, but avoid concrete job recommendations without public URLs and avoid company-specific tailoring without evidence.
+
 ## Interaction State
 
 User-facing stages should expose:

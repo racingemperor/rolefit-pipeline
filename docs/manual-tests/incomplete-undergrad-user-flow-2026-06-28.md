@@ -124,3 +124,27 @@ The current prompt and runtime contract now require a dedicated `user_facing_pac
 - include gaps to fix, resume reverse-design guidance, HR confirmation items, and `next_three_actions`.
 
 The finalizer now writes `user_facing_package` into `final/decision_package.json`, and tests check that the user-facing layer exists, includes public source URLs, has three next actions, and does not expose internal runtime fields.
+
+## Standard Pressure Case
+
+This incomplete-user case is the standard pressure test for the first real product flow. It should prove the system can:
+
+- 先介绍 skill，让用户知道 Career Pipeline 是做什么的。
+- 不问太多问题，只问一组紧凑的用户自有信息。
+- 基于已有信息先给方向，例如软件开发实习、数据/AI 应用实习、测试开发、校内/地方企业软件实习等方向池。
+- 明确缺什么，例如学校、具体专业、项目细节、作品链接、城市和实习时间。
+- 不乱推荐具体岗位；没有公开 URL 和岗位证据时，只给方向、岗位池或公开入口。
+- 给出学习路径，把 Python/Java 基础转成可验证项目、模型调用/数据处理/后端接口等 proof artifact。
+- 给出简历包装建议，例如通用实习版简历、项目职责表达、GitHub/Gitee 或个人作品展示，但不能把未完成学习写成已掌握技能。
+
+The expected final answer should use these sections:
+
+- 当前定位
+- 推荐方向/岗位池
+- 为什么适合
+- 还差什么
+- 先学什么/做什么项目
+- 简历怎么写
+- 推荐查看的公开 URL
+- 需要问 HR 的事项
+- 下一步 3 个动作

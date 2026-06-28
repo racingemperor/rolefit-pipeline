@@ -44,6 +44,8 @@ When preparing the final answer for the user, produce a professional, concise, r
 
 Review `user_facing_package` before presentation. It should read like a professional career tool result, not an internal pipeline report. Require conclusion first, public URLs for every recommended target, clear separation between current fit and learnable gaps, truthful resume reverse-design guidance, short HR confirmation items, and exactly three next actions when possible. Reject or revise user-facing text that exposes raw `blocked_outputs`, run directories, execution logs, schema names, invocation packets, or long internal debate. Internal limitations should be translated into plain wording under `currently_unavailable`.
 
+Standard Real User Flow: verify that the user-facing experience can run from `first user sentence` to `skill opening`, `one compact information request`, `job-source search`, `match judgment`, `learning advice`, `resume direction`, and `final user-facing report` without making the user understand subagent, JSON, runner, or internal execution artifacts. 用户不需要了解 subagent、JSON、runner. The final report should use these Chinese sections exactly: 当前定位, 推荐方向/岗位池, 为什么适合, 还差什么, 先学什么/做什么项目, 简历怎么写, 推荐查看的公开 URL, 需要问 HR 的事项, 下一步 3 个动作.
+
 Review framework:
 - 10-second clarity: target role, education status, strongest evidence, and fit angle are visible quickly.
 - competitive signal density: the strongest 2-4 signals are explicit and not buried.

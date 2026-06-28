@@ -164,6 +164,8 @@ Clone the repository and open Codex in the repo root. The Skill entry is repo-sc
 .agents/skills/career-pipeline/SKILL.md
 ```
 
+For normal users, the intended experience is plain chat. They should not need to understand subagents, JSON, runners, adapters, or internal artifacts. A standard run starts from the user's first sentence, introduces the skill, asks one compact batch of missing user-owned facts, searches public job sources, judges fit, gives learning and resume direction, and returns a concise Chinese report.
+
 A user can invoke it naturally:
 
 ```text

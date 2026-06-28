@@ -325,6 +325,88 @@ def build_user_facing_package(
     }
 
 
+def bullet_lines(items: list[Any], fallback: str) -> str:
+    cleaned = [str(item).strip() for item in items if str(item).strip()]
+    if not cleaned:
+        cleaned = [fallback]
+    return "\n".join(f"- {item}" for item in cleaned)
+
+
+def render_public_urls(source_index: list[dict[str, Any]]) -> str:
+    if not source_index:
+        return "- 暂无可展示的公开 URL；需要继续执行公开来源搜索。"
+    lines = []
+    for source in source_index[:8]:
+        title = str(source.get("title") or "公开来源").strip()
+        url = str(source.get("url") or "").strip()
+        tier = str(source.get("source_accuracy_tier") or "").strip()
+        if url:
+            lines.append(f"- {title}（{tier}）：{url}")
+    return "\n".join(lines) if lines else "- 暂无可展示的公开 URL；需要继续执行公开来源搜索。"
+
+
+def render_recommended_targets(targets: list[dict[str, Any]]) -> str:
+    if not targets:
+        return "- 当前不直接给具体岗位强推荐；先按岗位方向探索，等绑定公开 JD 或官方入口后再做投递优先级。"
+    lines = []
+    for target in targets[:6]:
+        company = str(target.get("company") or "待确认公司")
+        role = str(target.get("title_or_role_family") or "待确认岗位方向")
+        scenario = str(target.get("scenario") or "explore")
+        urls = ", ".join(str(url) for url in target.get("public_urls") or [])
+        lines.append(f"- {company}｜{role}｜{scenario}：{urls}")
+    return "\n".join(lines)
+
+
+def render_why_targets(targets: list[dict[str, Any]], source_index: list[dict[str, Any]]) -> str:
+    reasons = []
+    for target in targets[:4]:
+        reason = str(target.get("why_this_target") or "").strip()
+        if reason:
+            reasons.append(reason)
+    if not reasons and source_index:
+        reasons.append("已有公开来源可检查，适合先作为探索入口，不直接等同于最终投递建议。")
+    return bullet_lines(
+        reasons,
+        "当前信息不足以判断具体岗位适配度；先基于专业、技能和公开岗位方向做探索。",
+    )
+
+
+def build_user_facing_report_zh(user_facing_package: dict[str, Any]) -> str:
+    targets = user_facing_package.get("recommended_targets") or []
+    source_index = user_facing_package.get("public_source_index") or []
+    gaps = user_facing_package.get("gaps_to_fix_before_application") or []
+    ask_hr = user_facing_package.get("ask_hr_about") or []
+    unavailable = user_facing_package.get("currently_unavailable") or []
+    next_actions = user_facing_package.get("next_three_actions") or []
+    return "\n\n".join(
+        [
+            "## 当前定位\n"
+            + str(user_facing_package.get("positioning_conclusion") or "已完成初步整理，后续建议以公开岗位信息和用户补充经历继续收敛。"),
+            "## 推荐方向/岗位池\n" + render_recommended_targets(targets),
+            "## 为什么适合\n" + render_why_targets(targets, source_index),
+            "## 还差什么\n"
+            + bullet_lines(
+                gaps + unavailable,
+                "需要补充学校、专业、项目职责、作品链接、实习时间或目标 JD，才能做更精确判断。",
+            ),
+            "## 先学什么/做什么项目\n"
+            + bullet_lines(
+                gaps,
+                "先做一个能公开展示的项目或作品，把技能、职责、结果和可验证链接沉淀下来。",
+            ),
+            "## 简历怎么写\n"
+            + str(
+                user_facing_package.get("resume_reverse_design")
+                or "没有明确目标岗位时先做通用校招/实习版；有 JD 后按一岗一简历反向设计。"
+            ),
+            "## 推荐查看的公开 URL\n" + render_public_urls(source_index),
+            "## 需要问 HR 的事项\n" + bullet_lines(ask_hr, "确认岗位状态、城市/到岗要求、截止时间、实习周期和招聘流程。"),
+            "## 下一步 3 个动作\n" + bullet_lines(next_actions[:3], "补充关键信息后继续收敛岗位和简历方向。"),
+        ]
+    )
+
+
 def update_manifest_for_final(
     run_dir: Path,
     manifest_payload: dict[str, Any],
@@ -402,6 +484,7 @@ def finalize(args: argparse.Namespace) -> dict[str, Any]:
         role_outputs,
         limited_blocked_outputs,
     )
+    user_facing_report_zh = build_user_facing_report_zh(user_facing_package)
     final_ref = args.output
     final_path = run_dir / final_ref
     decision_package = {
@@ -429,6 +512,7 @@ def finalize(args: argparse.Namespace) -> dict[str, Any]:
             ),
             "gate_evidence_refs": role_output_refs + source_gate_refs,
             "user_facing_package": user_facing_package,
+            "user_facing_report_zh": user_facing_report_zh,
             "blocked_outputs": limited_blocked_outputs,
             "degraded_outputs": limited_blocked_outputs,
             "decision_summary": (

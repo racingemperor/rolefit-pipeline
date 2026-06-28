@@ -1166,10 +1166,27 @@ def test_finalizer_writes_final_package_when_role_outputs_are_done(tmp_path):
     assert user_package["positioning_conclusion"]
     assert user_package["public_source_index"][0]["url"].startswith("https://")
     assert len(user_package["next_three_actions"]) == 3
+    user_report = final_package["decision_package"]["user_facing_report_zh"]
+    for heading in [
+        "当前定位",
+        "推荐方向/岗位池",
+        "为什么适合",
+        "还差什么",
+        "先学什么/做什么项目",
+        "简历怎么写",
+        "推荐查看的公开 URL",
+        "需要问 HR 的事项",
+        "下一步 3 个动作",
+    ]:
+        assert f"## {heading}" in user_report
     user_package_text = json.dumps(user_package, ensure_ascii=False)
     assert "blocked_outputs" not in user_package_text
     assert "run_dir" not in user_package_text
     assert "execution_log" not in user_package_text
+    assert "blocked_outputs" not in user_report
+    assert "runtime" not in user_report.lower()
+    assert "schema" not in user_report.lower()
+    assert "subagent" not in user_report.lower()
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["execution_manifest"]["current_stage"] == "final_package_ready"
     assert manifest["run_state"]["stage"] == "final_package_ready"
@@ -3318,6 +3335,60 @@ def test_user_facing_package_rules_are_documented_across_runtime_layers():
         assert "blocked_outputs" in text
         assert "run directories" in text or "run_dir" in text
         assert "next_three_actions" in text
+
+
+def test_standard_real_user_flow_is_documented_without_internal_terms():
+    user_flow = (
+        ROOT
+        / ".agents"
+        / "skills"
+        / "career-pipeline"
+        / "references"
+        / "user-interaction-flow.md"
+    ).read_text(encoding="utf-8")
+    deployment_flow = REAL_USER_DEPLOYMENT_FLOW.read_text(encoding="utf-8")
+    orchestrator = (ROOT / ".codex" / "agents" / "career-orchestrator.toml").read_text(
+        encoding="utf-8"
+    )
+    hr_supervisor = (ROOT / ".codex" / "agents" / "hr-supervisor.toml").read_text(
+        encoding="utf-8"
+    )
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    for text in [user_flow, deployment_flow, orchestrator, hr_supervisor]:
+        assert "Standard Real User Flow" in text
+        for phrase in [
+            "first user sentence",
+            "skill opening",
+            "one compact information request",
+            "job-source search",
+            "match judgment",
+            "learning advice",
+            "resume direction",
+            "final user-facing report",
+        ]:
+            assert phrase in text
+        assert "用户不需要了解 subagent、JSON、runner" in text
+
+    assert "plain chat" in readme
+    assert "They should not need to understand subagents, JSON, runners" in readme
+
+
+def test_incomplete_user_flow_pressure_case_is_documented_as_standard_case():
+    manual_test = (
+        ROOT / "docs" / "manual-tests" / "incomplete-undergrad-user-flow-2026-06-28.md"
+    ).read_text(encoding="utf-8")
+
+    for phrase in [
+        "先介绍 skill",
+        "不问太多问题",
+        "基于已有信息先给方向",
+        "明确缺什么",
+        "不乱推荐具体岗位",
+        "学习路径",
+        "简历包装建议",
+    ]:
+        assert phrase in manual_test
 
 
 def test_target_job_fit_policy_does_not_overblock_when_current_jd_details_are_missing():

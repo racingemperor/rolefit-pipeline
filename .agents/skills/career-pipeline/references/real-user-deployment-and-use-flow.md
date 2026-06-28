@@ -46,6 +46,21 @@ The pipeline should not force a questionnaire first. It normalizes current infor
 
 If the user has no clear target job, the pipeline returns direction clusters, learning gaps, public-source research tasks, and exploration URLs. It should not force exact company recommendations.
 
+## Standard Real User Flow
+
+This is the standard end-to-end experience. 用户不需要了解 subagent、JSON、runner；they should be able to speak normally and receive a professional career-planning answer.
+
+1. `first user sentence`: user sends a vague profile, resume, website, Markdown, JD link, or mixed material.
+2. `skill opening`: the assistant introduces Career Pipeline briefly and professionally.
+3. `one compact information request`: the assistant summarizes known facts and asks only one compact batch of user-owned missing facts.
+4. `job-source search`: the controller searches official company pages, public JDs, public recruitment platforms, school career centers, local public employment channels, industrial parks/incubators, verified HR public posts, and auxiliary candidate/social signals under source policy.
+5. `match judgment`: specialist roles compare user evidence, major/domain priors, JD evidence, company/school signals, and constraints.
+6. `learning advice`: gaps become skills, projects, proof artifacts, timelines, and resume-conversion conditions.
+7. `resume direction`: broad campus/internship resume if no target exists; one role, one resume when a role family or JD is selected.
+8. `final user-facing report`: the final answer uses the fixed natural-language template and hides internal execution details.
+
+The flow must keep moving even when information is incomplete. It should give safe directions and next steps, while marking exact scores, final priority, company-specific resume tailoring, and concrete job recommendations as unavailable when public evidence or user facts are missing.
+
 ## Runtime Data Sources
 
 Use these sources in priority order:

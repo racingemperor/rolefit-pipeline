@@ -266,6 +266,22 @@ Rules:
 - planned learning can appear as a gap or proof-artifact task, but not as a completed resume claim.
 - if no target job exists, use exploration targets, role families, learning gaps, and broad campus resume guidance instead of fake precision.
 
+The final rendered natural-language result should also be available as `user_facing_report_zh`. It must use these exact headings:
+
+```text
+## 当前定位
+## 推荐方向/岗位池
+## 为什么适合
+## 还差什么
+## 先学什么/做什么项目
+## 简历怎么写
+## 推荐查看的公开 URL
+## 需要问 HR 的事项
+## 下一步 3 个动作
+```
+
+`user_facing_report_zh` is what a normal user should read. It must not mention subagent, JSON, runner, runtime, schema, raw role packets, run directories, or `blocked_outputs` unless the user is explicitly debugging the pipeline.
+
 ## Input Normalization Fields
 
 The first stage should expose:
