@@ -123,6 +123,27 @@ def evidence_refs_from_manifest(manifest_payload: dict[str, Any]) -> list[str]:
     return refs if isinstance(refs, list) else []
 
 
+def load_evidence_quality_by_source(run_dir: Path, evidence_refs: list[str]) -> dict[str, dict[str, Any]]:
+    quality: dict[str, dict[str, Any]] = {}
+    for evidence_ref in evidence_refs:
+        path = run_dir / evidence_ref
+        if not path.is_file():
+            continue
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for line in lines:
+            if not line.strip():
+                continue
+            item = json.loads(line)
+            packet = item.get("evidence_packet") if isinstance(item, dict) else None
+            if not isinstance(packet, dict):
+                continue
+            source_ref = str(packet.get("source_ref") or "").strip()
+            if not source_ref:
+                continue
+            quality[source_ref] = packet
+    return quality
+
+
 def validate_source_discovery(run_dir: Path, search_results_ref: str, allowed_sources_ref: str) -> tuple[bool, list[str]]:
     search_path = run_dir / search_results_ref
     allowed_path = run_dir / allowed_sources_ref
@@ -151,7 +172,11 @@ def source_accuracy_tier(source_type: str) -> str:
     return "D"
 
 
-def public_source_index(allowed_sources_payload: dict[str, Any]) -> list[dict[str, Any]]:
+def public_source_index(
+    allowed_sources_payload: dict[str, Any],
+    evidence_quality_by_source: dict[str, dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    evidence_quality_by_source = evidence_quality_by_source or {}
     sources = allowed_sources_payload.get("sources")
     if not isinstance(sources, list):
         return []
@@ -165,13 +190,20 @@ def public_source_index(allowed_sources_payload: dict[str, Any]) -> list[dict[st
             continue
         seen_urls.add(url)
         source_type = str(source.get("source_type") or "user_provided")
+        quality = evidence_quality_by_source.get(url, {})
         index.append(
             {
                 "title": str(source.get("title") or "公开来源"),
                 "url": url,
                 "source_type": source_type,
                 "source_accuracy_tier": source_accuracy_tier(source_type),
-                "may_support_application_claims": bool(source.get("may_set_final_decision")),
+                "may_support_application_claims": bool(
+                    quality.get("may_set_final_decision", source.get("may_set_final_decision"))
+                ),
+                "evidence_strength": str(quality.get("evidence_strength") or ""),
+                "confidence": str(quality.get("confidence") or ""),
+                "short_text_entrypoint_only": bool(quality.get("short_text_entrypoint_only")),
+                "generic_entrypoint_only": bool(quality.get("generic_entrypoint_only")),
                 "note": str(source.get("snippet") or "")[:180],
             }
         )
@@ -487,12 +519,13 @@ def build_user_facing_package(
     plan: dict[str, Any],
     manifest_payload: dict[str, Any],
     allowed_sources_payload: dict[str, Any],
+    evidence_quality_by_source: dict[str, dict[str, Any]],
     role_outputs: list[dict[str, Any]],
     limited_blocked_outputs: list[str],
     allowed_hr_companies: set[str],
 ) -> dict[str, Any]:
     task_type = str(manifest_payload["execution_manifest"].get("task_type") or plan.get("task_type") or "")
-    source_index = public_source_index(allowed_sources_payload)
+    source_index = public_source_index(allowed_sources_payload, evidence_quality_by_source)
     recommended_targets = collect_recommended_targets(role_outputs)
     gaps = collect_learning_gaps(role_outputs)
     project_recommendations = collect_project_recommendations(role_outputs)
@@ -774,10 +807,15 @@ def finalize(args: argparse.Namespace) -> dict[str, Any]:
         role_outputs.append(payload)
         role_packets.append(payload["role_output_packet"])
     limited_blocked_outputs = sorted(set(limited_blocked_outputs))
+    evidence_quality_by_source = load_evidence_quality_by_source(
+        run_dir,
+        evidence_refs_from_manifest(manifest_payload),
+    )
     user_facing_package = build_user_facing_package(
         plan,
         manifest_payload,
         allowed_sources_payload,
+        evidence_quality_by_source,
         role_outputs,
         limited_blocked_outputs,
         collect_target_or_recommended_companies(manifest_payload, role_outputs, run_dir),

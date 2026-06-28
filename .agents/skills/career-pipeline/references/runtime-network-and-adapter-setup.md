@@ -121,7 +121,17 @@ python scripts/collect_public_source_results.py --run-dir ../../../.career-pipel
 python scripts/search_public_sources.py --run-dir ../../../.career-pipeline-runs/<run_id> --provider external-json --search-results-json ../../../.career-pipeline-runs/<run_id>/evidence/search_results.controller_collected.json
 ```
 
-The notes file may contain one public URL per line with optional `title=`, `snippet=`, `source_type=`, and `task_id=` fields. The collector maps official pages, public recruitment JDs, school notices, verified HR public posts, public reports, and weak social/candidate signals to the existing source-plan tasks; the discovery and fetch scripts still decide which sources are usable.
+The notes file may contain one public URL per line with optional `title=`, `snippet=`, `source_type=`, and `task_id=` fields. It may also contain YAML-like blocks, which are easier for a main controller or browser pass to write without hand-authoring shell JSON:
+
+```md
+- task_id: recruitment-platform-public-jd
+  url: https://www.nowcoder.com/jobs/detail/123
+  title: Python backend intern public JD
+  source_type_hint: recruitment_platform_jd
+  snippet: Python, SQL, API, Linux.
+```
+
+The collector maps `source_type_hint` into the normal `source_type` field. It maps official pages, public recruitment JDs, school notices, verified HR public posts, public reports, and weak social/candidate signals to the existing source-plan tasks; the discovery and fetch scripts still decide which sources are usable.
 
 Minimal search adapter result shape:
 
@@ -170,6 +180,8 @@ For dynamic public pages, keep `source_ref` as the inspectable public URL and ad
 ```
 
 The rendered snapshot must contain only public text visible without login, private messages, backend access, or access-control bypass. If static fetch sees only a JavaScript shell and no `rendered_text_ref` is provided, `fetch_public_sources.py` should fail with a degraded research task instead of treating the shell as evidence. The fetcher also detects common Chinese charsets such as GB2312/GBK/GB18030.
+
+If a public source is only a recruiting homepage, campus entrypoint, job-search page, or report search entrypoint, `fetch_public_sources.py` should keep the public URL but downgrade the evidence to entrypoint-only: `may_set_final_decision = false`, `may_set_weight = false`, and `generic_entrypoint_only = true`. The final package may show the URL for exploration, but concrete role requirements, weights, final recommendations, and resume-tailoring claims need a public JD, official detail page, verified HR wording, report section, or user-provided original material.
 
 If no search results are available, `discover_public_sources.py` still writes a discovery log with generated queries and an empty `sources` list. The pipeline should return blocked/degraded public-research outputs rather than asking the user to name websites.
 

@@ -34,6 +34,16 @@ ROUTES = {
         "match-strategist",
         "learning-path-strategist",
     ],
+    "product_job_search": [
+        "major-cluster-classifier",
+        "profile-extractor",
+        "job-scout",
+        "jd-analyzer",
+        "match-strategist",
+        "learning-path-strategist",
+        "hr-supervisor",
+        "factual-reviewer",
+    ],
     "resume_generation": [
         "major-cluster-classifier",
         "profile-extractor",

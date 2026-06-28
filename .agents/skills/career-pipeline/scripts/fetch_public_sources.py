@@ -41,6 +41,59 @@ FINAL_DECISION_SOURCE_TYPES = {
 }
 
 WEIGHT_SOURCE_TYPES = FINAL_DECISION_SOURCE_TYPES | {"candidate_experience_secondary"}
+MIN_STRONG_TEXT_CHARS = 120
+SHORT_TEXT_ROLE_MARKERS = [
+    "intern",
+    "engineer",
+    "developer",
+    "岗位",
+    "职位",
+    "实习",
+    "工程师",
+    "开发",
+    "算法",
+    "后端",
+    "前端",
+    "测试",
+]
+SHORT_TEXT_REQUIREMENT_MARKERS = [
+    "requirement",
+    "requirements",
+    "qualification",
+    "qualifications",
+    "responsibilities",
+    "java",
+    "python",
+    "sql",
+    "mysql",
+    "redis",
+    "linux",
+    "任职",
+    "要求",
+    "职责",
+    "技能",
+    "经验",
+]
+GENERIC_ENTRYPOINT_MARKERS = [
+    "campus recruiting",
+    "search jobs",
+    "job list",
+    "join talent community",
+    "open positions",
+    "apply now",
+    "entrypoint",
+    "search entry",
+    "recruiting public entry",
+    "recruitment entrypoint",
+    "homepage",
+    "招聘首页",
+    "校招首页",
+    "职位列表",
+    "职位搜索",
+    "筛选城市",
+    "投递入口",
+    "人才社区",
+]
 
 
 class PublicSourceFetchError(Exception):
@@ -211,6 +264,59 @@ def confidence_for(source_type: str) -> str:
     return "low"
 
 
+def has_substantive_short_job_text(plain: str) -> bool:
+    lowered = plain.lower()
+    has_role = any(marker in lowered for marker in SHORT_TEXT_ROLE_MARKERS)
+    has_requirement = any(marker in lowered for marker in SHORT_TEXT_REQUIREMENT_MARKERS)
+    return has_role and has_requirement
+
+
+def source_metadata_text(source: dict[str, Any]) -> str:
+    return " ".join(str(source.get(field) or "") for field in ["title", "snippet", "source_ref"])
+
+
+def looks_like_generic_entrypoint(plain: str, source: dict[str, Any]) -> bool:
+    lowered = f"{plain} {source_metadata_text(source)}".lower()
+    entrypoint_hits = sum(1 for marker in GENERIC_ENTRYPOINT_MARKERS if marker in lowered)
+    requirement_hits = sum(1 for marker in SHORT_TEXT_REQUIREMENT_MARKERS if marker in lowered)
+    metadata_lowered = source_metadata_text(source).lower()
+    metadata_marks_entrypoint = any(marker in metadata_lowered for marker in GENERIC_ENTRYPOINT_MARKERS)
+    return (entrypoint_hits >= 2 and requirement_hits == 0) or metadata_marks_entrypoint
+
+
+def apply_short_text_entrypoint_limits(
+    source: dict[str, Any],
+    plain: str,
+    source_type: str,
+) -> dict[str, Any]:
+    if looks_like_generic_entrypoint(plain, source):
+        return {
+            "evidence_strength": "weak",
+            "confidence": "low",
+            "may_set_final_decision": False,
+            "may_set_weight": False,
+            "short_text_entrypoint_only": False,
+            "generic_entrypoint_only": True,
+        }
+    if len(plain) >= MIN_STRONG_TEXT_CHARS or has_substantive_short_job_text(plain):
+        return {
+            "evidence_strength": source.get("evidence_strength") or evidence_strength(source_type),
+            "confidence": source.get("confidence") or confidence_for(source_type),
+            "may_set_final_decision": source["may_set_final_decision"],
+            "may_set_weight": source["may_set_weight"],
+            "short_text_entrypoint_only": False,
+            "generic_entrypoint_only": False,
+        }
+    return {
+        "evidence_strength": "weak",
+        "confidence": "low",
+        "may_set_final_decision": False,
+        "may_set_weight": False,
+        "short_text_entrypoint_only": True,
+        "generic_entrypoint_only": False,
+    }
+
+
 def validate_source(source: dict[str, Any], tasks: dict[str, dict[str, Any]]) -> dict[str, Any]:
     for field in ["task_id", "source_type", "source_ref", "field"]:
         if source.get(field) in ("", None):
@@ -242,19 +348,38 @@ def fetch_sources(args: argparse.Namespace) -> dict[str, Any]:
     sources = unwrap_sources(load_json(args.sources_json))
     packets = []
     source_index = []
+    attempt_log = []
     for index, source in enumerate(sources):
-        source = validate_source(dict(source), tasks)
-        raw, extraction_method = fetch_or_load_public_text(source, args.timeout_seconds)
-        plain = to_plain_text(raw)
-        if not plain:
-            raise PublicSourceFetchError(f"source[{index}] produced empty text")
-        if extraction_method == "static_fetch" and looks_like_dynamic_page_shell(raw, plain):
-            raise PublicSourceFetchError(
-                f"source[{index}] looks like a dynamic page shell; provide rendered_text_ref "
-                "from a public browser-rendered snapshot"
+        try:
+            source = validate_source(dict(source), tasks)
+            raw, extraction_method = fetch_or_load_public_text(source, args.timeout_seconds)
+            plain = to_plain_text(raw)
+            if not plain:
+                raise PublicSourceFetchError(f"source[{index}] produced empty text")
+            if extraction_method == "static_fetch" and looks_like_dynamic_page_shell(raw, plain):
+                raise PublicSourceFetchError(
+                    f"source[{index}] looks like a dynamic page shell; provide rendered_text_ref "
+                    "from a public browser-rendered snapshot"
+                )
+        except (OSError, PublicSourceFetchError) as exc:
+            if not args.degrade_on_source_error:
+                raise
+            attempt_log.append(
+                {
+                    "index": index,
+                    "task_id": source.get("task_id", ""),
+                    "source_type": source.get("source_type", ""),
+                    "source_ref": source.get("source_ref", ""),
+                    "failure_type": "source_fetch_failed",
+                    "message": str(exc),
+                    "recovery_action": "replacement_public_url_required",
+                    "claim_status": "unsupported_by_this_source",
+                }
             )
+            continue
         excerpt = plain[: args.max_excerpt_chars]
         source_type = source["source_type"]
+        quality = apply_short_text_entrypoint_limits(source, plain, source_type)
         evidence_id = source.get("evidence_id") or f"ev-{source['task_id']}-{index}"
         packet = {
             "evidence_packet": {
@@ -266,12 +391,14 @@ def fetch_sources(args: argparse.Namespace) -> dict[str, Any]:
                 "artifact_ref": "",
                 "retrieved_or_published_date": source.get("retrieved_or_published_date") or utc_now_date(),
                 "freshness": source.get("freshness") or "0_6_months",
-                "evidence_strength": source.get("evidence_strength") or evidence_strength(source_type),
+                "evidence_strength": quality["evidence_strength"],
                 "inference_level": source.get("inference_level") or "none",
                 "privacy_class": "public" if source_type != "user_provided" else "user_private",
-                "confidence": source.get("confidence") or confidence_for(source_type),
-                "may_set_final_decision": source["may_set_final_decision"],
-                "may_set_weight": source["may_set_weight"],
+                "confidence": quality["confidence"],
+                "may_set_final_decision": quality["may_set_final_decision"],
+                "may_set_weight": quality["may_set_weight"],
+                "short_text_entrypoint_only": quality["short_text_entrypoint_only"],
+                "generic_entrypoint_only": quality["generic_entrypoint_only"],
                 "extraction_method": extraction_method,
                 "excerpt": excerpt,
             }
@@ -287,17 +414,24 @@ def fetch_sources(args: argparse.Namespace) -> dict[str, Any]:
                 "excerpt_chars": len(excerpt),
             }
         )
+    if not packets:
+        raise PublicSourceFetchError("all sources failed; replacement public URLs or rendered_text_ref are required")
     evidence_path = run_dir / args.output
     source_index_path = run_dir / args.source_index_output
+    attempt_log_path = run_dir / args.source_attempt_log_output
     write_json(evidence_path, {"evidence_packets": packets})
     write_json(source_index_path, {"fetched_source_index": source_index})
+    write_json(attempt_log_path, {"source_attempt_log": attempt_log})
+    exit_status = "degraded" if attempt_log else "success"
     return {
         "public_source_fetch_response": {
-            "exit_status": "success",
+            "exit_status": exit_status,
             "run_id": plan["run_id"],
             "accepted_count": len(packets),
+            "failed_count": len(attempt_log),
             "evidence_json_ref": rel(evidence_path, run_dir),
             "fetched_source_index_ref": rel(source_index_path, run_dir),
+            "source_attempt_log_ref": rel(attempt_log_path, run_dir),
         }
     }
 
@@ -309,6 +443,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--source-plan-ref", default="evidence/public_source_research_plan.json")
     parser.add_argument("--output", default="evidence/fetched_public_evidence.json")
     parser.add_argument("--source-index-output", default="evidence/fetched_source_index.json")
+    parser.add_argument("--source-attempt-log-output", default="evidence/source_attempt_log.json")
+    parser.add_argument("--degrade-on-source-error", action="store_true")
     parser.add_argument("--timeout-seconds", type=int, default=10)
     parser.add_argument("--max-excerpt-chars", type=int, default=1200)
     args = parser.parse_args(argv)

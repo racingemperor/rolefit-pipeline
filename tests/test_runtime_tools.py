@@ -179,6 +179,12 @@ def test_readme_documents_product_flow_and_public_source_collection_helpers():
     assert "browser search or visible web results" in network_text
     assert "title=" in network_text
     assert "snippet=" in network_text
+    assert "YAML-like" in readme_text
+    assert "source_type_hint" in readme_text
+    assert "YAML-like" in network_text
+    assert "source_type_hint" in network_text
+    assert "exploration entrypoints" in readme_text
+    assert "generic_entrypoint_only" in network_text
 
 
 def test_job_scout_injection_contains_default_recruitment_source_matrix(tmp_path):
@@ -987,6 +993,71 @@ def test_public_source_fetcher_rejects_dynamic_shell_without_rendered_snapshot(t
     assert "rendered_text_ref" in fetch.stderr
 
 
+def test_public_source_fetcher_can_degrade_single_source_fetch_failures(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "Computer science junior, Python, looking for backend or AI application internship.",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(SOURCE_PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+
+    local_source = tmp_path / "public-jd.html"
+    local_source.write_text(
+        "<html><body><h1>Python backend intern</h1><p>Python, SQL, API, Linux, project evidence.</p></body></html>",
+        encoding="utf-8",
+    )
+    sources = {
+        "sources": [
+            {
+                "task_id": "recruitment-platform-public-jd",
+                "source_type": "recruitment_platform_jd",
+                "source_ref": local_source.as_uri(),
+                "field": "current_jd_requirement",
+            },
+            {
+                "task_id": "recruitment-platform-public-jd",
+                "source_type": "recruitment_platform_jd",
+                "source_ref": "https://127.0.0.1:9/unreachable-public-jd",
+                "field": "current_jd_requirement",
+            },
+        ]
+    }
+    sources_path = tmp_path / "mixed-sources.json"
+    sources_path.write_text(json.dumps(sources), encoding="utf-8")
+
+    fetch = run_python(
+        PUBLIC_SOURCE_FETCHER,
+        "--run-dir",
+        str(run_dir),
+        "--sources-json",
+        str(sources_path),
+        "--degrade-on-source-error",
+        "--timeout-seconds",
+        "1",
+    )
+
+    assert fetch.returncode == 0, fetch.stderr
+    response = json.loads(fetch.stdout)["public_source_fetch_response"]
+    assert response["exit_status"] == "degraded"
+    assert response["accepted_count"] == 1
+    assert response["failed_count"] == 1
+    evidence = json.loads((run_dir / response["evidence_json_ref"]).read_text(encoding="utf-8"))
+    assert len(evidence["evidence_packets"]) == 1
+    attempt_log = json.loads((run_dir / response["source_attempt_log_ref"]).read_text(encoding="utf-8"))
+    assert attempt_log["source_attempt_log"][0]["failure_type"] == "source_fetch_failed"
+    assert "replacement_public_url_required" in attempt_log["source_attempt_log"][0]["recovery_action"]
+
+
 def test_public_source_discoverer_generates_allowed_sources_from_search_results(tmp_path):
     run_root = tmp_path / ".career-pipeline-runs"
     simulate = run_python(
@@ -1745,6 +1816,74 @@ def test_finalizer_writes_final_package_when_role_outputs_are_done(tmp_path):
     assert manifest["run_state"]["stage"] == "final_package_ready"
 
 
+def test_finalizer_uses_fetched_evidence_quality_for_public_source_index(tmp_path):
+    run_dir, _run_id = prepare_run_with_external_public_source(
+        tmp_path,
+        task_type="job_search",
+        route="job_search",
+        input_text="Computer science junior, Python, looking for internship.",
+        task_id="official-company-career",
+    )
+    assert run_python(WORK_ORDER_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+
+    allowed_sources = json.loads((run_dir / "evidence" / "allowed_public_sources.generated.json").read_text(encoding="utf-8"))
+    source_ref = allowed_sources["sources"][0]["source_ref"]
+    fetched = {
+        "evidence_packets": [
+            {
+                "evidence_packet": {
+                    "evidence_id": "ev-generic-entrypoint",
+                    "claim_id": "official-company-career",
+                    "field": "current_company_or_job_requirement",
+                    "source_type": "official_or_primary",
+                    "source_ref": source_ref,
+                    "artifact_ref": "",
+                    "retrieved_or_published_date": "2026-06-28",
+                    "freshness": "0_6_months",
+                    "evidence_strength": "weak",
+                    "inference_level": "none",
+                    "privacy_class": "public",
+                    "confidence": "low",
+                    "may_set_final_decision": False,
+                    "may_set_weight": False,
+                    "short_text_entrypoint_only": False,
+                    "generic_entrypoint_only": True,
+                    "extraction_method": "static_fetch",
+                    "excerpt": "Campus recruiting search entrypoint with filters and application links only.",
+                }
+            }
+        ]
+    }
+    fetched_path = tmp_path / "fetched-entrypoint-evidence.json"
+    fetched_path.write_text(json.dumps(fetched), encoding="utf-8")
+    backfill = run_python(EVIDENCE_BACKFILL, "--run-dir", str(run_dir), "--evidence-json", str(fetched_path))
+    assert backfill.returncode == 0, backfill.stderr
+
+    adapter_script = tmp_path / "external_adapter.py"
+    write_external_adapter_script(adapter_script)
+    adapter = run_python(
+        SUBAGENT_ADAPTER_RUNNER,
+        "--run-dir",
+        str(run_dir),
+        "--adapter-command",
+        sys.executable,
+        "--adapter-arg",
+        str(adapter_script),
+    )
+    assert adapter.returncode == 0, adapter.stderr
+
+    result = run_python(FINALIZER, "--run-dir", str(run_dir), "--real-subagent-execution")
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)["finalizer_response"]
+    final_package = json.loads((run_dir / response["final_package_ref"]).read_text(encoding="utf-8"))
+    public_source = final_package["decision_package"]["user_facing_package"]["public_source_index"][0]
+    assert public_source["may_support_application_claims"] is False
+    assert public_source["evidence_strength"] == "weak"
+    assert public_source["confidence"] == "low"
+    assert public_source["generic_entrypoint_only"] is True
+
+
 def test_finalizer_excludes_hr_questions_not_bound_to_target_or_recommended_company(tmp_path):
     run_dir, _run_id = prepare_run_with_external_public_source(
         tmp_path,
@@ -2340,6 +2479,329 @@ def test_product_flow_runner_returns_user_facing_status_without_internal_adapter
         assert forbidden not in report_text
 
 
+def test_product_flow_runner_prepares_real_user_run_instead_of_contract_simulation(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    result = run_python(
+        PRODUCT_FLOW_RUNNER,
+        "--task-type",
+        "job_search",
+        "--route",
+        "job_search",
+        "--input-text",
+        "Computer science junior, a little Python, course project only, looking for an internship but no target role.",
+        "--run-root",
+        str(run_root),
+    )
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)["product_flow_response"]
+    run_dir = run_root / response["run_id"]
+
+    context = json.loads(
+        (run_dir / "input" / "normalized" / "runtime_context_packet.json").read_text(encoding="utf-8")
+    )["runtime_context_packet"]
+    assert context["execution_intent"] == "product_real_user_flow"
+    assert "simulate local runtime contract" not in context["user_goal"]
+    for safe_output in [
+        "application_direction",
+        "application_strategy",
+        "learning_plan_before_application",
+    ]:
+        assert safe_output not in context["blocked_outputs"]
+    for exact_output in [
+        "fit_score",
+        "application_priority",
+        "targeted_resume_tailoring",
+        "company_specific_skill_weight_ranking",
+    ]:
+        assert exact_output in context["blocked_outputs"]
+
+    plan = json.loads((run_dir / response["controller_handoff"]["subagent_plan_ref"]).read_text(encoding="utf-8"))[
+        "subagent_invocation_plan"
+    ]
+    agents = [item["target_agent"] for item in plan["dispatch_queue"]]
+    assert agents == [
+        "major-cluster-classifier",
+        "profile-extractor",
+        "job-scout",
+        "jd-analyzer",
+        "match-strategist",
+        "learning-path-strategist",
+        "hr-supervisor",
+        "factual-reviewer",
+    ]
+    assert plan["dispatch_batches"][-1]["batch_id"] == "hr_and_factual_gates"
+
+    job_scout_injection = json.loads(
+        (run_dir / "injections" / "job-scout.secondary_prompt_injection.json").read_text(encoding="utf-8")
+    )["secondary_prompt_injection"]
+    role_context = job_scout_injection["role_specific_context"]
+    assert role_context["execution_scope"] == "product_real_user_flow_pending_real_roles"
+    assert "simulation_scope" not in role_context
+    assert role_context["safe_prepare_first_and_explore_allowed"] is True
+    assert role_context["exact_score_priority_and_tailoring_require_current_jd_public_evidence"] is True
+    assert "application_strategy" not in job_scout_injection["blocked_outputs"]
+
+
+def test_product_flow_removes_simulated_role_outputs_from_manifest(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    result = run_python(
+        PRODUCT_FLOW_RUNNER,
+        "--task-type",
+        "job_search",
+        "--route",
+        "job_search",
+        "--input-text",
+        "Computer science junior, Python, looking for internship but no target role.",
+        "--run-root",
+        str(run_root),
+    )
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)["product_flow_response"]
+    run_dir = run_root / response["run_id"]
+    assert not list((run_dir / "agents").glob("*/output.json"))
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    artifact_types = [
+        ref["artifact_type"]
+        for ref in manifest["execution_manifest"]["artifact_refs"]
+        if isinstance(ref, dict)
+    ]
+    assert "subagent_output" not in artifact_types
+    assert manifest["run_state"]["completed_agents"] == []
+    assert manifest["run_state"]["blocked_agents"] == []
+
+
+def test_public_source_fetcher_downgrades_tiny_entrypoint_text(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "Computer science junior, Python, looking for internship.",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(SOURCE_PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+
+    tiny_source = tmp_path / "tiny-entrypoint.html"
+    tiny_source.write_text("<html><body>招聘</body></html>", encoding="utf-8")
+    sources_path = tmp_path / "sources.json"
+    sources_path.write_text(
+        json.dumps(
+            {
+                "sources": [
+                    {
+                        "task_id": "official-company-career",
+                        "source_type": "official_or_primary",
+                        "source_ref": tiny_source.as_uri(),
+                        "field": "current_company_or_job_requirement",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    fetch = run_python(
+        PUBLIC_SOURCE_FETCHER,
+        "--run-dir",
+        str(run_dir),
+        "--sources-json",
+        str(sources_path),
+    )
+
+    assert fetch.returncode == 0, fetch.stderr
+    response = json.loads(fetch.stdout)["public_source_fetch_response"]
+    evidence = json.loads((run_dir / response["evidence_json_ref"]).read_text(encoding="utf-8"))
+    packet = evidence["evidence_packets"][0]["evidence_packet"]
+    assert packet["evidence_strength"] == "weak"
+    assert packet["confidence"] == "low"
+    assert packet["may_set_final_decision"] is False
+    assert packet["may_set_weight"] is False
+    assert packet["short_text_entrypoint_only"] is True or packet["generic_entrypoint_only"] is True
+
+
+def test_public_source_fetcher_downgrades_long_generic_recruiting_entrypoint(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "Computer science junior, Python, looking for internship.",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(SOURCE_PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+
+    entrypoint_source = tmp_path / "long-entrypoint.html"
+    entrypoint_source.write_text(
+        "<html><body><h1>Campus Recruiting</h1>"
+        "<p>Search jobs, filter city, choose category, submit application, join talent community.</p>"
+        "<p>Campus recruiting internship full-time school hiring campus talk job list apply now.</p>"
+        "<p>Open positions page for students. Explore companies, locations, and events.</p>"
+        "</body></html>",
+        encoding="utf-8",
+    )
+    sources_path = tmp_path / "sources.json"
+    sources_path.write_text(
+        json.dumps(
+            {
+                "sources": [
+                    {
+                        "task_id": "official-company-career",
+                        "source_type": "official_or_primary",
+                        "source_ref": entrypoint_source.as_uri(),
+                        "field": "current_company_or_job_requirement",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    fetch = run_python(
+        PUBLIC_SOURCE_FETCHER,
+        "--run-dir",
+        str(run_dir),
+        "--sources-json",
+        str(sources_path),
+    )
+
+    assert fetch.returncode == 0, fetch.stderr
+    response = json.loads(fetch.stdout)["public_source_fetch_response"]
+    evidence = json.loads((run_dir / response["evidence_json_ref"]).read_text(encoding="utf-8"))
+    packet = evidence["evidence_packets"][0]["evidence_packet"]
+    assert packet["evidence_strength"] == "weak"
+    assert packet["confidence"] == "low"
+    assert packet["may_set_final_decision"] is False
+    assert packet["may_set_weight"] is False
+    assert packet["generic_entrypoint_only"] is True
+
+
+def test_public_source_fetcher_downgrades_metadata_marked_entrypoint(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "Computer science junior, Python, looking for internship.",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(SOURCE_PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+
+    source_html = tmp_path / "campus-entrypoint-with-loaded-content.html"
+    source_html.write_text(
+        "<html><body><h1>Campus Recruiting</h1>"
+        "<p>AI application internship, backend engineer, Python, Java, SQL, project practice.</p>"
+        "<p>This homepage links to many job detail pages and campus events.</p>"
+        "</body></html>",
+        encoding="utf-8",
+    )
+    sources_path = tmp_path / "sources.json"
+    sources_path.write_text(
+        json.dumps(
+            {
+                "sources": [
+                    {
+                        "task_id": "official-company-career",
+                        "source_type": "official_or_primary",
+                        "source_ref": source_html.as_uri(),
+                        "field": "current_company_or_job_requirement",
+                        "title": "ByteDance campus recruiting public entry",
+                        "snippet": "Official campus recruitment entrypoint for internship and campus positions.",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    fetch = run_python(
+        PUBLIC_SOURCE_FETCHER,
+        "--run-dir",
+        str(run_dir),
+        "--sources-json",
+        str(sources_path),
+    )
+
+    assert fetch.returncode == 0, fetch.stderr
+    response = json.loads(fetch.stdout)["public_source_fetch_response"]
+    evidence = json.loads((run_dir / response["evidence_json_ref"]).read_text(encoding="utf-8"))
+    packet = evidence["evidence_packets"][0]["evidence_packet"]
+    assert packet["evidence_strength"] == "weak"
+    assert packet["confidence"] == "low"
+    assert packet["may_set_final_decision"] is False
+    assert packet["may_set_weight"] is False
+    assert packet["generic_entrypoint_only"] is True
+
+
+def test_public_source_result_collector_parses_multiline_notes_metadata(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "job_search",
+        "--input-text",
+        "Computer science junior, Python, looking for internship.",
+        "--run-root",
+        str(run_root),
+        "--route",
+        "job_search",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(SOURCE_PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+
+    notes = tmp_path / "source-notes.md"
+    notes.write_text(
+        """
+- task_id: recruitment-platform-public-jd
+  url: https://www.nowcoder.com/jobs/detail/123
+  title: Python 后端实习公开 JD
+  source_type_hint: recruitment_platform_jd
+  snippet: Python、SQL、API、Linux。
+""".strip(),
+        encoding="utf-8",
+    )
+
+    collect = run_python(
+        PUBLIC_SOURCE_RESULT_COLLECTOR,
+        "--run-dir",
+        str(run_dir),
+        "--notes-md",
+        str(notes),
+    )
+
+    assert collect.returncode == 0, collect.stderr
+    response = json.loads(collect.stdout)["public_source_result_collection_response"]
+    results = json.loads((run_dir / response["search_results_ref"]).read_text(encoding="utf-8"))["search_results"]
+    assert results[0]["title"] == "Python 后端实习公开 JD"
+    assert results[0]["snippet"] == "Python、SQL、API、Linux。"
+    assert results[0]["source_type"] == "recruitment_platform_jd"
+    assert results[0]["task_id"] == "recruitment-platform-public-jd"
+
+
 def test_one_command_runner_finalizes_with_external_adapters(tmp_path):
     run_root = tmp_path / ".career-pipeline-runs"
     external_results = tmp_path / "external-search-results.json"
@@ -2861,6 +3323,10 @@ def test_target_job_fit_plan_batches_agents_for_limited_subagent_concurrency(tmp
         "strategy_match",
         "strategy_learning",
     ]
+    batch_by_agent = {item["target_agent"]: item["batch_id"] for item in plan["dispatch_queue"]}
+    for item in plan["dispatch_queue"]:
+        for dependency_agent in item["depends_on_agents"]:
+            assert batch_by_agent[dependency_agent] != item["batch_id"]
     assert all(item["close_after_artifact_persisted"] is True for item in plan["dispatch_queue"])
 
     work_orders = run_python(WORK_ORDER_BUILDER, "--run-dir", str(run_dir))

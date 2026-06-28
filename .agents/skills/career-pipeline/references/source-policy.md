@@ -35,6 +35,8 @@ Use automatic source substitution before interrupting the user. Try replacement 
 
 For dynamic public pages, a browser-rendered public text snapshot may be used only when the text is visible without login, private messages, backend access, or access-control bypass. Keep the inspectable public URL as the source ref and mark the extraction method as browser-rendered public text. A JavaScript shell without a public rendered snapshot is not evidence.
 
+Official recruiting homepages, campus entrypoints, job-search pages, and public report search entrypoints are inspectable public URLs, but they are not concrete JD evidence by themselves. If the fetched text only shows navigation, search/filter controls, generic application entry, or report-search entry text without role duties, qualifications, skill requirements, or company-bound HR wording, mark it as an entrypoint-only source. It may support exploration or "check this official channel," but it must not set role requirements, weights, final recommendations, or resume-tailoring claims.
+
 Record a `source_attempt_log` when access fails: attempted URL, failure type, source type, replacement attempted, replacement URL if found, and which claims the replacement may support. If no replacement public source exists, return a research task or blocked field instead of guessing.
 
 ## Accuracy Tiers

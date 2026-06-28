@@ -11,6 +11,31 @@ class ProductFlowError(Exception):
     pass
 
 
+ROUTE_SUPERVISION_AGENTS = ["hr-supervisor", "factual-reviewer"]
+
+SAFE_PRODUCT_OUTPUTS = {
+    "application_direction",
+    "application_strategy",
+    "current_fit_assessment",
+    "application_readiness_decision",
+    "learning_plan_before_application",
+}
+
+EXACT_PRODUCT_BLOCKERS = [
+    "fit_score",
+    "application_priority",
+    "targeted_resume_tailoring",
+    "company_specific_skill_weight_ranking",
+    "final_resume_draft",
+]
+
+SIMULATION_BLOCKERS = {
+    "application_direction",
+    "application_strategy",
+    "application_priority",
+    "final_resume_draft",
+}
+
 SKILL_INTRO = (
     "我是 Career Pipeline，一个面向求职规划和简历设计的 Codex Skill。"
     "我会根据你的专业、经历、目标岗位和公开招聘信息，帮你判断适合的岗位方向、补齐能力差距，"
@@ -63,8 +88,217 @@ def response(payload: dict[str, Any], key: str, script_name: str) -> dict[str, A
     return value
 
 
+def unique_strings(items: list[str]) -> list[str]:
+    result: list[str] = []
+    for item in items:
+        if item and item not in result:
+            result.append(item)
+    return result
+
+
 def list_value(value: Any) -> list[Any]:
     return value if isinstance(value, list) else []
+
+
+def product_route(route: str, task_type: str) -> str:
+    if route != "job_search" or task_type != "job_search":
+        return route
+    return "product_job_search"
+
+
+def product_blocked_outputs(context: dict[str, Any]) -> list[str]:
+    blocked = [
+        str(item)
+        for item in list_value(context.get("blocked_outputs"))
+        if str(item) and str(item) not in SIMULATION_BLOCKERS
+    ]
+    for item in EXACT_PRODUCT_BLOCKERS:
+        if item not in blocked:
+            blocked.append(item)
+    return blocked
+
+
+def write_wrapped_json(path: Path, wrapper_key: str, payload: dict[str, Any]) -> None:
+    write_json(path, {wrapper_key: payload})
+
+
+def load_wrapped_json(path: Path, wrapper_key: str) -> dict[str, Any]:
+    payload = load_json(path)
+    value = payload.get(wrapper_key)
+    if not isinstance(value, dict):
+        raise ProductFlowError(f"{path}: missing `{wrapper_key}`")
+    return value
+
+
+def rewrite_context_for_product_run(run_dir: Path) -> dict[str, Any]:
+    context_path = run_dir / "input" / "normalized" / "runtime_context_packet.json"
+    context = load_wrapped_json(context_path, "runtime_context_packet")
+    context["execution_intent"] = "product_real_user_flow"
+    context["user_goal"] = (
+        "product real-user career planning flow from plain chat; prepare public-source "
+        "research, role execution, HR supervision, and factual review before final output"
+    )
+    context["blocked_outputs"] = product_blocked_outputs(context)
+    context["safe_outputs_allowed_before_exact_scoring"] = sorted(SAFE_PRODUCT_OUTPUTS)
+    context["next_possible_actions"] = [
+        "Summarize the user's current information and ask one compact batch for user-owned missing facts.",
+        "Automatically search policy-valid public job, company, school, HR, and local opportunity sources.",
+        "Dispatch role agents by batch, then run HR readability supervision and factual review before final output.",
+    ]
+    target_context = context.setdefault("target_context", {})
+    if isinstance(target_context, dict):
+        target_context["safe_prepare_first_and_explore_allowed"] = True
+        target_context["exact_score_priority_and_tailoring_require_current_jd_public_evidence"] = True
+        target_context.setdefault("fit_vs_growth_policy", "separate_current_fit_from_learning_path_before_application")
+    write_wrapped_json(context_path, "runtime_context_packet", context)
+    return context
+
+
+def rewrite_injections_for_product_run(run_dir: Path, context: dict[str, Any]) -> None:
+    injection_dir = run_dir / "injections"
+    product_blockers = product_blocked_outputs(context)
+    for path in sorted(injection_dir.glob("*.secondary_prompt_injection.json")):
+        injection = load_wrapped_json(path, "secondary_prompt_injection")
+        role_context = injection.setdefault("role_specific_context", {})
+        if isinstance(role_context, dict):
+            role_context.pop("simulation_scope", None)
+            role_context["execution_scope"] = "product_real_user_flow_pending_real_roles"
+            role_context["must_return_blockers_instead_of_precise_unsupported_claims"] = True
+            role_context["safe_prepare_first_and_explore_allowed"] = True
+            role_context["exact_score_priority_and_tailoring_require_current_jd_public_evidence"] = True
+            role_context["hr_supervision_required"] = True
+            role_context["factual_review_required_before_final"] = True
+        injection["blocked_outputs"] = [
+            item
+            for item in list_value(injection.get("blocked_outputs"))
+            if item not in {"application_strategy", "application_direction", "application_priority"}
+        ]
+        for item in product_blockers:
+            if item not in injection["blocked_outputs"] and item not in SAFE_PRODUCT_OUTPUTS:
+                injection["blocked_outputs"].append(item)
+        required_fields = list_value(injection.get("required_output_fields"))
+        for field in [
+            "evidence_basis",
+            "weight_provenance",
+            "conditional_options",
+            "runtime_research_tasks",
+        ]:
+            if field not in required_fields:
+                required_fields.append(field)
+        if injection.get("target_agent") in {"match-strategist", "learning-path-strategist"}:
+            for field in [
+                "skill_gap_analysis",
+                "learning_plan_before_application",
+                "project_recommendations",
+                "evidence_requirements",
+            ]:
+                if field not in required_fields:
+                    required_fields.append(field)
+        if injection.get("target_agent") == "hr-supervisor":
+            for field in [
+                "hr_real_question_bank",
+                "likely_interview_questions",
+                "resume_defensibility_checks",
+                "user_facing_package_review",
+            ]:
+                if field not in required_fields:
+                    required_fields.append(field)
+        injection["required_output_fields"] = required_fields
+        contract = injection.get("invocation_contract")
+        if isinstance(contract, dict):
+            contract["required_output_fields"] = required_fields
+            contract["timeout_or_budget_hint"] = "product-real-user-flow"
+            contract["on_failure"] = "return_blocked"
+        write_wrapped_json(path, "secondary_prompt_injection", injection)
+
+
+def rebuild_invocations_from_injections(run_dir: Path) -> list[str]:
+    manifest_payload = load_json(run_dir / "manifest.json")
+    manifest = manifest_payload.get("execution_manifest", {})
+    current_refs = manifest.get("subagent_invocation_refs")
+    ordered_agents = []
+    if isinstance(current_refs, list):
+        for ref in current_refs:
+            name = Path(str(ref).replace("\\", "/")).name
+            if name.endswith(".invocation.json"):
+                ordered_agents.append(name.replace(".invocation.json", ""))
+    injection_by_agent = {
+        path.name.replace(".secondary_prompt_injection.json", ""): path
+        for path in (run_dir / "injections").glob("*.secondary_prompt_injection.json")
+    }
+    ordered_agents.extend(agent for agent in sorted(injection_by_agent) if agent not in ordered_agents)
+    refs: list[str] = []
+    for agent in ordered_agents:
+        path = injection_by_agent.get(agent)
+        if path is None:
+            continue
+        injection = load_wrapped_json(path, "secondary_prompt_injection")
+        contract = injection.get("invocation_contract")
+        if not isinstance(contract, dict):
+            raise ProductFlowError(f"{path}: missing invocation_contract")
+        invocation_ref = str(contract.get("secondary_prompt_injection_ref") or "")
+        target_agent = str(contract.get("target_agent") or "")
+        if not target_agent:
+            raise ProductFlowError(f"{path}: missing target_agent")
+        invocation_path = run_dir / "invocations" / f"{target_agent}.invocation.json"
+        write_wrapped_json(invocation_path, "subagent_invocation", contract)
+        refs.append(rel(invocation_path, run_dir))
+        if invocation_ref and invocation_ref != rel(path, run_dir):
+            raise ProductFlowError(f"{path}: injection ref mismatch")
+    return refs
+
+
+def remove_simulated_role_outputs(run_dir: Path) -> None:
+    agents_dir = run_dir / "agents"
+    if not agents_dir.is_dir():
+        return
+    for output_path in agents_dir.glob("*/output.json"):
+        output_path.unlink()
+
+
+def update_manifest_for_product_run(run_dir: Path, invocation_refs: list[str]) -> None:
+    manifest_path = run_dir / "manifest.json"
+    manifest_payload = load_json(manifest_path)
+    manifest = manifest_payload.get("execution_manifest")
+    run_state = manifest_payload.get("run_state")
+    if not isinstance(manifest, dict) or not isinstance(run_state, dict):
+        raise ProductFlowError("manifest.json must contain execution_manifest and run_state")
+    manifest["current_stage"] = "injection_ready"
+    manifest["user_goal_summary"] = "product real-user career pipeline flow"
+    manifest["subagent_invocation_refs"] = invocation_refs
+    manifest["final_package_ref"] = ""
+    manifest["artifact_refs"] = [
+        ref
+        for ref in list_value(manifest.get("artifact_refs"))
+        if not (isinstance(ref, dict) and ref.get("artifact_type") == "subagent_output")
+    ]
+    gate_status = manifest.setdefault("gate_status", {})
+    if isinstance(gate_status, dict):
+        gate_status["specialists_completed_or_blocked"] = False
+        gate_status["debate_completed_or_recorded"] = False
+        gate_status["hr_review_completed"] = False
+        gate_status["factual_review_completed_when_needed"] = False
+    run_state["stage"] = "injection_ready"
+    run_state["subagent_invocation_refs"] = invocation_refs
+    run_state["active_agents"] = []
+    run_state["completed_agents"] = []
+    run_state["blocked_agents"] = []
+    run_state["failed_invocations"] = []
+    run_state["blocked_outputs"] = product_blocked_outputs(
+        load_wrapped_json(run_dir / "input" / "normalized" / "runtime_context_packet.json", "runtime_context_packet")
+    )
+    run_state["degraded_outputs"] = []
+    run_state["recovery_actions"] = ["run_public_research", "dispatch_real_role_agents_by_batch"]
+    run_state["next_action"] = "dispatch_agents"
+    write_json(manifest_path, manifest_payload)
+
+
+def convert_simulation_to_product_run(run_dir: Path) -> None:
+    context = rewrite_context_for_product_run(run_dir)
+    rewrite_injections_for_product_run(run_dir, context)
+    invocation_refs = rebuild_invocations_from_injections(run_dir)
+    remove_simulated_role_outputs(run_dir)
+    update_manifest_for_product_run(run_dir, invocation_refs)
 
 
 def summarize_known(profile: dict[str, Any], context: dict[str, Any]) -> list[str]:
@@ -164,13 +398,14 @@ def markdown_status(status: dict[str, Any]) -> str:
 
 
 def build_run(args: argparse.Namespace) -> dict[str, Any]:
+    route = product_route(args.route, args.task_type)
     simulate_response = response(
         run_python(
             "simulate_runtime_run.py",
             "--task-type",
             args.task_type,
             "--route",
-            args.route,
+            route,
             "--input-text",
             args.input_text,
             "--run-root",
@@ -183,6 +418,7 @@ def build_run(args: argparse.Namespace) -> dict[str, Any]:
     if not run_id:
         raise ProductFlowError("simulate_runtime_run.py did not return a run_id")
     run_dir = args.run_root / run_id
+    convert_simulation_to_product_run(run_dir)
 
     plan_response = response(
         run_python("build_subagent_plan.py", "--run-dir", str(run_dir), "--build-prompt-bundles"),

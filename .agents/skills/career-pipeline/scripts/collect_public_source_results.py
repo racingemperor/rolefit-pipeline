@@ -13,7 +13,8 @@ class PublicSourceResultCollectionError(Exception):
 
 
 URL_PATTERN = re.compile(r"https?://[^\s\]\)>\"']+")
-KEY_VALUE_PATTERN = re.compile(r"\b(title|snippet|source_type|task_id)=([^=]+?)(?=\s+\w+=|$)")
+KEY_VALUE_PATTERN = re.compile(r"\b(title|snippet|source_type|source_type_hint|task_id)=([^=]+?)(?=\s+\w+=|$)")
+NOTE_FIELD_PATTERN = re.compile(r"^\s*(?:-\s*)?(task_id|url|title|snippet|source_type|source_type_hint):\s*(.*?)\s*$")
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -89,8 +90,37 @@ def parse_kv(line: str) -> dict[str, str]:
     return {match.group(1): match.group(2).strip() for match in KEY_VALUE_PATTERN.finditer(line)}
 
 
+def clean_scalar(value: str) -> str:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+        return value[1:-1].strip()
+    return value
+
+
 def clean_url(url: str) -> str:
     return url.rstrip(".,;，。；)")
+
+
+def source_type_from_metadata(url: str, metadata: dict[str, str]) -> str:
+    explicit = metadata.get("source_type") or metadata.get("source_type_hint") or ""
+    return source_type_for_url(url, explicit)
+
+
+def result_from_metadata(plan: dict[str, Any], metadata: dict[str, str], fallback_text: str) -> dict[str, Any] | None:
+    url = clean_url(metadata.get("url", ""))
+    if not url:
+        return None
+    source_type = source_type_from_metadata(url, metadata)
+    task_text = " ".join(value for value in metadata.values() if value)
+    task_id = metadata.get("task_id") or choose_task_id(plan, source_type, task_text or fallback_text)
+    return {
+        "task_id": task_id,
+        "url": url,
+        "title": metadata.get("title") or "Public source",
+        "snippet": metadata.get("snippet") or fallback_text.strip() or "Public URL collected by the controller notes.",
+        "source_type": source_type,
+        "provider": "controller-collected",
+    }
 
 
 def result_from_line(plan: dict[str, Any], line: str) -> dict[str, Any] | None:
@@ -99,7 +129,7 @@ def result_from_line(plan: dict[str, Any], line: str) -> dict[str, Any] | None:
         return None
     url = clean_url(match.group(0))
     kv = parse_kv(line)
-    source_type = source_type_for_url(url, kv.get("source_type", ""))
+    source_type = source_type_from_metadata(url, kv)
     task_id = kv.get("task_id") or choose_task_id(plan, source_type, line)
     title = kv.get("title") or line.replace(match.group(0), "").strip(" -:：")[:80] or "Public source"
     snippet = kv.get("snippet") or line.strip()
@@ -113,10 +143,45 @@ def result_from_line(plan: dict[str, Any], line: str) -> dict[str, Any] | None:
     }
 
 
+def results_from_structured_notes(plan: dict[str, Any], text: str) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+    current: dict[str, str] = {}
+    current_lines: list[str] = []
+
+    def flush_current() -> None:
+        nonlocal current, current_lines
+        result = result_from_metadata(plan, current, "\n".join(current_lines))
+        if result:
+            results.append(result)
+        current = {}
+        current_lines = []
+
+    for line in text.splitlines():
+        if not line.strip():
+            flush_current()
+            continue
+        match = NOTE_FIELD_PATTERN.match(line)
+        if not match:
+            current_lines.append(line)
+            continue
+        if line.lstrip().startswith("- ") and current:
+            flush_current()
+        current[match.group(1)] = clean_scalar(match.group(2))
+        current_lines.append(line)
+    flush_current()
+    return results
+
+
 def results_from_notes(plan: dict[str, Any], notes_path: Path) -> list[dict[str, Any]]:
     text = notes_path.read_text(encoding="utf-8-sig")
     results = []
     seen = set()
+    for result in results_from_structured_notes(plan, text):
+        key = (result["task_id"], result["url"])
+        if key in seen:
+            continue
+        seen.add(key)
+        results.append(result)
     for line in text.splitlines():
         result = result_from_line(plan, line)
         if not result:

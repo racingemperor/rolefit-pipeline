@@ -233,6 +233,20 @@ When Codex or the browser has collected public URLs, convert them without hand-w
 python scripts/collect_public_source_results.py --run-dir ../../../.career-pipeline-runs/<run_id> --notes-md <public_source_notes.md>
 ```
 
+The notes file can be simple URL lines or YAML-like blocks. Use blocks when the controller has a title, snippet, task id, or source type hint from visible public search results:
+
+```md
+- task_id: recruitment-platform-public-jd
+  url: https://www.nowcoder.com/jobs/detail/123
+  title: Python backend intern public JD
+  source_type_hint: recruitment_platform_jd
+  snippet: Python, SQL, API, Linux.
+```
+
+The collector maps `source_type_hint` into the normal `source_type` field and still sends every URL through source-policy filtering, fetch/degrade handling, and final gates.
+
+Official recruiting homepages, campus entrypoints, job-search pages, and report search entrypoints can be shown as useful public URLs, but they are exploration entrypoints. They must not be treated as concrete JD evidence, role requirements, final application priority, or resume-tailoring proof unless the fetched public text contains duties, qualifications, skill requirements, or other claim-specific evidence.
+
 ## Contract Smoke Run
 
 This command checks local wiring only. It does not call real subagents and does not browse live recruitment sites:

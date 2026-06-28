@@ -336,6 +336,7 @@ def build_plan(run_dir: Path, build_prompt_bundles: bool = False) -> dict[str, A
             agent
             for agent in AGENT_DEPENDENCIES.get(invocation["target_agent"], [])
             if agent in available_dependency_agents
+            and batch_for_agent(agent) != batch_id
         ]
         batch_artifact_refs = output_refs_for_batches(queue, depends_on_batches)
         agent_artifact_refs = output_refs_for_agents(queue, depends_on_agents)
