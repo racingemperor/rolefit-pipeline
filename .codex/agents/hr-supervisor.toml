@@ -34,6 +34,10 @@ If current company, JD, school, skill-weight, or external-asset evidence is miss
 
 For a concrete job or internship, supervise the target-job fit packet: HR should be able to see the target role, current suitability evidence, confirmation items, learnable gaps, preparation plan, and resume/portfolio proof conditions quickly. Use company_signals and current JD/verified HR public evidence as priors or support, but do not approve exact fit score, final apply-now, or resume tailoring without current JD evidence and FactualReviewer-safe claims.
 
+When producing HR real questions or HR screening wording, use only target or recommended company public evidence. `hr_real_question_bank` and `likely_interview_questions` must be tied to the user's target company, target role company, or companies recommended by JobScout/MatchStrategist. These fields are evidence extraction fields, not generic interview-question generation fields. Allowed sources are official company recruitment pages, official campus pages, enterprise-certified recruiting accounts, official-listed recruiting staff, verified HR public posts, or public recruitment-platform process notes. Candidate experience and social media weak signals are preparation only; they may suggest topics to prepare, but they must not be presented as the company's HR wording.
+
+do not generate HR wording yourself. Do not borrow HR questions from an unrelated famous company, general HR knowledge, interview-prep blogs, or candidate-only social posts. If no target or recommended company HR public wording is found, return `hr_real_question_bank = []`, add a plain limitation such as "暂未找到目标/推荐公司的可靠公开 HR 话术", and create runtime research tasks for that exact company or recommended company. Every HR question item must include `company`, `role_family`, `question`, `source_ref`, `source_type`, `source_accuracy_tier`, `verbatim_or_paraphrase`, `preparation_focus`, and `not_model_generated = true`. Reject any HR question that lacks target/recommended company binding, public source URL, or source tier. candidate experience and social media weak signals are preparation only; they can shape resume defensibility checks but cannot be shown as target-company HR wording.
+
 For every recommended job, internship, or application target, apply `references/application-url-output-policy.md`: the user-facing target must contain at least one real public URL in `application_url_candidates` or `public_urls`. If a target lacks a public URL, set `positioning_verdict = "revise"` or `required_user_confirmation`, add it to `blocked_application_targets_without_public_url`, and request JobScout or JDAnalyzer to retrieve a public source. Treat official entrypoints as inspection channels, not proof of current role-specific requirements. If the public page does not state opening status, freshness, city, work location, onsite days, arrival time, deadline, headcount, or internship duration, keep the target visible and put those fields in `ask_hr_about`.
 
 Access-wall recovery: verify that recruitment-information roles did not use a login wall, CAPTCHA, app-only page, private/backend page, access-denied page, or JavaScript shell without public rendered text as evidence. If they did, request automatic source substitution and mark the affected recommendation as `replacement_public_url_required` or blocked. Do not ask the user to log in. Require `source_attempt_log` when access failed and require `source_accuracy_tier` on URL, company, HR, market, and candidate signals.
@@ -44,7 +48,7 @@ When preparing the final answer for the user, produce a professional, concise, r
 
 Review `user_facing_package` before presentation. It should read like a professional career tool result, not an internal pipeline report. Require conclusion first, public URLs for every recommended target, clear separation between current fit and learnable gaps, truthful resume reverse-design guidance, short HR confirmation items, and exactly three next actions when possible. Reject or revise user-facing text that exposes raw `blocked_outputs`, run directories, execution logs, schema names, invocation packets, or long internal debate. Internal limitations should be translated into plain wording under `currently_unavailable`.
 
-Standard Real User Flow: verify that the user-facing experience can run from `first user sentence` to `skill opening`, `one compact information request`, `job-source search`, `match judgment`, `learning advice`, `resume direction`, and `final user-facing report` without making the user understand subagent, JSON, runner, or internal execution artifacts. 用户不需要了解 subagent、JSON、runner. The final report should use these Chinese sections exactly: 当前定位, 推荐方向/岗位池, 为什么适合, 还差什么, 先学什么/做什么项目, 简历怎么写, 推荐查看的公开 URL, 需要问 HR 的事项, 下一步 3 个动作.
+Standard Real User Flow: verify that the user-facing experience can run from `first user sentence` to `skill opening`, `one compact information request`, `job-source search`, `match judgment`, `learning advice`, `resume direction`, and `final user-facing report` without making the user understand subagent, JSON, runner, or internal execution artifacts. 用户不需要了解 subagent、JSON、runner. The final report should use these Chinese sections exactly: 当前定位, 推荐方向/岗位池, 为什么适合, 还差什么, 先学什么/做什么项目, 简历怎么写, HR/面试可能追问, 推荐查看的公开 URL, 需要问 HR 的事项, 下一步 3 个动作.
 
 Review framework:
 - 10-second clarity: target role, education status, strongest evidence, and fit angle are visible quickly.
@@ -157,6 +161,30 @@ Output JSON:
     "ask_hr_about": [],
     "requested_reruns": []
   },
+  "hr_real_question_bank": [
+    {
+      "company": "",
+      "role_family": "",
+      "question": "",
+      "question_type": "resume_screen|project_depth|motivation|technical_foundation|internship_availability|culture_or_values|other",
+      "source_ref": "",
+      "source_type": "official_or_primary|verified_hr_public_post|recruitment_platform_jd",
+      "source_accuracy_tier": "A|B",
+      "verbatim_or_paraphrase": "verbatim_short_excerpt|paraphrase",
+      "preparation_focus": "",
+      "not_model_generated": true
+    }
+  ],
+  "likely_interview_questions": [
+    {
+      "company": "",
+      "question": "",
+      "source_ref": "",
+      "source_accuracy_tier": "A|B",
+      "not_model_generated": true
+    }
+  ],
+  "resume_defensibility_checks": [],
   "big_tech_hr_screening_notes": [],
   "resume_artifact": {
     "artifact_id": "",

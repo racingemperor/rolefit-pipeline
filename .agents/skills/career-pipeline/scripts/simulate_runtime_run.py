@@ -932,6 +932,117 @@ def build_injection(
             ]
         )
 
+    if target_agent == "learning-path-strategist":
+        role_specific_context["concrete_project_recommendation_required"] = {
+            "enabled": True,
+            "trigger": "user lacks project evidence, target role has project expectations, or resume needs proof artifacts",
+            "selection_basis": [
+                "target role or role family",
+                "user baseline skills and constraints",
+                "public JD and verified HR evidence",
+                "fastest credible completion path",
+                "resume value and interview defensibility",
+            ],
+            "hard_rule": (
+                "Project plans are preparation tasks; they must not be written as completed resume claims "
+                "until the user finishes proof artifacts and can explain personal contribution."
+            ),
+        }
+        research_tasks.append(
+            {
+                "research_question": "Find concrete project recommendation evidence for the target role; prefer public JD, verified HR expectations, and inspectable GitHub repositories.",
+                "target_sources": [
+                    "current public JD",
+                    "official company or campus page",
+                    "verified HR public posts",
+                    "public GitHub repositories",
+                    "role-family public technical guides",
+                ],
+                "required_freshness": "0_12_months preferred for JD/HR signals; repository activity should be checked when used",
+                "needed_for_outputs": [
+                    "project_recommendations",
+                    "project_selection_rubric",
+                    "implementation_steps",
+                    "proof_artifacts",
+                    "resume_conversion_conditions",
+                    "interview_defensibility_questions",
+                ],
+            }
+        )
+        required_output_fields.extend(
+            [
+                "project_recommendations",
+                "project_selection_rubric",
+                "resume_conversion_conditions",
+                "interview_defensibility_questions",
+            ]
+        )
+        handoff_contract.extend(
+            [
+                "handoff concrete project recommendations to HRSupervisor for first-screen readability",
+                "handoff resume-conversion conditions to ResumeArchitect and FactualReviewer",
+            ]
+        )
+        debate_contract.extend(
+            [
+                "challenge projects that are too hard, too shallow, unverifiable, or weakly tied to the target role",
+                "do not allow planned project work to become completed resume claims",
+            ]
+        )
+
+    if target_agent == "hr-supervisor":
+        role_specific_context["company_bound_hr_question_research"] = {
+            "enabled": True,
+            "scope": "target or recommended company only; comparable company signals may be preparation notes only and must not enter hr_real_question_bank",
+            "allowed_sources": [
+                "official company recruitment pages",
+                "official or enterprise-certified recruiting accounts",
+                "verified HR public posts",
+                "public recruitment-platform JD process notes",
+            ],
+            "auxiliary_sources": [
+                "candidate experience",
+                "social media weak signals",
+            ],
+            "hard_rule": (
+                "Do not generate HR wording yourself. Every hr_real_question_bank item must be tied to "
+                "the target or recommended company, source_ref, source_type, source_accuracy_tier, and not_model_generated=true. "
+                "Candidate experience and social media weak signals are preparation only."
+            ),
+        }
+        research_tasks.append(
+            {
+                "research_question": "Collect company-bound HR public wording or recruiter screening focus for the target company or recommended companies.",
+                "target_sources": [
+                    "target company official recruitment page",
+                    "target company official campus page",
+                    "verified HR public posts",
+                    "enterprise-certified recruiting account posts",
+                    "candidate experience only as auxiliary preparation",
+                    "social media weak signals only as auxiliary preparation",
+                ],
+                "required_freshness": "0_12_months preferred; mark stale or unavailable if source is older or not company-bound",
+                "needed_for_outputs": [
+                    "hr_real_question_bank",
+                    "likely_interview_questions",
+                    "resume_defensibility_checks",
+                ],
+            }
+        )
+        required_output_fields.extend(
+            [
+                "hr_real_question_bank",
+                "likely_interview_questions",
+                "resume_defensibility_checks",
+            ]
+        )
+        debate_contract.extend(
+            [
+                "reject HR questions that lack target/recommended company, public source_ref, or source_accuracy_tier",
+                "mark unavailable instead of inventing HR wording",
+            ]
+        )
+
     database_files_to_read = [
         "data/runtime_parameters/parameter_ownership.zh-CN.json",
         "data/major_taxonomy/summary.json",

@@ -76,6 +76,8 @@ For concrete job or internship requests, roles should separate:
 - `application_url_candidates`: public URL candidates that let the user inspect official, school, public JD, or verified HR sources.
 - `ask_hr_about`: missing operational details the public page does not state, such as opening status, city, onsite days, arrival time, deadline, headcount, or internship duration.
 - `blocked_application_targets_without_public_url`: targets that cannot be shown as concrete application recommendations yet.
+- `project_recommendations`: concrete project suggestions when the user lacks project evidence or needs prepare-first proof artifacts.
+- `hr_real_question_bank`: target or recommended company HR public wording or recruiter screening questions, with source-bound provenance.
 
 If current JD evidence is missing, exact fit score, final priority, targeted resume tailoring, and company-specific skill weights must be blocked or marked `not_available` rather than inferred from repository priors. Safe preparation-first, exploration, learning-path, and public-URL recommendations may still be returned with limitations stated.
 
@@ -84,6 +86,71 @@ For finalization, blocked exact fields may remain in `blocked_outputs` without b
 Recommended jobs, internships, or application targets must follow `application-url-output-policy.md`. A user-facing concrete target should not appear in `recommended_application_targets` unless it includes a source-policy-valid public URL candidate. Official entrypoints can support exploration, public JD or JD text can support prepare-first, and role-specific `apply_now`, exact fit score, and resume tailoring require stronger current JD plus user evidence.
 
 Every proposed parameter weight, score, priority, ranking, threshold, or confidence adjustment must be supported by hard data. A role must not set weights by intuition, popularity assumptions, or model-only reasoning. If runtime public/official network evidence or user-provided materials are missing, set the weight status to `not_available` or `needs_more_sources`, add `runtime_research_tasks`, and block downstream decisions that depend on that weight.
+
+Concrete project recommendations should use:
+
+```json
+{
+  "project_selection_rubric": {
+    "role_fit": "",
+    "completion_speed": "",
+    "implementation_cost": "",
+    "resume_value": "",
+    "interview_depth": "",
+    "public_evidence_quality": "",
+    "risk_control": ""
+  },
+  "project_recommendations": [
+    {
+      "project_name": "",
+      "target_role_family": "",
+      "recommended_project_mode": "interview-only|smoke-test|local-full-run|remote-full-run",
+      "why_this_project": "",
+      "implementation_steps": [],
+      "proof_artifacts": [],
+      "resume_conversion_conditions": [],
+      "interview_defensibility_questions": [],
+      "source_basis": [],
+      "risk_notes": []
+    }
+  ]
+}
+```
+
+Project recommendations are preparation guidance, not proof that the user has completed work. Planned work `must not be written as completed resume claims`. ResumeArchitect and FactualReviewer may only convert a project into resume content after proof artifacts exist and the user can explain personal contribution, input/output, core modules, and failure boundaries.
+
+HR real questions should use:
+
+```json
+{
+  "hr_real_question_bank": [
+    {
+      "company": "",
+      "role_family": "",
+      "question": "",
+      "question_type": "resume_screen|project_depth|motivation|technical_foundation|internship_availability|culture_or_values|other",
+      "source_ref": "",
+      "source_type": "official_or_primary|verified_hr_public_post|recruitment_platform_jd",
+      "source_accuracy_tier": "A|B",
+      "verbatim_or_paraphrase": "verbatim_short_excerpt|paraphrase",
+      "preparation_focus": "",
+      "not_model_generated": true
+    }
+  ],
+  "likely_interview_questions": [
+    {
+      "company": "",
+      "question": "",
+      "source_ref": "",
+      "source_accuracy_tier": "A|B",
+      "not_model_generated": true
+    }
+  ],
+  "resume_defensibility_checks": []
+}
+```
+
+`hr_real_question_bank` must be target or recommended company-bound. It is an evidence extraction field, not a generic interview-question generation field. do not generate HR wording yourself. Do not borrow questions from unrelated companies, interview-prep blogs, model memory, or candidate-only social posts. Valid direct support includes official/primary recruiting pages, official-listed recruiter posts, enterprise-certified recruiting accounts, public recruitment-platform process notes, and verified HR public posts tied to the target company or recommended company. candidate experience and social media weak signals are preparation only; they must not be presented as company HR wording or final requirements. If target or recommended company public HR wording is unavailable, return an empty question bank, a limitation, and runtime research tasks for that exact company or recommended company.
 
 Each `weight_provenance` item should use:
 
@@ -249,6 +316,9 @@ Use this shape:
       }
     ],
     "gaps_to_fix_before_application": [],
+    "project_recommendations": [],
+    "hr_real_questions": [],
+    "likely_interview_questions": [],
     "resume_reverse_design": "",
     "ask_hr_about": [],
     "currently_unavailable": [],
@@ -275,6 +345,7 @@ The final rendered natural-language result should also be available as `user_fac
 ## 还差什么
 ## 先学什么/做什么项目
 ## 简历怎么写
+## HR/面试可能追问
 ## 推荐查看的公开 URL
 ## 需要问 HR 的事项
 ## 下一步 3 个动作

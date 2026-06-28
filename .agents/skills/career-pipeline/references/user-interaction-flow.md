@@ -46,9 +46,10 @@ This is the standard product flow from the first user sentence to the final user
 3. `one compact information request`: summarize known facts, say what can be done now, say what is missing, and ask one compact batch of user-owned facts only.
 4. `job-source search`: automatically search allowed public sources: official company pages, public JD pages, recruitment platforms visible without login, school career notices, local public employment channels, industrial-park/incubator notices, verified HR public posts, and weak social/candidate signals only as auxiliary context.
 5. `match judgment`: judge current direction or target-role fit from user facts plus source-policy-valid evidence; do not invent exact scores or final priority when evidence is missing.
-6. `learning advice`: convert gaps into learnable skills, projects, proof artifacts, and resume-conversion conditions.
+6. `learning advice`: convert gaps into learnable skills, concrete project recommendations, proof artifacts, and resume-conversion conditions.
 7. `resume direction`: give broad campus/internship resume guidance when no target exists; use one-role-one-resume reverse design only after a target JD or role family is available.
-8. `final user-facing report`: render a concise Chinese report with current positioning, recommended directions or job pool, reasons, gaps, learning/project plan, resume writing direction, public URLs, HR questions, and next three actions.
+8. `company-bound HR question check`: if a target or recommended company exists, search official/verified HR public sources for real screening wording; candidate experience and social media weak signals are preparation only.
+9. `final user-facing report`: render a concise Chinese report with current positioning, recommended directions or job pool, reasons, gaps, learning/project plan, concrete project suggestions, resume writing direction, company-bound HR/面试可能追问, public URLs, HR confirmation items, and next three actions.
 
 For incomplete first-round users, do not stall the flow. Give safe direction clusters, learning path, and resume packaging advice from available facts, but avoid concrete job recommendations without public URLs and avoid company-specific tailoring without evidence.
 
@@ -140,6 +141,9 @@ Use this stable shape:
     "recommended_targets": [],
     "public_source_index": [],
     "gaps_to_fix_before_application": [],
+    "project_recommendations": [],
+    "hr_real_questions": [],
+    "likely_interview_questions": [],
     "resume_reverse_design": "",
     "ask_hr_about": [],
     "currently_unavailable": [],
@@ -154,6 +158,8 @@ Write it in concise Chinese, like a professional career and resume tool:
 - list only recommended targets that have public inspectable URLs.
 - show why each target is worth exploring or preparing for.
 - separate current suitability from learnable gaps.
+- include 具体项目建议 when the user lacks project experience or the target role needs stronger proof artifacts.
+- show HR/面试可能追问 only when tied to target or recommended company public HR/recruiting sources; do not generate HR wording yourself.
 - explain what can be written into the resume now and what can be written only after proof artifacts exist.
 - put missing operational JD details into `ask_hr_about`, not repeated user questions.
 - include exactly three next actions when possible.

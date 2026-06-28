@@ -232,6 +232,58 @@ def test_source_plan_uses_auto_injected_recruitment_source_matrix(tmp_path):
     assert target_tasks["target-learning-gap-evidence"]["display_sources"]
 
 
+def test_target_job_fit_injections_require_project_and_hr_question_outputs(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "target_job_fit",
+        "--input-text",
+        (
+            "Computer science junior. Python and Java basics, no strong project. "
+            "Target: backend or AI application internship. JD: Python, Java, SQL, LLM app."
+        ),
+        "--run-root",
+        str(run_root),
+        "--route",
+        "target_job_fit",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+
+    learning = json.loads(
+        (run_dir / "injections" / "learning-path-strategist.secondary_prompt_injection.json").read_text(
+            encoding="utf-8"
+        )
+    )["secondary_prompt_injection"]
+    hr = json.loads(
+        (run_dir / "injections" / "hr-supervisor.secondary_prompt_injection.json").read_text(
+            encoding="utf-8"
+        )
+    )["secondary_prompt_injection"]
+
+    learning_required = set(learning["required_output_fields"])
+    assert "project_recommendations" in learning_required
+    assert "project_selection_rubric" in learning_required
+    assert "resume_conversion_conditions" in learning_required
+    assert "interview_defensibility_questions" in learning_required
+    learning_payload = json.dumps(learning, ensure_ascii=False)
+    assert "concrete project recommendation" in learning_payload
+    assert "GitHub" in learning_payload
+    assert "must not be written as completed resume claims" in learning_payload
+
+    hr_required = set(hr["required_output_fields"])
+    assert "hr_real_question_bank" in hr_required
+    assert "likely_interview_questions" in hr_required
+    assert "resume_defensibility_checks" in hr_required
+    hr_payload = json.dumps(hr, ensure_ascii=False)
+    assert "verified HR public posts" in hr_payload
+    assert "candidate experience" in hr_payload
+    assert "social media weak signals" in hr_payload
+    assert "preparation only" in hr_payload
+
+
 def test_engineering_smoke_test_writes_results_for_ten_profiles(tmp_path):
     output_dir = tmp_path / "manual-skill-reliability-test"
     result = run_python(
@@ -1022,6 +1074,95 @@ result = {
         "next_action": "continue"
     }
 }
+if target_agent == "learning-path-strategist":
+    result["skill_gap_analysis"] = {
+        "must_have_gaps": ["缺少可验证的岗位相关项目经历"],
+        "nice_to_have_gaps": [],
+        "project_evidence_gaps": ["需要一个能公开展示、能被追问的项目证据"],
+        "interview_defensibility_gaps": []
+    }
+    result["learning_plan_before_application"] = {
+        "status": "prepare_first",
+        "skills_to_learn": ["按目标岗位补齐核心工具链和基础概念"],
+        "projects_to_build": ["完成一个岗位相关的最小可运行项目，并保留 README、运行截图和代码链接"],
+        "proof_artifacts": ["GitHub 仓库", "README", "demo 截图或录屏", "复盘文档"],
+        "resume_conversion_conditions": ["项目跑通并能解释输入、输出、核心模块和失败边界后，才能写入简历"],
+        "ready_to_apply_conditions": ["项目证据可公开检查，且简历中不把计划内容写成已完成成果"],
+        "ask_hr_about": []
+    }
+    result["project_recommendations"] = [
+        {
+            "project_name": "岗位反向设计的最小可运行项目",
+            "target_role_family": "AI 应用或后端实习",
+            "recommended_mode": "smoke-test",
+            "why_this_project": "适合项目经历不足的候选人，能在短周期内补出可验证证据。",
+            "implementation_steps": [
+                "选一个公开可运行仓库或自建最小业务闭环",
+                "跑通核心流程并记录命令",
+                "补一个岗位相关改造点",
+                "整理 README、截图、代码入口和复盘"
+            ],
+            "proof_artifacts": ["GitHub 仓库", "README", "demo 截图", "技术复盘"],
+            "resume_conversion_conditions": [
+                "必须完成并能解释个人贡献后才能写成简历项目",
+                "未完成内容只能写为学习计划或待补证据"
+            ],
+            "source_basis": ["current JD", "verified HR public post", "public GitHub repository"]
+        }
+    ]
+if target_agent == "hr-supervisor":
+    result["hr_real_question_bank"] = [
+        {
+            "company": "Tencent",
+            "role_family": "backend or AI application internship",
+            "question": "请准备说明项目经历和目标岗位要求的对应关系。",
+            "question_type": "project_depth",
+            "source_ref": "https://careers.tencent.com/",
+            "source_type": "official_or_primary",
+            "source_tier": "A",
+            "source_accuracy_tier": "A",
+            "source_basis": ["official company recruiting page"],
+            "verbatim_or_paraphrase": "paraphrase",
+            "preparation_focus": "用岗位要求、项目模块、个人贡献和可验证证据串起来回答。",
+            "not_model_generated": True
+        },
+        {
+            "company": "ByteDance",
+            "role_family": "backend internship",
+            "question": "这条非目标公司题目不应进入腾讯目标岗位结果。",
+            "question_type": "project_depth",
+            "source_ref": "https://jobs.bytedance.com/",
+            "source_type": "official_or_primary",
+            "source_tier": "A",
+            "source_accuracy_tier": "A",
+            "source_basis": ["official company recruiting page"],
+            "verbatim_or_paraphrase": "paraphrase",
+            "preparation_focus": "用于验证公司绑定过滤。",
+            "not_model_generated": True
+        }
+    ]
+    result["likely_interview_questions"] = [
+        {
+            "company": "Tencent",
+            "question": "请准备说明项目经历和目标岗位要求的对应关系。",
+            "source_ref": "https://careers.tencent.com/",
+            "source_type": "official_or_primary",
+            "source_accuracy_tier": "A",
+            "not_model_generated": True
+        },
+        {
+            "company": "ByteDance",
+            "question": "这条非目标公司可能追问不应进入腾讯目标岗位结果。",
+            "source_ref": "https://jobs.bytedance.com/",
+            "source_type": "official_or_primary",
+            "source_accuracy_tier": "A",
+            "not_model_generated": True
+        }
+    ]
+    result["resume_defensibility_checks"] = [
+        "简历中的项目、技能和指标必须能被公开材料或用户经历证明。",
+        "未完成的学习计划不能写成已掌握技能。"
+    ]
 json.dump(result, open(args.output_json, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 """.lstrip(),
         encoding="utf-8",
@@ -1135,7 +1276,17 @@ def test_subagent_adapter_runner_executes_external_command_outputs(tmp_path):
 
 
 def test_finalizer_writes_final_package_when_role_outputs_are_done(tmp_path):
-    run_dir, run_id = prepare_run_with_external_public_source(tmp_path)
+    run_dir, run_id = prepare_run_with_external_public_source(
+        tmp_path,
+        task_type="target_job_fit",
+        route="target_job_fit",
+        input_text=(
+            "Computer science junior. Python and Java basics, no strong project. "
+            "Target: Tencent backend or AI application internship. "
+            "JD: Python, Java, SQL, LLM app."
+        ),
+        task_id="target-current-jd-verification",
+    )
     assert run_python(WORK_ORDER_BUILDER, "--run-dir", str(run_dir)).returncode == 0
     adapter_script = tmp_path / "external_adapter.py"
     write_external_adapter_script(adapter_script)
@@ -1166,6 +1317,17 @@ def test_finalizer_writes_final_package_when_role_outputs_are_done(tmp_path):
     assert user_package["positioning_conclusion"]
     assert user_package["public_source_index"][0]["url"].startswith("https://")
     assert len(user_package["next_three_actions"]) == 3
+    assert user_package["project_recommendations"][0]["project_name"] == "岗位反向设计的最小可运行项目"
+    assert "GitHub 仓库" in user_package["project_recommendations"][0]["proof_artifacts"]
+    assert "必须完成并能解释个人贡献后才能写成简历项目" in user_package["project_recommendations"][0]["resume_conversion_conditions"]
+    assert user_package["hr_real_questions"][0]["company"] == "Tencent"
+    assert user_package["hr_real_questions"][0]["not_model_generated"] is True
+    assert user_package["hr_real_questions"][0]["source_ref"].startswith("https://")
+    assert user_package["hr_real_questions"][0]["source_accuracy_tier"] in {"A", "B"}
+    assert user_package["likely_interview_questions"][0]["not_model_generated"] is True
+    assert [item["company"] for item in user_package["hr_real_questions"]] == ["Tencent"]
+    assert [item["company"] for item in user_package["likely_interview_questions"]] == ["Tencent"]
+    assert "ByteDance" not in json.dumps(user_package, ensure_ascii=False)
     user_report = final_package["decision_package"]["user_facing_report_zh"]
     for heading in [
         "当前定位",
@@ -1174,11 +1336,15 @@ def test_finalizer_writes_final_package_when_role_outputs_are_done(tmp_path):
         "还差什么",
         "先学什么/做什么项目",
         "简历怎么写",
+        "HR/面试可能追问",
         "推荐查看的公开 URL",
         "需要问 HR 的事项",
         "下一步 3 个动作",
     ]:
         assert f"## {heading}" in user_report
+    assert "岗位反向设计的最小可运行项目" in user_report
+    assert "Tencent" in user_report
+    assert "https://careers.tencent.com/" in user_report
     user_package_text = json.dumps(user_package, ensure_ascii=False)
     assert "blocked_outputs" not in user_package_text
     assert "run_dir" not in user_package_text
@@ -1190,6 +1356,64 @@ def test_finalizer_writes_final_package_when_role_outputs_are_done(tmp_path):
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["execution_manifest"]["current_stage"] == "final_package_ready"
     assert manifest["run_state"]["stage"] == "final_package_ready"
+
+
+def test_finalizer_excludes_hr_questions_not_bound_to_target_or_recommended_company(tmp_path):
+    run_dir, _run_id = prepare_run_with_external_public_source(
+        tmp_path,
+        task_type="target_job_fit",
+        route="target_job_fit",
+        input_text=(
+            "Computer science junior. Target: Tencent backend internship. "
+            "JD: Java, SQL, backend project depth."
+        ),
+        task_id="target-current-jd-verification",
+    )
+    assert run_python(WORK_ORDER_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+    adapter_script = tmp_path / "external_adapter.py"
+    write_external_adapter_script(adapter_script)
+    adapter = run_python(
+        SUBAGENT_ADAPTER_RUNNER,
+        "--run-dir",
+        str(run_dir),
+        "--adapter-command",
+        sys.executable,
+        "--adapter-arg",
+        str(adapter_script),
+    )
+    assert adapter.returncode == 0, adapter.stderr
+
+    plan = json.loads((run_dir / "invocations" / "subagent_invocation_plan.json").read_text(encoding="utf-8"))[
+        "subagent_invocation_plan"
+    ]
+    hr_output_ref = next(
+        item["output_artifact_target"]
+        for item in plan["dispatch_queue"]
+        if item["target_agent"] == "hr-supervisor"
+    )
+    hr_output_path = run_dir / hr_output_ref
+    hr_output = json.loads(hr_output_path.read_text(encoding="utf-8"))
+    hr_output["hr_real_question_bank"] = [
+        item for item in hr_output["hr_real_question_bank"] if item["company"] == "ByteDance"
+    ]
+    hr_output["likely_interview_questions"] = [
+        item for item in hr_output["likely_interview_questions"] if item["company"] == "ByteDance"
+    ]
+    hr_output_path.write_text(
+        json.dumps(hr_output, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    result = run_python(FINALIZER, "--run-dir", str(run_dir), "--real-subagent-execution")
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)["finalizer_response"]
+    final_package = json.loads((run_dir / response["final_package_ref"]).read_text(encoding="utf-8"))
+    user_package = final_package["decision_package"]["user_facing_package"]
+    assert user_package["hr_real_questions"] == []
+    assert user_package["likely_interview_questions"] == []
+    assert any("暂未找到目标公司或推荐岗位公司的可靠公开 HR 话术" in item for item in user_package["currently_unavailable"])
+    assert "ByteDance" not in json.dumps(user_package, ensure_ascii=False)
 
 
 def test_finalizer_allows_limited_final_package_with_only_exact_fields_blocked(tmp_path):
@@ -3303,6 +3527,62 @@ def test_role_prompts_gate_application_recommendations_on_public_urls():
     assert "professional, concise, resume-like user-facing summary" in hr_supervisor
     assert "application_url_fact_review" in factual_reviewer
     assert "missing HR-operational fields" in factual_reviewer
+
+
+def test_role_prompts_cover_hr_questions_and_concrete_project_recommendations():
+    learning_prompt = (
+        ROOT / ".codex" / "agents" / "learning-path-strategist.toml"
+    ).read_text(encoding="utf-8")
+    hr_supervisor = (ROOT / ".codex" / "agents" / "hr-supervisor.toml").read_text(
+        encoding="utf-8"
+    )
+    role_contracts = (
+        ROOT
+        / ".agents"
+        / "skills"
+        / "career-pipeline"
+        / "references"
+        / "role-output-contracts.md"
+    ).read_text(encoding="utf-8")
+    user_flow = (
+        ROOT
+        / ".agents"
+        / "skills"
+        / "career-pipeline"
+        / "references"
+        / "user-interaction-flow.md"
+    ).read_text(encoding="utf-8")
+
+    for term in [
+        "project_recommendations",
+        "project_selection_rubric",
+        "recommended_project_mode",
+        "implementation_steps",
+        "proof_artifacts",
+        "resume_conversion_conditions",
+        "must not be written as completed resume claims",
+    ]:
+        assert term in learning_prompt
+        assert term in role_contracts
+
+    for term in [
+        "hr_real_question_bank",
+        "likely_interview_questions",
+        "target or recommended company",
+        "not_model_generated",
+        "source_ref",
+        "verified HR public posts",
+        "candidate experience",
+        "social media weak signals",
+        "resume_defensibility_checks",
+        "preparation only",
+        "do not generate HR wording yourself",
+    ]:
+        assert term in hr_supervisor
+        assert term in role_contracts
+
+    assert "HR/面试可能追问" in user_flow
+    assert "具体项目建议" in user_flow
 
 
 def test_user_facing_package_rules_are_documented_across_runtime_layers():

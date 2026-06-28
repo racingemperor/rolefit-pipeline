@@ -254,6 +254,219 @@ def collect_learning_gaps(role_outputs: list[dict[str, Any]]) -> list[str]:
     return list(dict.fromkeys(gaps))[:6]
 
 
+def collect_project_recommendations(role_outputs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    recommendations: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for payload in role_outputs:
+        for project in payload.get("project_recommendations") or []:
+            if not isinstance(project, dict):
+                continue
+            name = str(project.get("project_name") or project.get("title") or "").strip()
+            if not name:
+                continue
+            key = f"{name}|{project.get('target_role_family', '')}"
+            if key in seen:
+                continue
+            seen.add(key)
+            recommendations.append(
+                {
+                    "project_name": name,
+                    "target_role_family": str(project.get("target_role_family") or "").strip(),
+                    "recommended_project_mode": str(
+                        project.get("recommended_project_mode")
+                        or project.get("recommended_mode")
+                        or "smoke-test"
+                    ).strip(),
+                    "why_this_project": str(project.get("why_this_project") or "").strip(),
+                    "implementation_steps": [
+                        str(item).strip()
+                        for item in project.get("implementation_steps") or []
+                        if str(item).strip()
+                    ],
+                    "proof_artifacts": [
+                        str(item).strip()
+                        for item in project.get("proof_artifacts") or []
+                        if str(item).strip()
+                    ],
+                    "resume_conversion_conditions": [
+                        str(item).strip()
+                        for item in project.get("resume_conversion_conditions") or []
+                        if str(item).strip()
+                    ],
+                    "source_basis": [
+                        str(item).strip()
+                        for item in project.get("source_basis") or []
+                        if str(item).strip()
+                    ],
+                }
+            )
+    return recommendations[:3]
+
+
+def normalize_company_name(value: str) -> str:
+    return (
+        value.strip()
+        .lower()
+        .replace(" ", "")
+        .replace("-", "")
+        .replace("_", "")
+        .replace("有限公司", "")
+        .replace("股份", "")
+        .replace("集团", "")
+        .replace("公司", "")
+    )
+
+
+def add_company_name(names: set[str], value: Any) -> None:
+    text = str(value or "").strip()
+    normalized = normalize_company_name(text)
+    if normalized:
+        names.add(normalized)
+
+
+def collect_target_or_recommended_companies(
+    manifest_payload: dict[str, Any],
+    role_outputs: list[dict[str, Any]],
+    run_dir: Path | None = None,
+) -> set[str]:
+    companies: set[str] = set()
+
+    def add_from_target_context(target_context: dict[str, Any]) -> None:
+        for field in ["target_company", "company", "target_companies", "recommended_companies"]:
+            value = target_context.get(field)
+            if isinstance(value, list):
+                for item in value:
+                    add_company_name(companies, item)
+            else:
+                add_company_name(companies, value)
+
+    context_refs = [
+        manifest_payload.get("execution_manifest", {}).get("runtime_context_packet_ref"),
+        manifest_payload.get("run_state", {}).get("runtime_context_packet_ref"),
+    ]
+    if run_dir is not None:
+        for context_ref in context_refs:
+            if not context_ref:
+                continue
+            context_path = run_dir / str(context_ref)
+            if not context_path.is_file():
+                continue
+            payload = load_json(context_path)
+            context = payload.get("runtime_context_packet")
+            if isinstance(context, dict):
+                target_context = context.get("target_context")
+                if isinstance(target_context, dict):
+                    add_from_target_context(target_context)
+
+    for payload in role_outputs:
+        target_context = payload.get("target_job_context") or payload.get("target_context")
+        if isinstance(target_context, dict):
+            add_from_target_context(target_context)
+        for field in ["target_company", "company", "recommended_companies"]:
+            value = payload.get(field)
+            if isinstance(value, list):
+                for item in value:
+                    add_company_name(companies, item)
+            else:
+                add_company_name(companies, value)
+        for target in payload.get("recommended_application_targets") or []:
+            if isinstance(target, dict):
+                add_company_name(companies, target.get("company"))
+
+    return companies
+
+
+def valid_hr_question_source(question: dict[str, Any]) -> bool:
+    source_ref = str(question.get("source_ref") or "").strip()
+    source_type = str(question.get("source_type") or "").strip()
+    tier = str(question.get("source_accuracy_tier") or question.get("source_tier") or "").strip()
+    company = str(question.get("company") or "").strip()
+    not_model_generated = question.get("not_model_generated") is True
+    return (
+        bool(company)
+        and source_ref.startswith(("http://", "https://"))
+        and source_type in {"official_or_primary", "verified_hr_public_post", "recruitment_platform_jd"}
+        and tier in {"A", "B"}
+        and not_model_generated
+    )
+
+
+def is_company_bound_to_target_or_recommendation(question: dict[str, Any], allowed_companies: set[str]) -> bool:
+    if not allowed_companies:
+        return False
+    company = normalize_company_name(str(question.get("company") or ""))
+    if not company:
+        return False
+    return any(company == allowed or company in allowed or allowed in company for allowed in allowed_companies)
+
+
+def collect_hr_real_questions(
+    role_outputs: list[dict[str, Any]],
+    allowed_companies: set[str],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    question_bank: list[dict[str, Any]] = []
+    likely_questions: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for payload in role_outputs:
+        for question in payload.get("hr_real_question_bank") or []:
+            if not isinstance(question, dict) or not valid_hr_question_source(question):
+                continue
+            if not is_company_bound_to_target_or_recommendation(question, allowed_companies):
+                continue
+            text = str(question.get("question") or "").strip()
+            if not text:
+                continue
+            key = f"{question.get('company')}|{text}|{question.get('source_ref')}"
+            if key in seen:
+                continue
+            seen.add(key)
+            question_bank.append(
+                {
+                    "company": str(question.get("company") or "").strip(),
+                    "role_family": str(question.get("role_family") or "").strip(),
+                    "question": text,
+                    "question_type": str(question.get("question_type") or "").strip(),
+                    "source_ref": str(question.get("source_ref") or "").strip(),
+                    "source_type": str(question.get("source_type") or "").strip(),
+                    "source_accuracy_tier": str(
+                        question.get("source_accuracy_tier") or question.get("source_tier") or ""
+                    ).strip(),
+                    "verbatim_or_paraphrase": str(question.get("verbatim_or_paraphrase") or "paraphrase").strip(),
+                    "preparation_focus": str(question.get("preparation_focus") or "").strip(),
+                    "not_model_generated": True,
+                }
+            )
+        for question in payload.get("likely_interview_questions") or []:
+            if (
+                isinstance(question, dict)
+                and valid_hr_question_source(question)
+                and is_company_bound_to_target_or_recommendation(question, allowed_companies)
+            ):
+                likely_questions.append(
+                    {
+                        "company": str(question.get("company") or "").strip(),
+                        "question": str(question.get("question") or "").strip(),
+                        "source_ref": str(question.get("source_ref") or "").strip(),
+                        "source_accuracy_tier": str(
+                            question.get("source_accuracy_tier") or question.get("source_tier") or ""
+                        ).strip(),
+                        "not_model_generated": True,
+                    }
+                )
+    if not likely_questions:
+        likely_questions = [
+            {
+                "company": item["company"],
+                "question": item["question"],
+                "source_ref": item["source_ref"],
+                "source_accuracy_tier": item["source_accuracy_tier"],
+                "not_model_generated": True,
+            }
+            for item in question_bank[:3]
+        ]
+    return question_bank[:6], likely_questions[:6]
+
+
 def collect_ask_hr_about(role_outputs: list[dict[str, Any]]) -> list[str]:
     items: list[str] = []
     for payload in role_outputs:
@@ -276,11 +489,14 @@ def build_user_facing_package(
     allowed_sources_payload: dict[str, Any],
     role_outputs: list[dict[str, Any]],
     limited_blocked_outputs: list[str],
+    allowed_hr_companies: set[str],
 ) -> dict[str, Any]:
     task_type = str(manifest_payload["execution_manifest"].get("task_type") or plan.get("task_type") or "")
     source_index = public_source_index(allowed_sources_payload)
     recommended_targets = collect_recommended_targets(role_outputs)
     gaps = collect_learning_gaps(role_outputs)
+    project_recommendations = collect_project_recommendations(role_outputs)
+    hr_real_questions, likely_interview_questions = collect_hr_real_questions(role_outputs, allowed_hr_companies)
     ask_hr = collect_ask_hr_about(role_outputs)
     if not ask_hr:
         ask_hr = [
@@ -290,6 +506,10 @@ def build_user_facing_package(
     if limited_blocked_outputs:
         unavailable_items.append(
             "精确适配分、最终投递优先级或公司定制权重需要更强的当前 JD、公开来源和个人经历证据。"
+        )
+    if not hr_real_questions:
+        unavailable_items.append(
+            "暂未找到目标公司或推荐岗位公司的可靠公开 HR 话术；不使用模型自行生成的 HR 问题。"
         )
     if recommended_targets:
         conclusion = (
@@ -315,6 +535,29 @@ def build_user_facing_package(
             "有明确目标岗位时，按该岗位 JD、公开来源和可证明经历生成一岗一简历；"
             "没有明确目标时，先生成覆盖面更广的校招/实习版简历。"
         ),
+        "project_recommendations": project_recommendations
+        or [
+            {
+                "project_name": "目标岗位最小可验证项目",
+                "target_role_family": "待目标岗位确认",
+                "recommended_project_mode": "smoke-test",
+                "why_this_project": "当前项目证据不足时，先补一个能公开展示、能解释个人贡献的最小项目。",
+                "implementation_steps": [
+                    "围绕目标岗位选择一个最小业务闭环或公开可运行仓库。",
+                    "跑通核心路径，记录命令、输入输出、关键模块和失败边界。",
+                    "补一个和岗位要求直接相关的改造点。",
+                    "沉淀 README、截图或录屏、代码入口和复盘文档。",
+                ],
+                "proof_artifacts": ["代码仓库", "README", "运行截图或录屏", "项目复盘"],
+                "resume_conversion_conditions": [
+                    "完成并能解释个人贡献后才能写进简历。",
+                    "未完成内容只能作为学习计划，不能写成已完成项目。",
+                ],
+                "source_basis": ["current JD or role-family public evidence required"],
+            }
+        ],
+        "hr_real_questions": hr_real_questions,
+        "likely_interview_questions": likely_interview_questions,
         "ask_hr_about": ask_hr,
         "currently_unavailable": unavailable_items,
         "next_three_actions": [
@@ -372,10 +615,64 @@ def render_why_targets(targets: list[dict[str, Any]], source_index: list[dict[st
     )
 
 
+def render_project_recommendations(projects: list[dict[str, Any]]) -> str:
+    if not projects:
+        return "- 当前没有足够证据给出具体项目建议；先补目标岗位或公开 JD。"
+    lines: list[str] = []
+    for project in projects[:3]:
+        name = str(project.get("project_name") or "具体项目建议")
+        role = str(project.get("target_role_family") or "目标岗位方向待确认")
+        mode = str(project.get("recommended_project_mode") or "smoke-test")
+        why = str(project.get("why_this_project") or "用于补齐可验证项目经历。")
+        steps = [
+            str(item).strip()
+            for item in project.get("implementation_steps") or []
+            if str(item).strip()
+        ][:4]
+        artifacts = [
+            str(item).strip()
+            for item in project.get("proof_artifacts") or []
+            if str(item).strip()
+        ][:4]
+        conditions = [
+            str(item).strip()
+            for item in project.get("resume_conversion_conditions") or []
+            if str(item).strip()
+        ][:3]
+        lines.append(f"- {name}：面向 {role}，建议按 {mode} 做。{why}")
+        if steps:
+            lines.append("  落地步骤：" + "；".join(steps) + "。")
+        if artifacts:
+            lines.append("  交付证据：" + "、".join(artifacts) + "。")
+        if conditions:
+            lines.append("  写进简历前提：" + "；".join(conditions) + "。")
+    return "\n".join(lines)
+
+
+def render_hr_real_questions(questions: list[dict[str, Any]]) -> str:
+    if not questions:
+        return "- 暂未找到目标公司或推荐岗位公司的可靠公开 HR 话术；不使用模型自行生成的 HR 问题。可以继续检索目标公司官方招聘页、认证 HR 公开帖或公开招聘账号。"
+    lines: list[str] = []
+    for item in questions[:5]:
+        company = str(item.get("company") or "目标公司")
+        question = str(item.get("question") or "").strip()
+        source_ref = str(item.get("source_ref") or "").strip()
+        tier = str(item.get("source_accuracy_tier") or "").strip()
+        focus = str(item.get("preparation_focus") or "").strip()
+        if question and source_ref:
+            line = f"- {company}（{tier}）：{question} 来源：{source_ref}"
+            if focus:
+                line += f"；准备重点：{focus}"
+            lines.append(line)
+    return "\n".join(lines) if lines else "- 暂未找到可靠公开 HR 话术。"
+
+
 def build_user_facing_report_zh(user_facing_package: dict[str, Any]) -> str:
     targets = user_facing_package.get("recommended_targets") or []
     source_index = user_facing_package.get("public_source_index") or []
     gaps = user_facing_package.get("gaps_to_fix_before_application") or []
+    projects = user_facing_package.get("project_recommendations") or []
+    hr_questions = user_facing_package.get("hr_real_questions") or []
     ask_hr = user_facing_package.get("ask_hr_about") or []
     unavailable = user_facing_package.get("currently_unavailable") or []
     next_actions = user_facing_package.get("next_three_actions") or []
@@ -391,15 +688,15 @@ def build_user_facing_report_zh(user_facing_package: dict[str, Any]) -> str:
                 "需要补充学校、专业、项目职责、作品链接、实习时间或目标 JD，才能做更精确判断。",
             ),
             "## 先学什么/做什么项目\n"
-            + bullet_lines(
-                gaps,
-                "先做一个能公开展示的项目或作品，把技能、职责、结果和可验证链接沉淀下来。",
-            ),
+            + bullet_lines(gaps, "先补齐目标岗位要求中的核心技能和项目证据。")
+            + "\n"
+            + render_project_recommendations(projects),
             "## 简历怎么写\n"
             + str(
                 user_facing_package.get("resume_reverse_design")
                 or "没有明确目标岗位时先做通用校招/实习版；有 JD 后按一岗一简历反向设计。"
             ),
+            "## HR/面试可能追问\n" + render_hr_real_questions(hr_questions),
             "## 推荐查看的公开 URL\n" + render_public_urls(source_index),
             "## 需要问 HR 的事项\n" + bullet_lines(ask_hr, "确认岗位状态、城市/到岗要求、截止时间、实习周期和招聘流程。"),
             "## 下一步 3 个动作\n" + bullet_lines(next_actions[:3], "补充关键信息后继续收敛岗位和简历方向。"),
@@ -483,6 +780,7 @@ def finalize(args: argparse.Namespace) -> dict[str, Any]:
         allowed_sources_payload,
         role_outputs,
         limited_blocked_outputs,
+        collect_target_or_recommended_companies(manifest_payload, role_outputs, run_dir),
     )
     user_facing_report_zh = build_user_facing_report_zh(user_facing_package)
     final_ref = args.output

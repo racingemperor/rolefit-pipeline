@@ -6,13 +6,14 @@ This repository contains a Codex Skill that helps users move from an incomplete 
 
 Current planning scope is **engineering majors and engineering-adjacent backgrounds**. Other disciplines are reserved in the taxonomy and prompt framework, but engineering is the first usable MVP.
 
-[Skill Entry](.agents/skills/career-pipeline/SKILL.md) | [Real User Flow](.agents/skills/career-pipeline/references/real-user-deployment-and-use-flow.md) | [Source Policy](.agents/skills/career-pipeline/references/source-policy.md) | [Archived Old README](docs/archive/README.legacy-2026-06-27.md)
+[Skill Entry](.agents/skills/career-pipeline/SKILL.md) | [Real User Flow](.agents/skills/career-pipeline/references/real-user-deployment-and-use-flow.md) | [Source Policy](.agents/skills/career-pipeline/references/source-policy.md) | [Reference Repo Gap Analysis](docs/reference-repo-gap-analysis-2026-06-28.md) | [Archived Old README](docs/archive/README.legacy-2026-06-27.md)
 
 ## News
 
 - 2026-06-27: Added public-source recovery rules for login walls, CAPTCHA pages, app-only pages, and dynamic JavaScript shells.
 - 2026-06-27: Added limited final-package support for `prepare-first` outputs when exact fit score, final priority, or company-specific tailoring is not yet supported by evidence.
 - 2026-06-27: Added Codex Desktop built-in subagent adapter protocol for batched role execution.
+- 2026-06-28: Added company-bound HR real-question sourcing and concrete project recommendation contracts.
 
 ## What It Does
 
@@ -25,9 +26,11 @@ The skill can help with:
 - **Personalized career positioning**: classify the user's major, stage, strengths, constraints, and possible engineering job families.
 - **Target-job fit analysis**: compare the user's current evidence with a concrete internship or full-time role.
 - **Learning-first planning**: when the user is not ready, propose skills, projects, proof artifacts, and resume-conversion conditions before applying.
+- **Concrete project recommendation**: when project evidence is weak, suggest the easiest credible project path for the target role, including implementation steps, proof artifacts, and when it can truthfully enter the resume.
 - **Role-specific resume strategy**: design a resume around one company or one role family instead of producing a broad, generic resume.
 - **Personal branding**: decide whether GitHub, Gitee, personal website, portfolio, paper page, project demo, blog, or other assets matter for the target direction.
 - **Public-source job research**: use official career pages, school notices, public JDs, verified HR public posts, reports, local employer sources, small/mid-size company sources, school-local internship notices, and weak social signals with explicit confidence levels.
+- **Company-bound HR question prep**: collect target-company or recommended-company HR public wording from official/verified sources; if no reliable public HR source exists, say so instead of generating fake HR talk.
 - **HR-supervised output**: keep the final advice concise, credible, and easy for a recruiter to scan.
 
 ## Core Idea
@@ -45,8 +48,9 @@ The result should be a compact decision package:
 - recommended application targets with real public URLs;
 - current fit and risks;
 - missing skills and concrete learning path;
-- proof artifacts to build before applying;
+- concrete projects and proof artifacts to build before applying;
 - one-role resume outline or draft;
+- company-bound HR/面试可能追问 when supported by target or recommended company public sources;
 - HR confirmation items such as city, deadline, headcount, or internship duration when the public page is silent.
 
 The job pool should not be limited to big tech. When the user has no precise target, the skill should consider major companies, small/mid-size companies, startups, local/regional employers, school-recommended internships, industrial-park or incubator employers, and local public internship channels when public evidence exists.
@@ -99,6 +103,27 @@ If a user has useful foundations but is missing a key direction, the skill does 
 - what to apply to now versus what to delay.
 
 Example: a student with Python and Java but weak LLM knowledge can be guided toward AI application projects, RAG/Agent basics, evaluation artifacts, and resume bullets only after those artifacts exist.
+
+When a user lacks project experience, the project advice should be specific enough to execute:
+
+- target role or role family;
+- recommended project mode: `interview-only`, `smoke-test`, `local-full-run`, or `remote-full-run`;
+- implementation steps;
+- proof artifacts such as GitHub/Gitee, README, demo screenshots, logs, tests, or evaluation notes;
+- resume-conversion conditions.
+
+Planned project work is preparation. It must not be written as completed resume experience until the user actually finishes the proof artifacts and can explain personal contribution.
+
+### HR Questions From Public Sources
+
+HR/面试可能追问 must be company-bound. The source should be the target company, a recommended company, or that company's official/verified recruiting source:
+
+- official company recruitment or campus page;
+- enterprise-certified recruiting account;
+- official-listed recruiter or verified HR public post;
+- public recruitment-platform process notes.
+
+Candidate experience and social media can only support preparation notes. If no reliable target-company or recommended-company HR wording is found, the skill should say that clearly and create a research task. It should not invent HR wording.
 
 ### Public Evidence And Source Accuracy
 
@@ -237,13 +262,16 @@ See:
 The final user-facing answer should be professional and compact:
 
 ```text
-1. Positioning conclusion
-2. Recommended targets with public URLs
-3. Why these targets fit
-4. Gaps to fix before application
-5. Resume design direction
-6. ask_hr_about confirmation items
-7. Next three actions
+1. 当前定位
+2. 推荐方向/岗位池
+3. 为什么适合
+4. 还差什么
+5. 先学什么/做什么项目
+6. 简历怎么写
+7. HR/面试可能追问
+8. 推荐查看的公开 URL
+9. 需要问 HR 的事项
+10. 下一步 3 个动作
 ```
 
 If public evidence is incomplete, the output should still give safe planning advice, but exact fit score, final application priority, apply-now decision, company-specific skill weights, and targeted resume tailoring remain unavailable until evidence supports them.

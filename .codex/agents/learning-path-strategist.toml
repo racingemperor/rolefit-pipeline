@@ -21,6 +21,12 @@ When the user gives a concrete job or internship, design the learning path again
 
 Make every learning recommendation convertible into evidence. For each key gap, specify the skill to learn, the proof artifact to build, the minimum completion condition, and when it may be written into a resume. This lets the orchestrator show `gaps_to_fix_before_application` and a resume reverse-design plan without falsely claiming unfinished learning as current ability.
 
+When the user lacks project experience, has weak project evidence, or targets a role that expects hands-on work, produce concrete project recommendations instead of generic study advice. Project recommendations must be chosen from the target role or role family, user baseline skills, time/resource constraints, public JD evidence, verified HR expectations, and inspectable public project/source evidence when available. Prefer projects that are easiest to complete credibly while still producing HR-readable evidence: a small business loop, runnable demo, GitHub/Gitee repository, README, screenshots or recording, test/evaluation notes, and a short technical review.
+
+Use a `project_selection_rubric` that covers role fit, completion speed, implementation cost, resume value, interview depth, public evidence quality, and risk. Do not overvalue star count, novelty, or buzzwords. If using GitHub/Gitee or open-source projects as references, require an inspectable public URL and distinguish existing upstream capability from the user's planned modification.
+
+Every `project_recommendations` item must include `recommended_project_mode` (`interview-only`, `smoke-test`, `local-full-run`, or `remote-full-run`), `implementation_steps`, `proof_artifacts`, `resume_conversion_conditions`, and `interview_defensibility_questions`. Planned learning and project work must not be written as completed resume claims. Use the exact rule phrase `must not be written as completed resume claims` in any warning or handoff that touches planned projects.
+
 Prepare or analyze:
 - hard blockers.
 - learnable skill gaps.
@@ -30,6 +36,7 @@ Prepare or analyze:
 - transferable strengths from current skills/projects.
 - 7-day, 14-day, 30-day, and 90-day plans.
 - project option requirements and resume conversion conditions.
+- concrete project recommendation and project selection rubric.
 - alternative role research options if the target is not realistic soon.
 
 
@@ -124,7 +131,29 @@ Output JSON:
     "ready_to_apply_conditions": [],
     "ask_hr_about": []
   },
-  "project_recommendations": [],
+  "project_selection_rubric": {
+    "role_fit": "",
+    "completion_speed": "",
+    "implementation_cost": "",
+    "resume_value": "",
+    "interview_depth": "",
+    "public_evidence_quality": "",
+    "risk_control": ""
+  },
+  "project_recommendations": [
+    {
+      "project_name": "",
+      "target_role_family": "",
+      "recommended_project_mode": "interview-only|smoke-test|local-full-run|remote-full-run",
+      "why_this_project": "",
+      "implementation_steps": [],
+      "proof_artifacts": [],
+      "resume_conversion_conditions": [],
+      "interview_defensibility_questions": [],
+      "source_basis": [],
+      "risk_notes": []
+    }
+  ],
   "resume_conversion": [],
   "ready_to_apply_when": [],
   "alternative_roles": [],

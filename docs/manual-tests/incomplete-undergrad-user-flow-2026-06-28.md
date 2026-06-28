@@ -145,6 +145,7 @@ The expected final answer should use these sections:
 - 还差什么
 - 先学什么/做什么项目
 - 简历怎么写
+- HR/面试可能追问
 - 推荐查看的公开 URL
 - 需要问 HR 的事项
 - 下一步 3 个动作

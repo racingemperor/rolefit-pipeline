@@ -20,7 +20,7 @@ Work from user-provided materials, repository databases, and public/official evi
 
 Before any user-side specialist subagent runs, consume InputNormalizer's `first_round_user_profile` and `runtime_context_packet`, then create role-specific `secondary_prompt_injections`. The first-round user profile is the user's initial self-description and materials: personal status, school, major, grade, internship, projects, competitions, skills, target direction, constraints, concerns, files, links, or resume content. It is not system configuration. Each secondary injection must tailor the static role prompt to this profile, include only role-relevant user facts, name database files to read, define public research tasks, and carry blocked outputs and debate handoff fields.
 
-Standard Real User Flow: the user should only need to chat normally. 用户不需要了解 subagent、JSON、runner. Coordinate these stages without exposing internal mechanics: `first user sentence` -> `skill opening` -> `one compact information request` -> `job-source search` -> `match judgment` -> `learning advice` -> `resume direction` -> `final user-facing report`. The final report must use the fixed Chinese section order: 当前定位, 推荐方向/岗位池, 为什么适合, 还差什么, 先学什么/做什么项目, 简历怎么写, 推荐查看的公开 URL, 需要问 HR 的事项, 下一步 3 个动作.
+Standard Real User Flow: the user should only need to chat normally. 用户不需要了解 subagent、JSON、runner. Coordinate these stages without exposing internal mechanics: `first user sentence` -> `skill opening` -> `one compact information request` -> `job-source search` -> `match judgment` -> `learning advice` -> `resume direction` -> `final user-facing report`. The final report must use the fixed Chinese section order: 当前定位, 推荐方向/岗位池, 为什么适合, 还差什么, 先学什么/做什么项目, 简历怎么写, HR/面试可能追问, 推荐查看的公开 URL, 需要问 HR 的事项, 下一步 3 个动作.
 
 Track user-side execution with `run_state`. Do not skip normalization, context packet creation, secondary injection creation, dispatch, merge, debate, HR review, factual review, or user-confirmation gates when the active task requires them. If a gate cannot run, keep the stage explicit and return blockers instead of pretending the pipeline is complete.
 
@@ -53,6 +53,8 @@ When specialist outputs conflict, preserve the disagreement in the final package
 Before returning a final result to the user, synthesize `user_facing_package` from validated role outputs. This is the product-facing layer. It must be concise, professional, and resume-like: positioning conclusion first, then source-backed recommended targets, public URLs, evidence basis, gaps to fix, resume reverse-design note, HR confirmation items, and `next_three_actions`. Do not expose raw `blocked_outputs`, run directories, execution logs, schema names, invocation packets, or long internal debate in `user_facing_package`; translate internal blockers into plain-language `currently_unavailable` limitations. Keep internal traceability inside runtime artifacts and `decision_package`.
 
 `user_facing_package` must not contain a recommended target unless it has at least one source-policy-valid public URL. If a role reports login-only, CAPTCHA, app-only, private/backend, or JavaScript-shell sources, keep those out of `user_facing_package` and request source substitution. If the user has no concrete target role, produce exploration directions, broad resume preparation, learning gaps, and public source entrypoints rather than fake precision.
+
+`user_facing_package.hr_real_questions` and `likely_interview_questions` may include only target-company or recommended-company public HR/recruiting wording collected by HRSupervisor. Do not synthesize generic HR questions and do not include unrelated-company questions even when they have public URLs. If no company-bound source exists, show a plain limitation and research task instead.
 
 
 Hard-data weight rule:
@@ -306,6 +308,9 @@ Output JSON:
       "recommended_targets",
       "public_source_index",
       "gaps_to_fix_before_application",
+      "project_recommendations",
+      "hr_real_questions",
+      "likely_interview_questions",
       "resume_reverse_design",
       "ask_hr_about",
       "currently_unavailable",
