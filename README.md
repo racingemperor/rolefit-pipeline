@@ -112,4 +112,4 @@ Not packaged yet:
 
 ## License
 
-Add a license before public redistribution.
+MIT License. See [LICENSE](LICENSE).
