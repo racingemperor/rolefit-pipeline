@@ -2527,6 +2527,8 @@ def test_product_flow_runner_prepares_real_user_run_instead_of_contract_simulati
         "jd-analyzer",
         "match-strategist",
         "learning-path-strategist",
+        "resume-format-gate",
+        "resume-architect",
         "hr-supervisor",
         "factual-reviewer",
     ]
@@ -2541,6 +2543,67 @@ def test_product_flow_runner_prepares_real_user_run_instead_of_contract_simulati
     assert role_context["safe_prepare_first_and_explore_allowed"] is True
     assert role_context["exact_score_priority_and_tailoring_require_current_jd_public_evidence"] is True
     assert "application_strategy" not in job_scout_injection["blocked_outputs"]
+
+
+def test_product_flow_without_target_includes_general_resume_generation_gate(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    result = run_python(
+        PRODUCT_FLOW_RUNNER,
+        "--task-type",
+        "job_search",
+        "--route",
+        "job_search",
+        "--input-text",
+        "我是计算机相关专业大三，会一点 Python，想找实习但不知道投什么。",
+        "--run-root",
+        str(run_root),
+    )
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)["product_flow_response"]
+    run_dir = run_root / response["run_id"]
+
+    context = json.loads(
+        (run_dir / "input" / "normalized" / "runtime_context_packet.json").read_text(encoding="utf-8")
+    )["runtime_context_packet"]
+    resume_context = context["resume_generation_context"]
+    assert resume_context["default_resume_version_when_no_target"] == "campus_general_cn_one_page"
+    assert resume_context["general_resume_draft_allowed_without_target"] is True
+    assert resume_context["tailored_resume_requires_concrete_target"] is True
+    assert resume_context["required_delivery_formats"] == ["docx", "pdf", "image"]
+    assert "general_resume_draft" not in context["blocked_outputs"]
+    assert "final_resume_draft" not in context["blocked_outputs"]
+    assert "targeted_resume_tailoring" in context["blocked_outputs"]
+
+    plan = json.loads((run_dir / response["controller_handoff"]["subagent_plan_ref"]).read_text(encoding="utf-8"))[
+        "subagent_invocation_plan"
+    ]
+    agents = [item["target_agent"] for item in plan["dispatch_queue"]]
+    assert agents == [
+        "major-cluster-classifier",
+        "profile-extractor",
+        "job-scout",
+        "jd-analyzer",
+        "match-strategist",
+        "learning-path-strategist",
+        "resume-format-gate",
+        "resume-architect",
+        "hr-supervisor",
+        "factual-reviewer",
+    ]
+    assert plan["dispatch_batches"][-2]["batch_id"] == "branding_and_resume"
+    assert plan["dispatch_batches"][-1]["batch_id"] == "hr_and_factual_gates"
+
+    gate_injection = json.loads(
+        (run_dir / "injections" / "resume-format-gate.secondary_prompt_injection.json").read_text(encoding="utf-8")
+    )["secondary_prompt_injection"]
+    architect_injection = json.loads(
+        (run_dir / "injections" / "resume-architect.secondary_prompt_injection.json").read_text(encoding="utf-8")
+    )["secondary_prompt_injection"]
+    assert "resume_generation_context" in gate_injection["role_specific_context"]
+    assert "final_resume_draft" in architect_injection["required_output_fields"]
+    assert "resume_delivery_artifacts" in architect_injection["required_output_fields"]
+    assert "general_resume_draft" not in architect_injection["blocked_outputs"]
 
 
 def test_product_flow_removes_simulated_role_outputs_from_manifest(tmp_path):
@@ -4002,6 +4065,35 @@ def test_resume_generation_gate_uses_lower_threshold_and_candidate_information_f
     assert "recommended_role_adjustment" in gate_prompt
     assert "major-target mismatch" in architect_prompt
     assert "generate an editable first draft" in architect_prompt
+
+
+def test_resume_prompts_require_general_resume_and_delivery_artifacts_without_target():
+    gate_prompt = (ROOT / ".codex" / "agents" / "resume-format-gate.toml").read_text(
+        encoding="utf-8"
+    )
+    architect_prompt = (ROOT / ".codex" / "agents" / "resume-architect.toml").read_text(
+        encoding="utf-8"
+    )
+    factual_prompt = (ROOT / ".codex" / "agents" / "factual-reviewer.toml").read_text(
+        encoding="utf-8"
+    )
+    hr_prompt = (ROOT / ".codex" / "agents" / "hr-supervisor.toml").read_text(
+        encoding="utf-8"
+    )
+    interaction_flow = (
+        ROOT / ".agents" / "skills" / "career-pipeline" / "references" / "user-interaction-flow.md"
+    ).read_text(encoding="utf-8")
+
+    assert "do not block resume generation only for that reason" in gate_prompt
+    assert "general_resume_draft_allowed_without_target" in gate_prompt
+    assert "campus_general_cn_one_page" in architect_prompt
+    assert "resume_delivery_artifacts" in architect_prompt
+    for text in [architect_prompt, factual_prompt, hr_prompt, interaction_flow]:
+        assert "DOCX" in text or "docx" in text
+        assert "PDF" in text or "pdf" in text
+        assert "image" in text or "图片" in text
+    assert "resume generation gate" in interaction_flow
+    assert "Lack of target blocks company-specific tailoring, not the general resume" in interaction_flow
 
 
 def test_simulator_supports_target_job_fit_route_with_target_context(tmp_path):

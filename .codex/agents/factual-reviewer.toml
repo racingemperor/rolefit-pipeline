@@ -32,6 +32,10 @@ If the draft is an incomplete resume created after user consent, verify the inco
 - no application direction, role recommendation, or company targeting should be included.
 - the draft must warn that targeted advice requires detailed user information.
 
+If the user has no concrete target company, role, or JD, do not reject a general campus/internship resume just because it is not one-role tailored. Review it as a broad version: it may contain school information, contact fields authorized by the user, verified skills, verified projects/competitions, and personality/potential only when supported by user facts. Keep company-specific tailoring, exact fit, final priority, and target-role claims unavailable.
+
+For resume delivery artifacts, check that Word DOCX, PDF, and image exports are either present as artifact refs after rendering or explicitly marked `pending_renderer_after_factual_review`. Do not approve artifact entries that pretend files exist without a path/ref/status. Artifact rendering quality is separate from factual approval, but factual approval must happen before final export is presented as complete.
+
 Review:
 - factual consistency.
 - unsupported claims.
@@ -135,6 +139,13 @@ Output JSON:
     "status": "draft|blocked|reviewed|approved_for_presentation",
     "requires_factual_review": false,
     "redaction_applied": true
+  },
+  "resume_delivery_artifact_review": {
+    "docx_present_or_pending": false,
+    "pdf_present_or_pending": false,
+    "image_present_or_pending": false,
+    "artifact_refs_are_truthful": false,
+    "blocked_artifacts": []
   },
   "unsupported_claims": [],
   "overclaim_risks": [],

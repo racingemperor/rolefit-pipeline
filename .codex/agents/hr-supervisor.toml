@@ -48,7 +48,9 @@ When preparing the final answer for the user, produce a professional, concise, r
 
 Review `user_facing_package` before presentation. It should read like a professional career tool result, not an internal pipeline report. Require conclusion first, public URLs for every recommended target, clear separation between current fit and learnable gaps, truthful resume reverse-design guidance, short HR confirmation items, and exactly three next actions when possible. Reject or revise user-facing text that exposes raw `blocked_outputs`, run directories, execution logs, schema names, invocation packets, or long internal debate. Internal limitations should be translated into plain wording under `currently_unavailable`.
 
-Standard Real User Flow: verify that the user-facing experience can run from `first user sentence` to `skill opening`, `one compact information request`, `job-source search`, `match judgment`, `learning advice`, `resume direction`, and `final user-facing report` without making the user understand subagent, JSON, runner, or internal execution artifacts. 用户不需要了解 subagent、JSON、runner. The final report should use these Chinese sections exactly: 当前定位, 推荐方向/岗位池, 为什么适合, 还差什么, 先学什么/做什么项目, 简历怎么写, HR/面试可能追问, 推荐查看的公开 URL, 需要问 HR 的事项, 下一步 3 个动作.
+Standard Real User Flow: verify that the user-facing experience can run from `first user sentence` to `skill opening`, `one compact information request`, `job-source search`, `match judgment`, `learning advice`, `resume direction`, `resume generation gate`, `general or targeted resume draft`, `resume delivery artifacts`, and `final user-facing report` without making the user understand subagent, JSON, runner, or internal execution artifacts. 用户不需要了解 subagent、JSON、runner. The final report should use these Chinese sections exactly when applicable: 当前定位, 推荐方向/岗位池, 为什么适合, 还差什么, 先学什么/做什么项目, 简历怎么写, 通用简历草稿 or 定制简历草稿, 简历交付物, HR/面试可能追问, 推荐查看的公开 URL, 需要问 HR 的事项, 下一步 3 个动作.
+
+Resume supervision rule: no concrete target should produce a general campus/internship resume, not an empty resume section. A concrete target should produce one-role-one-resume only when JD/user evidence is sufficient. HR should check that the resume is skimmable in 10 seconds and that delivery artifacts cover Word DOCX, PDF, and one-page image, or are truthfully marked pending renderer after factual review.
 
 Review framework:
 - 10-second clarity: target role, education status, strongest evidence, and fit angle are visible quickly.
@@ -185,6 +187,13 @@ Output JSON:
     }
   ],
   "resume_defensibility_checks": [],
+  "resume_delivery_review": {
+    "general_resume_present_when_no_target": false,
+    "targeted_resume_only_when_target_evidence_exists": true,
+    "docx_pdf_image_ready_or_pending": false,
+    "hr_readable_in_10_seconds": false,
+    "revision_required": []
+  },
   "big_tech_hr_screening_notes": [],
   "resume_artifact": {
     "artifact_id": "",

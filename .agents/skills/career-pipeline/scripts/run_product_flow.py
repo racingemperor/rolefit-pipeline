@@ -26,7 +26,6 @@ EXACT_PRODUCT_BLOCKERS = [
     "application_priority",
     "targeted_resume_tailoring",
     "company_specific_skill_weight_ranking",
-    "final_resume_draft",
 ]
 
 SIMULATION_BLOCKERS = {
@@ -139,6 +138,9 @@ def rewrite_context_for_product_run(run_dir: Path) -> dict[str, Any]:
         "research, role execution, HR supervision, and factual review before final output"
     )
     context["blocked_outputs"] = product_blocked_outputs(context)
+    context["blocked_outputs"] = [
+        item for item in context["blocked_outputs"] if item not in {"final_resume_draft", "general_resume_draft"}
+    ]
     context["safe_outputs_allowed_before_exact_scoring"] = sorted(SAFE_PRODUCT_OUTPUTS)
     context["next_possible_actions"] = [
         "Summarize the user's current information and ask one compact batch for user-owned missing facts.",
@@ -150,6 +152,21 @@ def rewrite_context_for_product_run(run_dir: Path) -> dict[str, Any]:
         target_context["safe_prepare_first_and_explore_allowed"] = True
         target_context["exact_score_priority_and_tailoring_require_current_jd_public_evidence"] = True
         target_context.setdefault("fit_vs_growth_policy", "separate_current_fit_from_learning_path_before_application")
+    resume_context = context.setdefault("resume_generation_context", {})
+    if isinstance(resume_context, dict):
+        resume_context["resume_generation_gate_required"] = True
+        resume_context.setdefault("default_resume_version_when_no_target", "campus_general_cn_one_page")
+        resume_context["general_resume_draft_allowed_without_target"] = True
+        resume_context["tailored_resume_requires_concrete_target"] = True
+        resume_context["targeted_resume_tailoring_requires_current_jd"] = True
+        resume_context["required_delivery_formats"] = ["docx", "pdf", "image"]
+        resume_context["delivery_artifact_policy"] = (
+            "Generate a general campus/internship resume when no concrete target exists; "
+            "after factual and HR review, export Word DOCX, PDF, and one-page image artifacts."
+        )
+        resume_context["no_target_policy"] = (
+            "No concrete target blocks one-role-one-resume tailoring, not the broad campus/internship resume draft."
+        )
     write_wrapped_json(context_path, "runtime_context_packet", context)
     return context
 
@@ -171,7 +188,14 @@ def rewrite_injections_for_product_run(run_dir: Path, context: dict[str, Any]) -
         injection["blocked_outputs"] = [
             item
             for item in list_value(injection.get("blocked_outputs"))
-            if item not in {"application_strategy", "application_direction", "application_priority"}
+            if item
+            not in {
+                "application_strategy",
+                "application_direction",
+                "application_priority",
+                "final_resume_draft",
+                "general_resume_draft",
+            }
         ]
         for item in product_blockers:
             if item not in injection["blocked_outputs"] and item not in SAFE_PRODUCT_OUTPUTS:
@@ -200,6 +224,41 @@ def rewrite_injections_for_product_run(run_dir: Path, context: dict[str, Any]) -
                 "likely_interview_questions",
                 "resume_defensibility_checks",
                 "user_facing_package_review",
+            ]:
+                if field not in required_fields:
+                    required_fields.append(field)
+        if injection.get("target_agent") in {"resume-format-gate", "resume-architect"}:
+            role_context["resume_generation_context"] = context.get("resume_generation_context", {})
+            for field in [
+                "format_gate_status",
+                "format_status",
+                "factual_review_status",
+                "incomplete_resume",
+                "job_direction_blocked",
+            ]:
+                if field not in required_fields:
+                    required_fields.append(field)
+        if injection.get("target_agent") == "resume-format-gate":
+            for field in [
+                "primary_resume_version",
+                "section_evidence_status",
+                "editable_first_draft_allowed",
+                "resume_architect_allowed",
+                "missing_materials",
+                "questions_for_user",
+            ]:
+                if field not in required_fields:
+                    required_fields.append(field)
+        if injection.get("target_agent") == "resume-architect":
+            for field in [
+                "resume_version",
+                "resume_strategy",
+                "section_order",
+                "section_plan",
+                "format_quality_after_generation",
+                "resume_artifact",
+                "final_resume_draft",
+                "resume_delivery_artifacts",
             ]:
                 if field not in required_fields:
                     required_fields.append(field)

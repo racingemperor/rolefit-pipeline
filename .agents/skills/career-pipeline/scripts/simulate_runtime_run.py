@@ -41,6 +41,8 @@ ROUTES = {
         "jd-analyzer",
         "match-strategist",
         "learning-path-strategist",
+        "resume-format-gate",
+        "resume-architect",
         "hr-supervisor",
         "factual-reviewer",
     ],
@@ -698,6 +700,37 @@ def build_context_packet(
         "Keep final recommendations blocked until required evidence exists.",
     ]
     target_context = profile["target_direction"]
+    has_concrete_target = bool(target_context.get("has_concrete_target"))
+    target_kind = str(target_context.get("internship_or_full_time") or "")
+    secondary_resume_version = (
+        "internship_short_version"
+        if target_kind == "internship" or profile["education_status"]["education_status"] == "non_graduating"
+        else ""
+    )
+    resume_generation_context = {
+        "resume_generation_gate_required": True,
+        "resume_format_gate_role": "resume-format-gate",
+        "resume_architect_role": "resume-architect",
+        "target_status": "concrete_target" if has_concrete_target else "no_concrete_target",
+        "default_resume_version_when_no_target": "campus_general_cn_one_page",
+        "secondary_resume_version_when_internship": secondary_resume_version,
+        "general_resume_draft_allowed_without_target": True,
+        "tailored_resume_requires_concrete_target": True,
+        "targeted_resume_tailoring_requires_current_jd": True,
+        "required_delivery_formats": ["docx", "pdf", "image"],
+        "delivery_artifact_policy": (
+            "ResumeArchitect should produce an editable resume draft and delivery artifact plan. "
+            "After factual and HR review, the renderer should export Word DOCX, PDF, and one-page image."
+        ),
+        "missing_information_policy": (
+            "Do not fabricate missing facts. Omit unsupported sections or ask one compact follow-up; "
+            "if the user refuses more information, draft only an incomplete fact-only resume with consent."
+        ),
+        "no_target_policy": (
+            "Missing target company or JD must not block a general campus/internship resume. "
+            "Use broad role-family positioning and keep one-role-one-resume tailoring unavailable until a target is selected."
+        ),
+    }
     if task_type == "target_job_fit":
         public_research_needed.extend(
             [
@@ -733,7 +766,6 @@ def build_context_packet(
         blocked_outputs = [
             "application_direction",
             "targeted_resume_tailoring",
-            "final_resume_draft",
             "fit_score",
             "application_priority",
             "company_specific_skill_weight_ranking",
@@ -763,6 +795,7 @@ def build_context_packet(
             "school_signal_research_needed": ["official school-company cooperation evidence"],
         },
         "target_context": target_context,
+        "resume_generation_context": resume_generation_context,
         "provided_materials": profile["materials_provided"],
         "missing_user_owned_facts": missing_user_owned_facts,
         "public_research_needed": public_research_needed,
@@ -800,6 +833,7 @@ def build_injection(
         "distinguish_current_fit_from_growth_path": target_job_fit_requested,
         "safe_prepare_first_and_explore_allowed": target_job_fit_requested,
         "exact_score_priority_and_tailoring_require_current_jd_public_evidence": target_job_fit_requested,
+        "resume_generation_context": (context or {}).get("resume_generation_context", {}),
     }
     auto_recruitment_research = automatic_public_recruitment_research(target_agent)
     if auto_recruitment_research["enabled"]:
@@ -860,7 +894,7 @@ def build_injection(
         "blocked_outputs",
         "runtime_research_tasks",
     ]
-    blocked_outputs = ["fit_score", "application_strategy", "final_resume_draft"]
+    blocked_outputs = ["fit_score", "application_strategy", "targeted_resume_tailoring"]
     handoff_contract = ["return blockers to CareerOrchestrator"]
     debate_contract = ["challenge unsupported weights instead of creating scores"]
 
@@ -927,7 +961,6 @@ def build_injection(
             "application_priority",
             "targeted_resume_tailoring",
             "company_specific_skill_weight_ranking",
-            "final_resume_draft",
         ]
         handoff_contract.extend(
             [
@@ -939,6 +972,95 @@ def build_injection(
             [
                 "separate current readiness from future growth potential",
                 "challenge any apply-now, exact score, final priority, or targeted tailoring recommendation without current JD evidence",
+            ]
+        )
+
+    if target_agent == "resume-format-gate":
+        resume_context = (context or {}).get("resume_generation_context", {})
+        role_specific_context["resume_generation_gate"] = {
+            "must_run": True,
+            "no_concrete_target_default": resume_context.get(
+                "default_resume_version_when_no_target",
+                "campus_general_cn_one_page",
+            ),
+            "general_resume_draft_allowed_without_target": True,
+            "tailored_resume_requires_concrete_target": True,
+            "required_delivery_formats": resume_context.get("required_delivery_formats", ["docx", "pdf", "image"]),
+            "incomplete_fact_only_draft_requires_user_consent": True,
+        }
+        required_output_fields.extend(
+            [
+                "format_gate_status",
+                "primary_resume_version",
+                "section_evidence_status",
+                "editable_first_draft_allowed",
+                "missing_materials",
+                "questions_for_user",
+                "resume_architect_allowed",
+                "incomplete_resume_allowed_with_user_consent",
+                "job_direction_blocked",
+            ]
+        )
+        blocked_outputs = [
+            "fit_score",
+            "application_priority",
+            "targeted_resume_tailoring",
+            "company_specific_skill_weight_ranking",
+        ]
+        handoff_contract.extend(
+            [
+                "handoff general resume gate result to ResumeArchitect even when no concrete target exists",
+                "block only one-role-one-resume tailoring when target JD evidence is missing",
+            ]
+        )
+        debate_contract.extend(
+            [
+                "do not block a broad campus or internship resume only because the user has no target company",
+                "do not approve fabricated contact, school, project, metric, award, or finished-learning claims",
+            ]
+        )
+
+    if target_agent == "resume-architect":
+        resume_context = (context or {}).get("resume_generation_context", {})
+        role_specific_context["resume_generation_output_policy"] = {
+            "no_concrete_target_default": resume_context.get(
+                "default_resume_version_when_no_target",
+                "campus_general_cn_one_page",
+            ),
+            "general_resume_draft_allowed_without_target": True,
+            "tailored_resume_requires_concrete_target": True,
+            "required_delivery_formats": resume_context.get("required_delivery_formats", ["docx", "pdf", "image"]),
+            "delivery_artifact_policy": resume_context.get("delivery_artifact_policy", ""),
+            "omit_missing_sections_without_placeholders": True,
+        }
+        required_output_fields.extend(
+            [
+                "resume_version",
+                "resume_strategy",
+                "section_order",
+                "section_plan",
+                "format_quality_after_generation",
+                "resume_artifact",
+                "final_resume_draft",
+                "resume_delivery_artifacts",
+            ]
+        )
+        blocked_outputs = [
+            "fit_score",
+            "application_priority",
+            "targeted_resume_tailoring",
+            "company_specific_skill_weight_ranking",
+        ]
+        handoff_contract.extend(
+            [
+                "produce a broad campus/internship resume draft when no concrete target exists",
+                "handoff final_resume_draft and delivery artifacts to FactualReviewer and HRSupervisor",
+            ]
+        )
+        debate_contract.extend(
+            [
+                "planned learning or project recommendations must not appear as completed resume experience",
+                "missing fields must be omitted or requested, not filled with placeholders",
             ]
         )
 

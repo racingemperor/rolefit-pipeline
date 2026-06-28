@@ -198,7 +198,7 @@ Clone the repository and open Codex in the repo root. The Skill entry is repo-sc
 .agents/skills/career-pipeline/SKILL.md
 ```
 
-For normal users, the intended experience is plain chat. They should not need to understand subagents, JSON, runners, adapters, or internal artifacts. A standard run starts from the user's first sentence, introduces the skill, asks one compact batch of missing user-owned facts, searches public job sources, judges fit, gives learning and resume direction, and returns a concise Chinese report.
+For normal users, the intended experience is plain chat. They should not need to understand subagents, JSON, runners, adapters, or internal artifacts. A standard run starts from the user's first sentence, introduces the skill, asks one compact batch of missing user-owned facts, searches public job sources, judges fit, gives learning guidance, runs the resume gate, generates a general or targeted resume draft, and returns a concise Chinese report.
 
 A user can invoke it naturally:
 
@@ -306,10 +306,12 @@ The final user-facing answer should be professional and compact:
 4. 还差什么
 5. 先学什么/做什么项目
 6. 简历怎么写
-7. HR/面试可能追问
-8. 推荐查看的公开 URL
-9. 需要问 HR 的事项
-10. 下一步 3 个动作
+7. 通用简历草稿 / 定制简历草稿
+8. 简历交付物
+9. HR/面试可能追问
+10. 推荐查看的公开 URL
+11. 需要问 HR 的事项
+12. 下一步 3 个动作
 ```
 
 If public evidence is incomplete, the output should still give safe planning advice, but exact fit score, final application priority, apply-now decision, company-specific skill weights, and targeted resume tailoring remain unavailable until evidence supports them.
@@ -327,6 +329,8 @@ Implemented:
 - Deterministic local simulation and contract validation scripts.
 - Batched subagent work-order protocol.
 - Manual Controller MVP and Codex Desktop adapter documentation.
+- General resume generation gate for users without a concrete target role.
+- Resume delivery contract for Word DOCX, PDF, and one-page image artifacts after factual and HR review.
 
 Not yet packaged:
 
@@ -338,7 +342,7 @@ Not yet packaged:
 
 - Productize the repo-scoped Skill into a Codex plugin after the user-side workflow stabilizes.
 - Add stronger real-source adapters for public JD and official career-page discovery.
-- Add DOCX/LaTeX/Markdown resume rendering.
+- Add stronger DOCX/PDF/image renderer automation and visual QA for final resume files.
 - Expand beyond engineering into science, humanities, social science, business, arts/design, medicine, agriculture, law/public affairs, and interdisciplinary users.
 - Add interview preparation from the final resume and target JD.
 

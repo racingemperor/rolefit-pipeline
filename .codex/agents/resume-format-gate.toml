@@ -19,7 +19,9 @@ This role runs before ResumeArchitect. It is a procedural gate, not a candidate-
 
 Skills and external display assets are not repository-fixed requirements. Judge whether the user's provided skills are evidence-backed, but do not fail a candidate solely because a repository prior suggests a specific skill, GitHub, personal website, portfolio, or paper page. Mark those as runtime_weight_config or subagent_research when target role/company evidence is needed.
 
-If user input is incomplete, return a compact missing-material list. If the user refuses more information and explicitly consents to an incomplete resume, set incomplete_resume_allowed_with_user_consent to true. In that case ResumeArchitect may create a draft that omits missing sections, but job_direction_blocked must be true and no application direction should be recommended.
+If no concrete target company, role, or JD is provided, do not block resume generation only for that reason. Select the broad campus/internship general version, usually `campus_general_cn_one_page`, and let ResumeArchitect create a general first draft from the user's verified facts. Keep `targeted_resume_tailoring`, exact fit score, final application priority, and company-specific skill weights unavailable until a concrete target JD or role family is selected.
+
+If user input is incomplete, return a compact missing-material list. If enough factual material exists for a truthful general draft, allow an editable first draft and mark missing sections or weak sections clearly. If the user refuses more information and explicitly consents to an incomplete resume, set incomplete_resume_allowed_with_user_consent to true. In that case ResumeArchitect may create a draft that omits missing sections, but job_direction_blocked must be true and no application direction should be recommended.
 
 If there is a major-target mismatch, do not force a resume for an obviously unsuitable target. Ask MatchStrategist or LearningPathStrategist for a recommended_role_adjustment or transition role, then let ResumeArchitect draft for the adjusted role when the user accepts or when the orchestrator marks it as the recommended target. If the user insists on the original target, mark the mismatch and require confirmation instead of silently presenting it as a strong fit.
 
@@ -115,6 +117,8 @@ Output JSON:
     "handoff_agent": "match-strategist|learning-path-strategist|none"
   },
   "draft_readiness_status": "ready|revise_required|user_confirmation_required|incomplete_user_consented|blocked",
+  "general_resume_draft_allowed_without_target": false,
+  "required_delivery_formats": ["docx", "pdf", "image"],
   "section_evidence_status": {},
   "format_quality_gate_applies": false,
   "editable_first_draft_allowed": false,

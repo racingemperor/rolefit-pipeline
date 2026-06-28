@@ -86,7 +86,7 @@ BATCH_DEFINITIONS = {
     },
     "hr_and_factual_gates": {
         "description": "Run HR readability, factual, privacy, and final presentation gates.",
-        "depends_on_batches": ["strategy_learning"],
+        "depends_on_batches": ["strategy_learning", "branding_and_resume"],
     },
 }
 

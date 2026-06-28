@@ -335,6 +335,26 @@ def collect_project_recommendations(role_outputs: list[dict[str, Any]]) -> list[
     return recommendations[:3]
 
 
+def collect_resume_draft(role_outputs: list[dict[str, Any]]) -> dict[str, Any]:
+    for payload in role_outputs:
+        draft = str(payload.get("final_resume_draft") or "").strip()
+        artifact = payload.get("resume_artifact")
+        delivery_artifacts = payload.get("resume_delivery_artifacts")
+        if draft:
+            return {
+                "resume_version": str(payload.get("resume_version") or "").strip(),
+                "resume_strategy": str(payload.get("resume_strategy") or "").strip(),
+                "incomplete_resume": bool(payload.get("incomplete_resume")),
+                "job_direction_blocked": bool(payload.get("job_direction_blocked")),
+                "final_resume_draft": draft,
+                "resume_artifact": artifact if isinstance(artifact, dict) else {},
+                "resume_delivery_artifacts": delivery_artifacts if isinstance(delivery_artifacts, list) else [],
+                "factual_review_status": str(payload.get("factual_review_status") or "").strip(),
+                "format_status": str(payload.get("format_status") or "").strip(),
+            }
+    return {}
+
+
 def normalize_company_name(value: str) -> str:
     return (
         value.strip()
@@ -529,6 +549,7 @@ def build_user_facing_package(
     recommended_targets = collect_recommended_targets(role_outputs)
     gaps = collect_learning_gaps(role_outputs)
     project_recommendations = collect_project_recommendations(role_outputs)
+    resume_draft = collect_resume_draft(role_outputs)
     hr_real_questions, likely_interview_questions = collect_hr_real_questions(role_outputs, allowed_hr_companies)
     ask_hr = collect_ask_hr_about(role_outputs)
     if not ask_hr:
@@ -568,6 +589,7 @@ def build_user_facing_package(
             "有明确目标岗位时，按该岗位 JD、公开来源和可证明经历生成一岗一简历；"
             "没有明确目标时，先生成覆盖面更广的校招/实习版简历。"
         ),
+        "resume_draft": resume_draft,
         "project_recommendations": project_recommendations
         or [
             {
@@ -700,6 +722,39 @@ def render_hr_real_questions(questions: list[dict[str, Any]]) -> str:
     return "\n".join(lines) if lines else "- 暂未找到可靠公开 HR 话术。"
 
 
+def render_resume_draft(resume_draft: dict[str, Any]) -> str:
+    if not resume_draft:
+        return "- 当前没有可展示的简历草稿；需要 ResumeFormatGate 和 ResumeArchitect 通过后再生成。"
+    draft = str(resume_draft.get("final_resume_draft") or "").strip()
+    version = str(resume_draft.get("resume_version") or "通用校招/实习版").strip()
+    strategy = str(resume_draft.get("resume_strategy") or "").strip()
+    header = f"- 版本：{version}"
+    if strategy:
+        header += f"\n- 策略：{strategy}"
+    if resume_draft.get("incomplete_resume"):
+        header += "\n- 注意：这是信息不完整草稿，未提供的信息不会写入简历。"
+    return header + "\n\n" + draft
+
+
+def render_resume_delivery_artifacts(resume_draft: dict[str, Any]) -> str:
+    artifacts = resume_draft.get("resume_delivery_artifacts") if isinstance(resume_draft, dict) else []
+    if not isinstance(artifacts, list) or not artifacts:
+        return "- 默认交付 Word DOCX、PDF 和一页图片；若当前运行未产出文件，需在事实审核后由渲染器导出。"
+    lines: list[str] = []
+    for item in artifacts:
+        if not isinstance(item, dict):
+            continue
+        file_type = str(item.get("format") or item.get("type") or "").strip()
+        ref = str(item.get("artifact_ref") or item.get("path") or item.get("url") or "").strip()
+        status = str(item.get("status") or "").strip()
+        label = file_type.upper() if file_type else "artifact"
+        if ref:
+            lines.append(f"- {label}：{ref}" + (f"（{status}）" if status else ""))
+        else:
+            lines.append(f"- {label}" + (f"：{status}" if status else ""))
+    return "\n".join(lines) if lines else "- 默认交付 Word DOCX、PDF 和一页图片；若当前运行未产出文件，需在事实审核后由渲染器导出。"
+
+
 def build_user_facing_report_zh(user_facing_package: dict[str, Any]) -> str:
     targets = user_facing_package.get("recommended_targets") or []
     source_index = user_facing_package.get("public_source_index") or []
@@ -709,6 +764,7 @@ def build_user_facing_report_zh(user_facing_package: dict[str, Any]) -> str:
     ask_hr = user_facing_package.get("ask_hr_about") or []
     unavailable = user_facing_package.get("currently_unavailable") or []
     next_actions = user_facing_package.get("next_three_actions") or []
+    resume_draft = user_facing_package.get("resume_draft") or {}
     return "\n\n".join(
         [
             "## 当前定位\n"
@@ -729,6 +785,8 @@ def build_user_facing_report_zh(user_facing_package: dict[str, Any]) -> str:
                 user_facing_package.get("resume_reverse_design")
                 or "没有明确目标岗位时先做通用校招/实习版；有 JD 后按一岗一简历反向设计。"
             ),
+            "## 通用简历草稿\n" + render_resume_draft(resume_draft),
+            "## 简历交付物\n" + render_resume_delivery_artifacts(resume_draft),
             "## HR/面试可能追问\n" + render_hr_real_questions(hr_questions),
             "## 推荐查看的公开 URL\n" + render_public_urls(source_index),
             "## 需要问 HR 的事项\n" + bullet_lines(ask_hr, "确认岗位状态、城市/到岗要求、截止时间、实习周期和招聘流程。"),
