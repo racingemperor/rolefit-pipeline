@@ -218,6 +218,21 @@ Use the career-pipeline skill.
 如果不适合，告诉我先补什么项目和技能，再设计一版更贴合这个岗位的简历。
 ```
 
+For product-flow testing from one plain user sentence:
+
+```bash
+cd .agents/skills/career-pipeline
+python scripts/run_product_flow.py --task-type job_search --route job_search --input-text "我是计算机相关专业大三，会一点 Python，想找实习但不知道投什么。" --run-root ../../../.career-pipeline-runs
+```
+
+This produces a user-facing status report plus controller handoff artifacts for public-source search and batched role execution. It does not pretend to be a final career judgment before real public sources and real role outputs exist.
+
+When Codex or the browser has collected public URLs, convert them without hand-writing JSON:
+
+```bash
+python scripts/collect_public_source_results.py --run-dir ../../../.career-pipeline-runs/<run_id> --notes-md <public_source_notes.md>
+```
+
 ## Contract Smoke Run
 
 This command checks local wiring only. It does not call real subagents and does not browse live recruitment sites:

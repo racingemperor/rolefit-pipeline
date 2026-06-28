@@ -114,6 +114,15 @@ For local contract tests, `search_public_sources.py --provider seed` can create 
 
 For live browsing, browser search, or API search, write results to the minimal search-adapter shape and pass them through `search_public_sources.py --provider external-json --search-results-json <search_results.json>`. This records the external search result file in the run and marks `real_time_search = true`, but the URLs are still only candidates until `discover_public_sources.py`, `fetch_public_sources.py`, and `backfill_public_evidence.py` accept them.
 
+When the main Codex controller has already gathered public URLs through browser search or visible web results, use `collect_public_source_results.py` to avoid hand-writing shell JSON:
+
+```bash
+python scripts/collect_public_source_results.py --run-dir ../../../.career-pipeline-runs/<run_id> --notes-md <public_source_notes.md>
+python scripts/search_public_sources.py --run-dir ../../../.career-pipeline-runs/<run_id> --provider external-json --search-results-json ../../../.career-pipeline-runs/<run_id>/evidence/search_results.controller_collected.json
+```
+
+The notes file may contain one public URL per line with optional `title=`, `snippet=`, `source_type=`, and `task_id=` fields. The collector maps official pages, public recruitment JDs, school notices, verified HR public posts, public reports, and weak social/candidate signals to the existing source-plan tasks; the discovery and fetch scripts still decide which sources are usable.
+
 Minimal search adapter result shape:
 
 ```json

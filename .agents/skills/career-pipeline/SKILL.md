@@ -39,11 +39,13 @@ Run the scripts from this skill directory, not from the repository root:
 
 ```bash
 cd .agents/skills/career-pipeline
+python scripts/run_product_flow.py --task-type job_search --route job_search --input-text "computer science junior, Python, looking for internship but unsure which role" --run-root ../../../.career-pipeline-runs
 python scripts/career_pipeline_run.py --task-type target_job_fit --route target_job_fit --input-text "computer science senior, assess fit for Tencent backend role. JD: Java and MySQL" --run-root ../../../.career-pipeline-runs --source-adapter seed --subagent-adapter mock-blocked
 python scripts/simulate_runtime_run.py --task-type job_search --route job_search --input-text "computer science sophomore, Python, looking for AI internship" --run-root ../../../.career-pipeline-runs
 python scripts/build_subagent_plan.py --run-dir ../../../.career-pipeline-runs/<run_id> --build-prompt-bundles
 python scripts/build_public_source_plan.py --run-dir ../../../.career-pipeline-runs/<run_id>
 python scripts/discover_public_sources.py --run-dir ../../../.career-pipeline-runs/<run_id> --generate-query-plan-only
+python scripts/collect_public_source_results.py --run-dir ../../../.career-pipeline-runs/<run_id> --notes-md <public_source_notes.md>
 python scripts/search_public_sources.py --run-dir ../../../.career-pipeline-runs/<run_id> --provider seed
 python scripts/search_public_sources.py --run-dir ../../../.career-pipeline-runs/<run_id> --provider external-json --search-results-json <search_results.json>
 python scripts/discover_public_sources.py --run-dir ../../../.career-pipeline-runs/<run_id> --search-results-json <search_results.json>
@@ -63,12 +65,14 @@ python scripts/execute_subagent_plan.py --run-dir ../../../.career-pipeline-runs
 Do not run these commands from the repository root as `scripts/*.py`; the `scripts/` path is relative to `.agents/skills/career-pipeline/`. If already at the repository root, use `.agents/skills/career-pipeline/scripts/<script>.py`.
 
 - `scripts/validate_runtime_contracts.py` validates repository role prompts, secondary prompt injections, canonical subagent invocation packets, execution manifests, and blocked/final gate consistency.
+- `scripts/run_product_flow.py` is the product-style entrypoint for ordinary chat intake. It introduces the skill, normalizes the first user profile, builds prompt bundles, public-source query plans, and work orders, and writes a concise user-facing status package without exposing adapter/source internals. It does not claim final career judgment until real public sources and real role outputs are supplied.
 - `scripts/career_pipeline_run.py` is the one-command deterministic user-side runner. With `--source-adapter seed --subagent-adapter mock-blocked`, it creates a complete blocked run with source-discovery artifacts and subagent work orders, but does not claim real subagent execution. With explicit `external-json`, `external-command`, and `--finalize`, it can produce a final package only after role outputs validate.
 - `scripts/simulate_runtime_run.py` creates a private ignored `.career-pipeline-runs/<run_id>/` artifact tree for a no-network blocked run, useful for checking runtime packet shape before building a real runner.
 - `scripts/build_subagent_plan.py` creates a plan-only dispatch queue from a simulated run with `dispatch_strategy = "batched_artifact_handoff"`, `dispatch_batches`, `max_parallel_subagents`, `artifact_handoff_required`, and `close_completed_subagents`. It must not be treated as proof that local subagents executed.
 - `scripts/build_subagent_prompt_bundle.py` creates the concrete derived prompt bundle for one subagent from the static role prompt, runtime context packet, secondary prompt injection, allowed user facts, source policy, and output contract.
 - `scripts/build_public_source_plan.py` creates a policy-bound public-source research task list for official pages, public JDs, verified HR posts, candidate experience, and weak social signals without browsing or logging in.
 - `scripts/discover_public_sources.py` converts search-adapter results into `evidence/allowed_public_sources.generated.json`, rejecting login/private/backend sources and preserving weak-source limits so users do not need to name recruitment websites.
+- `scripts/collect_public_source_results.py` converts controller/browser-collected public URLs or Markdown notes into `search_results` shape so the main Codex controller can pass public evidence forward without asking users to hand-write shell JSON.
 - `scripts/search_public_sources.py` runs a public-source search adapter. The built-in `seed` provider is deterministic and local: it turns query plans into source-candidate URLs from repository collection targets, not live web search. The `external-json` provider accepts browser/search/API results from outside the script and marks them as real-time URL candidates, still requiring discovery, fetch, and backfill checks before evidence use.
 - `scripts/fetch_public_sources.py` fetches allowed public `http(s)` or user-provided `file://` sources into evidence packets. It detects common Chinese charsets, refuses forbidden/login-only source types, and does not bypass platform access controls. For dynamic public pages that static fetch sees only as a JavaScript shell, pass a local browser-rendered text snapshot as `rendered_text_ref` while keeping the public URL in `source_ref`.
 - `scripts/backfill_public_evidence.py` validates and writes externally collected public evidence packets into the run after checking source policy constraints.

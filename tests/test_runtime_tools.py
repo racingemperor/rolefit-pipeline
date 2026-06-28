@@ -40,8 +40,12 @@ PUBLIC_SOURCE_DISCOVERER = (
     ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "discover_public_sources.py"
 )
 PUBLIC_SOURCE_SEARCHER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "search_public_sources.py"
+PUBLIC_SOURCE_RESULT_COLLECTOR = (
+    ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "collect_public_source_results.py"
+)
 SUBAGENT_ADAPTER_RUNNER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "run_subagent_adapter.py"
 CAREER_PIPELINE_RUNNER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "career_pipeline_run.py"
+PRODUCT_FLOW_RUNNER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "run_product_flow.py"
 FINALIZER = ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "finalize_runtime_run.py"
 PROJECT_CANDIDATE_DISCOVERER = (
     ROOT / ".agents" / "skills" / "career-pipeline" / "scripts" / "discover_project_candidates.py"
@@ -76,6 +80,8 @@ def test_skill_md_names_skill_relative_script_commands():
     text = SKILL_MD.read_text(encoding="utf-8")
 
     assert "cd .agents/skills/career-pipeline" in text
+    assert "python scripts/run_product_flow.py" in text
+    assert "python scripts/collect_public_source_results.py" in text
     assert "python scripts/simulate_runtime_run.py" in text
     assert "python scripts/discover_public_sources.py" in text
     assert "Do not run these commands from the repository root as `scripts/*.py`" in text
@@ -158,6 +164,21 @@ def test_runtime_execution_layer_points_to_setup_reference():
     assert "runtime-network-and-adapter-setup.md" in text
     assert "Real subagent execution remains blocked until a concrete adapter is configured and tested" in text
     assert "discover_public_sources.py" in text
+    assert "run_product_flow.py" in text
+    assert "collect_public_source_results.py" in text
+
+
+def test_readme_documents_product_flow_and_public_source_collection_helpers():
+    readme_text = (ROOT / "README.md").read_text(encoding="utf-8")
+    network_text = RUNTIME_NETWORK_ADAPTER_SETUP.read_text(encoding="utf-8")
+
+    assert "scripts/run_product_flow.py" in readme_text
+    assert "scripts/collect_public_source_results.py" in readme_text
+    assert "without hand-writing JSON" in readme_text
+    assert "main Codex controller has already gathered public URLs" in network_text
+    assert "browser search or visible web results" in network_text
+    assert "title=" in network_text
+    assert "snippet=" in network_text
 
 
 def test_job_scout_injection_contains_default_recruitment_source_matrix(tmp_path):
@@ -1287,6 +1308,84 @@ def test_public_source_searcher_accepts_external_json_adapter_results(tmp_path):
     assert json.loads(discover.stdout)["public_source_discovery_response"]["accepted_count"] == 1
 
 
+def test_public_source_result_collector_converts_plain_markdown_urls_to_search_results(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    simulate = run_python(
+        SIMULATOR,
+        "--task-type",
+        "target_job_fit",
+        "--input-text",
+        (
+            "Computer science junior. Target: Tencent backend or AI application internship. "
+            "JD: Python, Java, SQL, LLM app."
+        ),
+        "--run-root",
+        str(run_root),
+        "--route",
+        "target_job_fit",
+    )
+    assert simulate.returncode == 0, simulate.stderr
+    run_id = json.loads(simulate.stdout)["runner_response"]["run_id"]
+    run_dir = run_root / run_id
+    assert run_python(SOURCE_PLAN_BUILDER, "--run-dir", str(run_dir)).returncode == 0
+    assert run_python(PUBLIC_SOURCE_DISCOVERER, "--run-dir", str(run_dir), "--generate-query-plan-only").returncode == 0
+
+    notes_md = tmp_path / "public-source-notes.md"
+    notes_md.write_text(
+        "\n".join(
+            [
+                "- https://careers.tencent.com/ title=Tencent official careers source_type=official_or_primary snippet=Official recruiting entry.",
+                "- https://www.nowcoder.com/jobs/backend-intern title=Backend intern public JD source_type=recruitment_platform_jd snippet=Python Java SQL internship.",
+                "- https://mp.weixin.qq.com/s/tencent-campus-hr title=Tencent HR public recruiting post source_type=verified_hr_public_post snippet=HR screening project experience.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = run_python(
+        PUBLIC_SOURCE_RESULT_COLLECTOR,
+        "--run-dir",
+        str(run_dir),
+        "--notes-md",
+        str(notes_md),
+    )
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)["public_source_result_collection_response"]
+    assert response["exit_status"] == "success"
+    assert response["user_instruction_required"] is False
+    assert response["result_count"] == 3
+    payload = json.loads((run_dir / response["search_results_ref"]).read_text(encoding="utf-8"))
+    assert payload["metadata"]["provider"] == "controller-collected"
+    assert payload["metadata"]["real_time_search"] is True
+    assert payload["metadata"]["user_instruction_required"] is False
+    task_ids = {item["task_id"] for item in payload["search_results"]}
+    assert "target-current-jd-verification" in task_ids
+    assert "company-bound-hr-real-questions" in task_ids
+    assert all(item["url"].startswith("https://") for item in payload["search_results"])
+
+    source_search = run_python(
+        PUBLIC_SOURCE_SEARCHER,
+        "--run-dir",
+        str(run_dir),
+        "--provider",
+        "external-json",
+        "--search-results-json",
+        str(run_dir / response["search_results_ref"]),
+    )
+    assert source_search.returncode == 0, source_search.stderr
+    search_ref = json.loads(source_search.stdout)["public_source_search_response"]["search_results_ref"]
+    discover = run_python(
+        PUBLIC_SOURCE_DISCOVERER,
+        "--run-dir",
+        str(run_dir),
+        "--search-results-json",
+        str(run_dir / search_ref),
+    )
+    assert discover.returncode == 0, discover.stderr
+    assert json.loads(discover.stdout)["public_source_discovery_response"]["accepted_count"] == 3
+
+
 def write_external_adapter_script(path: Path) -> None:
     path.write_text(
         """
@@ -2201,6 +2300,44 @@ def test_one_command_runner_creates_blocked_user_side_run(tmp_path):
     assert (run_dir / "evidence" / "allowed_public_sources.generated.json").is_file()
     assert (run_dir / "invocations" / "subagent_work_orders.json").is_file()
     assert response["blocked_by"]
+
+
+def test_product_flow_runner_returns_user_facing_status_without_internal_adapter_terms(tmp_path):
+    run_root = tmp_path / ".career-pipeline-runs"
+    result = run_python(
+        PRODUCT_FLOW_RUNNER,
+        "--task-type",
+        "job_search",
+        "--route",
+        "job_search",
+        "--input-text",
+        "我是计算机相关专业大三，会一点 Python，想找实习但不知道投什么。",
+        "--run-root",
+        str(run_root),
+    )
+
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)["product_flow_response"]
+    assert response["exit_status"] == "needs_real_role_execution"
+    assert response["run_id"]
+    assert response["user_facing_status"]["skill_intro"].startswith("我是 Career Pipeline")
+    assert response["user_facing_status"]["known_information_summary"]
+    assert response["user_facing_status"]["what_can_be_done_now"]
+    assert response["user_facing_status"]["missing_user_owned_facts"]
+    assert len(response["user_facing_status"]["next_three_actions"]) == 3
+    assert response["controller_handoff"]["work_orders_ref"] == "invocations/subagent_work_orders.json"
+    assert response["controller_handoff"]["public_source_query_plan_ref"] == "evidence/public_source_discovery_log.json"
+    assert response["controller_handoff"]["dispatch_strategy"] == "batched_artifact_handoff"
+    text = json.dumps(response["user_facing_status"], ensure_ascii=False).lower()
+    for forbidden in ["mock-blocked", "external-json", "adapter", "subagent", "runner", "schema", "run_dir"]:
+        assert forbidden not in text
+
+    user_report = run_root / response["run_id"] / response["user_facing_status_ref"]
+    assert user_report.is_file()
+    report_text = user_report.read_text(encoding="utf-8").lower()
+    assert "我是 career pipeline" in report_text
+    for forbidden in ["mock-blocked", "external-json", "adapter", "schema", "run_dir"]:
+        assert forbidden not in report_text
 
 
 def test_one_command_runner_finalizes_with_external_adapters(tmp_path):
