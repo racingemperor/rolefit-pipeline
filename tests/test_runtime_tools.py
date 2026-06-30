@@ -115,8 +115,31 @@ def test_skill_has_ui_metadata_for_direct_invocation():
     text = metadata_path.read_text(encoding="utf-8")
 
     assert 'display_name: "RoleFit Pipeline"' in text
-    assert 'default_prompt: "Use $career-pipeline' in text
+    assert 'default_prompt: "$career-pipeline' in text
+    assert "请用中文介绍这个 Skill" in text
+    assert "分析我的背景" in text
+    assert "Use $career-pipeline" not in text
     assert "allow_implicit_invocation: true" in text
+
+
+def test_direct_invocation_opening_is_chinese_and_not_screenshot_english():
+    skill_text = SKILL_MD.read_text(encoding="utf-8")
+    interaction_flow = (
+        ROOT
+        / ".agents"
+        / "skills"
+        / "career-pipeline"
+        / "references"
+        / "user-interaction-flow.md"
+    ).read_text(encoding="utf-8")
+
+    for text in [skill_text, interaction_flow]:
+        assert "默认用中文" in text
+        assert "我是 RoleFit Pipeline" in text
+        assert "岗位方向判断、能力差距分析、项目/学习规划、简历反向设计" in text
+        assert "请尽量一次性提供" in text
+        assert "RoleFit Pipeline helps analyze your background" not in text
+        assert "Send whatever you have in one batch" not in text
 
 
 def test_resume_polisher_and_portfolio_asset_builder_roles_are_documented():

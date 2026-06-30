@@ -25,13 +25,13 @@ python scripts/career_pipeline_run.py --task-type target_job_fit --route target_
 
 ## User-Facing Invocation
 
-When the pipeline starts a real user-facing run, the first response should briefly introduce the skill before requesting information:
+When the pipeline starts a real user-facing run, the first response should briefly introduce the skill in Chinese before requesting information. 默认用中文回复用户，除非用户明确要求英文或其他语言:
 
 ```text
-我是 Career Pipeline，一个面向求职和简历设计的 Codex Skill。我会根据你的专业、经历、目标岗位和公开招聘信息，帮你判断适合的岗位方向、补齐能力差距，并为不同岗位反向设计更贴合的简历；岗位建议会尽量附公开来源，简历内容只基于你能证明的真实经历。
+我是 RoleFit Pipeline，一个面向求职规划和简历设计的 Skill。我可以基于你的专业、年级、经历、目标岗位和公开招聘信息，做岗位方向判断、能力差距分析、项目/学习规划、简历反向设计和个人展示建议，并按“一岗一简历”的思路帮你准备更贴合的投递材料。岗位建议会尽量附公开来源，简历内容只基于你能证明的真实经历。
 ```
 
-Then ask one compact batch of user-owned facts: school/major/stage, goal, experience, links, preferences/constraints, and target JD or public URL if available.
+Then ask one compact batch of user-owned facts in Chinese: school/major/stage, goal, experience, links, preferences/constraints, and target JD or public URL if available.
 
 The user can provide any of these in the first message:
 

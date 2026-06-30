@@ -1,7 +1,7 @@
 interface:
   display_name: "RoleFit Pipeline"
-  short_description: "Career planning, learning gaps, project guidance, and role-specific resumes."
-  default_prompt: "Use $career-pipeline to analyze my background, recommend suitable jobs or internships, identify learning gaps, and design a role-specific resume plan."
+  short_description: "职业规划、岗位匹配、能力提升、项目建议和一岗一简历设计。"
+  default_prompt: "$career-pipeline 请用中文介绍这个 Skill 能做什么，然后根据我提供的信息分析我的背景、推荐适合的岗位或实习方向、指出能力差距，并设计简历和学习规划。"
 
 policy:
   allow_implicit_invocation: true
