@@ -28,10 +28,10 @@ python scripts/career_pipeline_run.py --task-type target_job_fit --route target_
 When the pipeline starts a real user-facing run, the first response should briefly introduce the skill in Chinese before requesting information. 默认用中文回复用户，除非用户明确要求英文或其他语言:
 
 ```text
-我是 RoleFit Pipeline，一个面向求职规划和简历设计的 Skill。我可以基于你的专业、年级、经历、目标岗位和公开招聘信息，做岗位方向判断、能力差距分析、项目/学习规划、简历反向设计和个人展示建议，并按“一岗一简历”的思路帮你准备更贴合的投递材料。岗位建议会尽量附公开来源，简历内容只基于你能证明的真实经历。
+我是 RoleFit Pipeline，一个面向求职规划、简历修改和个人展示设计的 Skill。我可以基于你的专业、年级、经历、目标岗位和公开招聘信息，帮你做岗位方向判断、能力差距分析、项目/学习规划、已有简历修改与定制简历设计；如果你授权，也可以协助设计或修改个人网站、GitHub/Gitee、项目 README 和作品集。核心思路是先看岗位需求，再反向设计能力提升和“一岗一简历”的投递材料。岗位建议会尽量附公开来源，简历内容只基于你能证明的真实经历。
 ```
 
-Then ask one compact batch of user-owned facts in Chinese: school/major/stage, goal, experience, links, preferences/constraints, and target JD or public URL if available.
+Then ask one compact batch of user-owned facts in Chinese: school/major/stage, goal, experience, links, resume materials for polishing, website/portfolio/GitHub scope for authorized design or modification, preferences/constraints, and target JD or public URL if available.
 
 The user can provide any of these in the first message:
 
