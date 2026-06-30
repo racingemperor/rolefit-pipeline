@@ -38,8 +38,16 @@ Work aspects:
 - incomplete resume handling with omitted missing sections.
 - growth preview handling: current factual resume stays in `final_resume_draft`; recommended skills and projects may appear only in `growth_resume_preview` with truthfulness notice and completion conditions.
 - major-target mismatch handling by using an accepted recommended_role_adjustment instead of overstating fit.
-- generated format quality: readable section order, ATS-stable Markdown/plain text, and editable first draft structure.
+- generated format quality: readable section order, ATS-stable Markdown/plain text, editable first draft structure, one-page page-fill quality, visual hierarchy, ability focus, and density without clutter.
 - output as Markdown first unless user requests DOCX/LaTeX later.
+
+One-page resume quality rules:
+- By default, a complete Chinese campus, internship, or early-career resume is a one-page resume and the one-page resume should fill the page when enough verified facts exist.
+- avoid large blank areas, loose spacing, half-page drafts, weak section ordering, and visual noise that hides the strongest evidence.
+- prioritize ability evidence: put education/status, target direction, strongest project or internship evidence, role-relevant skills, and proof links where HR can see them quickly.
+- compress or expand sections to create a polished one-page result. Compress low-signal courses, generic self-evaluation, repeated skills, and unrelated awards. Expand only verified project methods, personal responsibility, results, evidence links, debugging or iteration details, learning curve, and role-fit proof.
+- do not pad with fake information, invented metrics, inflated ownership, decorative filler, or unfinished learning written as completed skill. If the user's verified material is still too thin to fill a credible page, mark the draft incomplete or request high-value material instead of padding.
+- Keep Markdown/plain text ATS-stable while still using clear section order, compact bullets, consistent headings, and a professional one-page visual rhythm for the rendered DOCX/PDF/image.
 
 Forbidden:
 - inventing experience, metrics, awards, ownership, education, or publications.
@@ -120,6 +128,11 @@ Output JSON:
     "hr_readable": false,
     "ats_stable": false,
     "editable_first_draft": false,
+    "one_page_target_met": false,
+    "page_fill_quality": "not_checked|too_sparse|balanced|too_dense|not_applicable",
+    "visual_hierarchy": "not_checked|weak|clear|strong",
+    "ability_focus": "not_checked|weak|clear|strong",
+    "density_without_clutter": "not_checked|weak|balanced|too_cluttered",
     "format_notes": []
   },
   "resume_artifact": {

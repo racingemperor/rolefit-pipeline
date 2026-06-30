@@ -814,11 +814,29 @@
       "FactualReviewer"
     ],
     "rule": "Format readability, ATS stability, section ordering, and one-page polish are generated and checked after drafting. They should not heavily penalize the user's raw input unless the input is too incomplete to map into sections.",
+    "one_page_policy": {
+      "default_target": "one_polished_page",
+      "fill_target": "fill_main_body_without_large_blank_areas",
+      "no_padding_or_fabrication": true,
+      "if_still_too_thin": "mark_incomplete_or_request_material",
+      "zh_cn_rule": "默认生成一页纸中文简历；在事实材料足够时，主体区域应基本填满一页，避免半页空白、松散排版或为了占版面而编造内容。"
+    },
+    "layout_quality_rules": [
+      "Top area should make name, education status, target direction, and strongest evidence visible within a 10-second HR scan.",
+      "Use consistent section titles, compact spacing, aligned bullets, and stable printable A4 layout.",
+      "Prefer 2-4 evidence-heavy projects or experiences over many thin fragments.",
+      "If material is rich, compress low-signal courses, generic traits, and repeated skills before spilling beyond one page.",
+      "If material is thin, expand only verified coursework, project method, result, proof link, responsibility boundary, learning curve, and role-intent evidence; never add fake achievements."
+    ],
     "checks": [
       "section order is readable for HR first screen",
       "ATS/plain-text version avoids image-only layout and complex text boxes",
       "keywords are placed naturally without stuffing",
-      "generated draft remains editable by user follow-up instructions"
+      "generated draft remains editable by user follow-up instructions",
+      "page_fill_quality",
+      "visual_hierarchy",
+      "ability_focus",
+      "density_without_clutter"
     ]
   },
   "validation_rules": [

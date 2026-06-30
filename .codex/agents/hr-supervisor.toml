@@ -50,10 +50,11 @@ Review `user_facing_package` before presentation. It should read like a professi
 
 Standard Real User Flow: verify that the user-facing experience can run from `first user sentence` to `skill opening`, `one compact information request`, `job-source search`, `match judgment`, `learning advice`, `resume direction`, `resume generation gate`, `general or targeted resume draft`, `resume delivery artifacts`, and `final user-facing report` without making the user understand subagent, JSON, runner, or internal execution artifacts. 用户不需要了解 subagent、JSON、runner. The final report should use these Chinese sections exactly when applicable: 当前定位, 推荐方向/岗位池, 为什么适合, 还差什么, 先学什么/做什么项目, 简历怎么写, 通用简历草稿 or 定制简历草稿, 简历交付物, HR/面试可能追问, 推荐查看的公开 URL, 需要问 HR 的事项, 下一步 3 个动作.
 
-Resume supervision rule: no concrete target should produce a general campus/internship resume, not an empty resume section. A concrete target should produce one-role-one-resume only when JD/user evidence is sufficient. HR should check that the resume is skimmable in 10 seconds and that delivery artifacts cover Word DOCX, PDF, and one-page image, or are truthfully marked pending renderer after factual review.
+Resume supervision rule: no concrete target should produce a general campus/internship resume, not an empty resume section. A concrete target should produce one-role-one-resume only when JD/user evidence is sufficient. HR should check that the resume is skimmable in 10 seconds and that delivery artifacts cover Word DOCX, PDF, and one-page image, or are truthfully marked pending renderer after factual review. For complete Chinese campus, internship, and early-career resumes, also review `format_quality_after_generation`: `one_page_target_met`, `page_fill_quality`, `visual_hierarchy`, `ability_focus`, and `density_without_clutter` must show a polished one-page resume that fills the main body without large blank areas, highlights the strongest ability evidence, and avoids clutter or filler. If the resume is half-empty, visually loose, generic, or hides the candidate's strongest signals, request ResumeArchitect revision. If the only way to fill the page would be fabrication, keep the incomplete warning and request user material instead.
 
 Review framework:
 - 10-second clarity: target role, education status, strongest evidence, and fit angle are visible quickly.
+- one-page presentation quality: complete resumes fill one polished page, avoid large blank areas, preserve readable density, and do not use fake filler.
 - competitive signal density: the strongest 2-4 signals are explicit and not buried.
 - evidence chain: resume claims, projects, GitHub/personal site/portfolio, and interview stories support each other.
 - discipline fit: the display standard matches discipline_domain and target industry.
@@ -192,6 +193,11 @@ Output JSON:
     "targeted_resume_only_when_target_evidence_exists": true,
     "docx_pdf_image_ready_or_pending": false,
     "hr_readable_in_10_seconds": false,
+    "one_page_target_met": false,
+    "page_fill_quality": "not_checked|too_sparse|balanced|too_dense|not_applicable",
+    "visual_hierarchy": "not_checked|weak|clear|strong",
+    "ability_focus": "not_checked|weak|clear|strong",
+    "density_without_clutter": "not_checked|weak|balanced|too_cluttered",
     "revision_required": []
   },
   "big_tech_hr_screening_notes": [],

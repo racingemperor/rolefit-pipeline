@@ -274,7 +274,69 @@ def write_pdf_and_png(blocks: list[dict[str, str]], pdf_path: Path, image_path: 
     return page_count
 
 
-def render_one_resume(draft_path: Path, basename: str, out_dir: Path) -> tuple[list[dict[str, str]], int]:
+def estimate_layout_quality(blocks: list[dict[str, str]], page_count: int) -> dict[str, Any]:
+    page_height = 842
+    margin = 48
+    usable_height = page_height - (margin * 2)
+    y = float(margin)
+    first_page_used_height = 0.0
+    line_count = 0
+
+    for block in blocks:
+        block_type = block["type"]
+        text = block["text"]
+        if block_type == "title":
+            lines = wrap_text(text, 24)
+            spacing = 27
+            before_lines = 0
+        elif block_type == "section":
+            lines = wrap_text(text, 32)
+            spacing = 20
+            before_lines = 12
+        elif block_type == "bullet":
+            lines = wrap_text(f"- {text}", 44)
+            spacing = 16
+            before_lines = 0
+        else:
+            lines = wrap_text(text, 46)
+            spacing = 16
+            before_lines = 0
+
+        block_height = before_lines + (spacing * len(lines)) + 4
+        if first_page_used_height < usable_height:
+            first_page_used_height = min(max(y + block_height - margin, first_page_used_height), usable_height)
+        y += block_height
+        line_count += len(lines)
+
+    fill_ratio = round(max(min(first_page_used_height / usable_height, 1.0), 0.01), 2)
+    warnings: list[str] = []
+    if page_count > 1:
+        page_fill_quality = "too_dense"
+        warnings.append("exceeds_one_page_target")
+    elif fill_ratio < 0.55 or line_count < 18:
+        page_fill_quality = "too_sparse"
+        warnings.append("large_blank_area_risk")
+    elif fill_ratio > 0.94 and line_count > 55:
+        page_fill_quality = "too_dense"
+        warnings.append("too_dense_or_cluttered")
+    else:
+        page_fill_quality = "balanced"
+
+    section_count = sum(1 for block in blocks if block["type"] == "section")
+    if section_count < 4:
+        warnings.append("few_sections_for_complete_resume")
+
+    return {
+        "first_page_fill_ratio_estimate": fill_ratio,
+        "page_fill_quality": page_fill_quality,
+        "line_count": line_count,
+        "block_count": len(blocks),
+        "section_count": section_count,
+        "layout_warnings": warnings,
+    }
+
+
+def render_one_resume(draft_path: Path, basename: str, out_dir: Path) -> tuple[list[dict[str, str]], int, dict[str, Any]]:
     blocks = parse_markdown(read_text(draft_path))
     safe_basename = sanitize_basename(basename)
     docx_path = out_dir / f"{safe_basename}.docx"
@@ -282,12 +344,13 @@ def render_one_resume(draft_path: Path, basename: str, out_dir: Path) -> tuple[l
     image_path = out_dir / f"{safe_basename}.png"
     write_docx(blocks, docx_path)
     page_count = write_pdf_and_png(blocks, pdf_path, image_path)
+    layout_quality = estimate_layout_quality(blocks, page_count)
     artifacts = [
         {"format": "docx", "artifact_ref": str(docx_path), "status": "ready", "notes": "Editable Word document."},
         {"format": "pdf", "artifact_ref": str(pdf_path), "status": "ready", "notes": "Printable PDF."},
         {"format": "image", "artifact_ref": str(image_path), "status": "ready", "notes": "First-page PNG preview."},
     ]
-    return artifacts, page_count
+    return artifacts, page_count, layout_quality
 
 
 def render_all_resume_versions(args: argparse.Namespace) -> dict[str, Any]:
@@ -302,7 +365,7 @@ def render_all_resume_versions(args: argparse.Namespace) -> dict[str, Any]:
         draft_path = out_dir / version["markdown_filename"]
         draft_path.write_text(version["markdown"].rstrip() + "\n", encoding="utf-8")
         basename = args.basename if version["version_key"] == "resume_draft" else version["basename"]
-        artifacts, version_page_count = render_one_resume(draft_path, basename, out_dir)
+        artifacts, version_page_count, layout_quality = render_one_resume(draft_path, basename, out_dir)
         if index == 0:
             page_count = version_page_count
         rendered_versions.append(
@@ -311,6 +374,7 @@ def render_all_resume_versions(args: argparse.Namespace) -> dict[str, Any]:
                 "source_draft_ref": str(draft_path),
                 "resume_delivery_artifacts": artifacts,
                 "page_count": version_page_count,
+                "layout_quality": layout_quality,
             }
         )
     primary = rendered_versions[0]
@@ -323,6 +387,7 @@ def render_all_resume_versions(args: argparse.Namespace) -> dict[str, Any]:
             "resume_delivery_artifacts": primary["resume_delivery_artifacts"],
             "resume_version_artifacts": rendered_versions,
             "page_count": page_count,
+            "layout_quality": primary["layout_quality"],
         }
     }
 
@@ -334,7 +399,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
     basename = sanitize_basename(args.basename)
     out_dir = args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
-    artifacts, page_count = render_one_resume(draft_path, basename, out_dir)
+    artifacts, page_count, layout_quality = render_one_resume(draft_path, basename, out_dir)
     return {
         "resume_render_response": {
             "exit_status": "success",
@@ -343,6 +408,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
             "out_dir_ref": str(out_dir),
             "resume_delivery_artifacts": artifacts,
             "page_count": page_count,
+            "layout_quality": layout_quality,
         }
     }
 

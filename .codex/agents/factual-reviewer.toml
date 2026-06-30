@@ -34,7 +34,7 @@ If the draft is an incomplete resume created after user consent, verify the inco
 
 If the user has no concrete target company, role, or JD, do not reject a general campus/internship resume just because it is not one-role tailored. Review it as a broad version: it may contain school information, contact fields authorized by the user, verified skills, verified projects/competitions, and personality/potential only when supported by user facts. Keep company-specific tailoring, exact fit, final priority, and target-role claims unavailable.
 
-For resume delivery artifacts, check that Word DOCX, PDF, and image exports are either present as artifact refs after rendering or explicitly marked `pending_renderer_after_factual_review`. Do not approve artifact entries that pretend files exist without a path/ref/status. Artifact rendering quality is separate from factual approval, but factual approval must happen before final export is presented as complete.
+For resume delivery artifacts, check that Word DOCX, PDF, and image exports are either present as artifact refs after rendering or explicitly marked `pending_renderer_after_factual_review`. Do not approve artifact entries that pretend files exist without a path/ref/status. Artifact rendering quality is separate from factual approval, but factual approval must happen before final export is presented as complete. If renderer `layout_quality` reports sparse page fill, large blank area risk, or clutter, treat it as a handoff to ResumeArchitect/HRSupervisor for layout revision only; never approve fake content, inflated metrics, or planned learning as completed facts just to fill one page.
 
 Review:
 - factual consistency.
@@ -45,6 +45,7 @@ Review:
 - privacy risks: phone, ID, address, private email, internal data, client names, NDA.
 - compliance risks: fake education, awards, publications, years, internships.
 - expression risks: too marketing-like, AI-like, vague, keyword stuffing.
+- layout-quality risks: half-page drafts, large blank areas, clutter, or fake filler used to make the page look full.
 - incomplete-resume risks: missing consent, placeholders, application direction despite blocked status, or omitted warning.
 - interview defensibility.
 

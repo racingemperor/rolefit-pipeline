@@ -4528,6 +4528,51 @@ def test_resume_generation_gate_uses_lower_threshold_and_candidate_information_f
     assert "generate an editable first draft" in architect_prompt
 
 
+def test_resume_generation_quality_requires_full_one_page_and_ability_focus():
+    resume_db = json.loads(
+        (ROOT / "data" / "resume_formats" / "resume_format_database.zh-CN.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    architect_prompt = (ROOT / ".codex" / "agents" / "resume-architect.toml").read_text(
+        encoding="utf-8"
+    )
+    hr_prompt = (ROOT / ".codex" / "agents" / "hr-supervisor.toml").read_text(
+        encoding="utf-8"
+    )
+
+    format_quality = resume_db["format_quality_after_generation"]
+    one_page_policy = format_quality["one_page_policy"]
+    assert one_page_policy["default_target"] == "one_polished_page"
+    assert one_page_policy["fill_target"] == "fill_main_body_without_large_blank_areas"
+    assert one_page_policy["no_padding_or_fabrication"] is True
+    assert one_page_policy["if_still_too_thin"] == "mark_incomplete_or_request_material"
+
+    assert "page_fill_quality" in format_quality["checks"]
+    assert "visual_hierarchy" in format_quality["checks"]
+    assert "ability_focus" in format_quality["checks"]
+    assert "density_without_clutter" in format_quality["checks"]
+
+    for phrase in [
+        "one-page resume should fill the page",
+        "avoid large blank areas",
+        "prioritize ability evidence",
+        "compress or expand sections",
+        "do not pad with fake information",
+    ]:
+        assert phrase in architect_prompt
+
+    for field in [
+        "one_page_target_met",
+        "page_fill_quality",
+        "visual_hierarchy",
+        "ability_focus",
+        "density_without_clutter",
+    ]:
+        assert field in architect_prompt
+        assert field in hr_prompt
+
+
 def test_resume_prompts_require_general_resume_and_delivery_artifacts_without_target():
     gate_prompt = (ROOT / ".codex" / "agents" / "resume-format-gate.toml").read_text(
         encoding="utf-8"
@@ -4608,6 +4653,12 @@ def test_resume_renderer_exports_docx_pdf_png_from_markdown(tmp_path):
     assert artifact_refs["pdf"].suffix == ".pdf"
     assert artifact_refs["image"].suffix == ".png"
     assert response["page_count"] >= 1
+    layout_quality = response["layout_quality"]
+    assert 0 < layout_quality["first_page_fill_ratio_estimate"] <= 1
+    assert layout_quality["line_count"] >= 1
+    assert layout_quality["block_count"] >= 1
+    assert "page_fill_quality" in layout_quality
+    assert "layout_warnings" in layout_quality
 
 
 def test_resume_renderer_extracts_resume_from_decision_package(tmp_path):
